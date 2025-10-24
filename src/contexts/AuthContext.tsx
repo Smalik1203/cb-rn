@@ -60,9 +60,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // First get user from users table
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('id, full_name, email, phone, role, school_code, school_name, class_instance_id, created_at')
+        .select('id, full_name, email, phone, role, school_code, class_instance_id, created_at')
         .eq('id', currentUser.id)
-        .single();
+        .maybeSingle();
 
       if (userError) {
         throw userError;
@@ -81,7 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         phone: userData.phone,
         role: userData.role,
         school_code: userData.school_code,
-        school_name: userData.school_name,
+        school_name: null,
         class_instance_id: userData.class_instance_id,
       };
 
@@ -90,15 +90,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const { data: studentData, error: studentError } = await supabase
             .from('student')
-            .select('id, full_name, email, phone, auth_user_id, school_code, school_name, class_instance_id, student_code, created_at')
+            .select('id, full_name, email, phone, auth_user_id, school_code, class_instance_id, student_code, created_at')
             .eq('auth_user_id', currentUser.id)
-            .single();
+            .maybeSingle();
           
           if (studentError) {
             // Handle error silently
           } else if (studentData) {
             profile.student = studentData;
             profile.class_instance_id = studentData.class_instance_id;
+            profile.school_name = studentData.school_code;
           }
         } catch (error) {
           // Handle error silently
@@ -107,14 +108,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const { data: adminData, error: adminError } = await supabase
             .from('admin')
-            .select('id, full_name, email, phone, role, auth_user_id, school_code, school_name, created_at')
+            .select('id, full_name, email, phone, role, auth_user_id, school_code, created_at')
             .eq('auth_user_id', currentUser.id)
-            .single();
+            .maybeSingle();
           
           if (adminError) {
             // Handle error silently
           } else if (adminData) {
             profile.admin = adminData;
+            profile.school_name = adminData.school_code;
           }
         } catch (error) {
           // Handle error silently
@@ -126,9 +128,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const { data: classData, error: classError } = await supabase
             .from('class_instances')
-            .select('id, grade, section, school_code, academic_year_id, class_id, class_teacher_id, created_by, created_at')
+            .select('id, grade, section, school_code, academic_year_id, class_teacher_id, created_by, created_at')
             .eq('id', profile.class_instance_id)
-            .single();
+            .maybeSingle();
           
           if (classError) {
             // Handle error silently
@@ -207,9 +209,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
+    let mounted = true;
+
     const initializeAuth = async () => {
       try {
         const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+        if (!mounted) return;
 
         setSession(currentSession);
         if (currentSession?.user) {
@@ -217,27 +223,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await fetchUserProfile(currentSession.user);
         }
       } catch (error) {
-        setLoading(false);
+        console.error('Auth initialization error:', error);
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
-    };
-
-    // Add a timeout to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      setLoading(false);
-    }, 10000); // 10 second timeout
-
-    initializeAuth();
-
-    return () => {
-      clearTimeout(timeoutId);
     };
 
     initializeAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
+        if (!mounted) return;
+
         try {
           setSession(currentSession);
           setUser(currentSession?.user ?? null);
@@ -247,20 +246,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else {
             setProfile(null);
           }
-
-          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-            setLoading(false);
-          } else if (event === 'SIGNED_OUT') {
-            setProfile(null);
-            setLoading(false);
-          }
         } catch (error) {
-          setLoading(false);
+          console.error('Auth state change error:', error);
         }
       }
     );
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, [fetchUserProfile]);

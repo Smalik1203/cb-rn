@@ -1,20 +1,15 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, RefreshControl } from 'react-native';
-import { Text, Card, ActivityIndicator, Surface } from 'react-native-paper';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Calendar, CheckSquare, DollarSign, BarChart3, Users, BookOpen, TrendingUp, Activity, AlertCircle, Clock, User, School } from 'lucide-react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { Text } from 'react-native-paper';
+import { Calendar, CheckSquare, DollarSign, BarChart3, BookOpen, Clock, TrendingUp, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '@/src/contexts/AuthContext';
-import { useAppScope } from '@/src/contexts/AppScopeContext';
 import { useRouter } from 'expo-router';
-import { colors, typography, spacing, borderRadius, shadows, gradients } from '@/lib/design-system';
+import { colors, typography, spacing, borderRadius, shadows } from '@/lib/design-system';
 import { useDashboardStats } from '@/src/features/dashboard/hooks/useDashboardStats';
 import { ScopeSelector } from '@/src/components/common/ScopeSelector';
 
-const { width } = Dimensions.get('window');
-
 export default function HomeScreen() {
   const { profile } = useAuth();
-  const { scope } = useAppScope();
   const router = useRouter();
   const { data: stats, isLoading, error, refetch } = useDashboardStats();
   const [refreshing, setRefreshing] = React.useState(false);
@@ -28,40 +23,40 @@ export default function HomeScreen() {
   const quickActions = [
     {
       title: 'Timetable',
-      description: 'Daily Schedule',
+      description: 'View schedule',
       icon: Calendar,
-      color: '#3B82F6',
-      onPress: () => router.push('/timetable'),
+      color: colors.primary[500],
+      route: '/timetable',
     },
     {
       title: 'Attendance',
-      description: 'Mark & View',
+      description: 'Mark & view',
       icon: CheckSquare,
-      color: '#10B981',
-      onPress: () => router.push('/attendance'),
+      color: colors.success[500],
+      route: '/attendance',
     },
     {
       title: 'Fees',
-      description: 'Payment Details',
+      description: 'Payments',
       icon: DollarSign,
-      color: '#F59E0B',
-      onPress: () => router.push('/fees'),
+      color: colors.warning[500],
+      route: '/fees',
     },
     {
-      title: 'Analytics',
-      description: 'Performance',
-      icon: BarChart3,
-      color: '#8B5CF6',
-      onPress: () => router.push('/analytics'),
+      title: 'Resources',
+      description: 'Learning',
+      icon: BookOpen,
+      color: colors.info[500],
+      route: '/resources',
     },
   ];
 
   if (error) {
     return (
       <View style={styles.errorContainer}>
-        <AlertCircle size={64} color={colors.error} />
-        <Text variant="titleLarge" style={styles.errorTitle}>Unable to load dashboard</Text>
-        <Text variant="bodyMedium" style={styles.errorMessage}>
+        <AlertCircle size={48} color={colors.error[500]} />
+        <Text style={styles.errorTitle}>Unable to load dashboard</Text>
+        <Text style={styles.errorMessage}>
           {error instanceof Error ? error.message : 'Something went wrong'}
         </Text>
         <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
@@ -73,36 +68,14 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Modern Header */}
-      <LinearGradient
-        colors={['#667eea', '#764ba2']}
-        style={styles.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.headerContent}>
-          <View style={styles.welcomeSection}>
-            <Text style={styles.welcomeTitle}>Good Morning!</Text>
-            <Text style={styles.welcomeSubtitle}>{profile?.full_name || 'User'}</Text>
-            <View style={styles.roleContainer}>
-              <View style={styles.roleBadge}>
-                <Text style={styles.roleText}>{profile?.role?.toUpperCase()}</Text>
-              </View>
-              <View style={styles.schoolInfo}>
-                <School size={16} color="rgba(255,255,255,0.8)" />
-                <Text style={styles.schoolText}>{profile?.school_name}</Text>
-              </View>
-            </View>
-          </View>
-          <View style={styles.headerIcon}>
-            <User size={32} color="white" />
-          </View>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.greeting}>Good day</Text>
+          <Text style={styles.userName}>{profile?.full_name || 'User'}</Text>
         </View>
-      </LinearGradient>
-
-      {/* Scope Selector for Admins */}
-      <View style={styles.scopeSelectorContainer}>
-        <ScopeSelector compact={true} />
+        <View style={styles.roleBadge}>
+          <Text style={styles.roleText}>{profile?.role?.toUpperCase()}</Text>
+        </View>
       </View>
 
       <ScrollView
@@ -112,87 +85,87 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
-        {/* Stats Cards - Mobile Vertical Layout */}
+        <View style={styles.scopeContainer}>
+          <ScopeSelector compact={true} />
+        </View>
+
         {!isLoading && stats && (
           <View style={styles.statsContainer}>
             <View style={styles.statCard}>
-              <View style={[styles.statIcon, { backgroundColor: '#10B981' }]}>
-                <CheckSquare size={20} color="white" />
+              <View style={[styles.statIconContainer, { backgroundColor: colors.success[50] }]}>
+                <TrendingUp size={24} color={colors.success[600]} />
               </View>
               <View style={styles.statContent}>
                 <Text style={styles.statValue}>{stats.todayAttendance}%</Text>
-                <Text style={styles.statLabel}>Attendance</Text>
+                <Text style={styles.statLabel}>Today's Attendance</Text>
               </View>
             </View>
-            
+
             <View style={styles.statCard}>
-              <View style={[styles.statIcon, { backgroundColor: '#3B82F6' }]}>
-                <BookOpen size={20} color="white" />
+              <View style={[styles.statIconContainer, { backgroundColor: colors.primary[50] }]}>
+                <BookOpen size={24} color={colors.primary[600]} />
               </View>
               <View style={styles.statContent}>
                 <Text style={styles.statValue}>{stats.totalClasses}</Text>
-                <Text style={styles.statLabel}>Classes</Text>
+                <Text style={styles.statLabel}>Total Classes</Text>
               </View>
             </View>
-            
+
             <View style={styles.statCard}>
-              <View style={[styles.statIcon, { backgroundColor: '#8B5CF6' }]}>
-                <TrendingUp size={20} color="white" />
+              <View style={[styles.statIconContainer, { backgroundColor: colors.info[50] }]}>
+                <BarChart3 size={24} color={colors.info[600]} />
               </View>
               <View style={styles.statContent}>
-                <Text style={styles.statValue}>{stats.currentGrade}</Text>
-                <Text style={styles.statLabel}>Grade</Text>
+                <Text style={styles.statValue}>Grade {stats.currentGrade}</Text>
+                <Text style={styles.statLabel}>Current Level</Text>
               </View>
             </View>
           </View>
         )}
 
-        {/* Quick Actions - Mobile Vertical Layout */}
-        <View style={styles.actionsContainer}>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.actionsGrid}>
             {quickActions.map((action, index) => (
               <TouchableOpacity
                 key={index}
                 style={styles.actionCard}
-                onPress={action.onPress}
+                onPress={() => router.push(action.route as any)}
                 activeOpacity={0.7}
               >
-                <View style={[styles.actionIcon, { backgroundColor: action.color + '20' }]}>
-                  <action.icon size={20} color={action.color} />
+                <View style={[styles.actionIconContainer, { backgroundColor: action.color + '15' }]}>
+                  <action.icon size={24} color={action.color} />
                 </View>
-                <View style={styles.actionText}>
-                  <Text style={styles.actionTitle}>{action.title}</Text>
-                  <Text style={styles.actionDescription}>{action.description}</Text>
-                </View>
+                <Text style={styles.actionTitle}>{action.title}</Text>
+                <Text style={styles.actionDescription}>{action.description}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* Recent Activity */}
-        <View style={styles.activityContainer}>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Activity</Text>
-          <Surface style={styles.activityCard} elevation={2}>
+          <View style={styles.activityCard}>
             <View style={styles.activityItem}>
-              <View style={[styles.activityIcon, { backgroundColor: '#10B981' }]}>
-                <Clock size={16} color="white" />
+              <View style={[styles.activityIcon, { backgroundColor: colors.success[50] }]}>
+                <Clock size={18} color={colors.success[600]} />
               </View>
               <View style={styles.activityContent}>
-                <Text style={styles.activityTitle}>Last Attendance Marked</Text>
-                <Text style={styles.activitySubtitle}>October 21, 2025</Text>
+                <Text style={styles.activityTitle}>Attendance Marked</Text>
+                <Text style={styles.activityTime}>Today at 9:00 AM</Text>
               </View>
             </View>
+
             <View style={styles.activityItem}>
-              <View style={[styles.activityIcon, { backgroundColor: '#3B82F6' }]}>
-                <Calendar size={16} color="white" />
+              <View style={[styles.activityIcon, { backgroundColor: colors.primary[50] }]}>
+                <Calendar size={18} color={colors.primary[600]} />
               </View>
               <View style={styles.activityContent}>
                 <Text style={styles.activityTitle}>Timetable Updated</Text>
-                <Text style={styles.activitySubtitle}>October 17, 2025</Text>
+                <Text style={styles.activityTime}>2 days ago</Text>
               </View>
             </View>
-          </Surface>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -202,237 +175,181 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background.app,
   },
   header: {
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-  },
-  headerContent: {
+    backgroundColor: colors.surface.primary,
+    padding: spacing.lg,
+    paddingTop: spacing.xl + 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  welcomeSection: {
-    flex: 1,
-  },
-  headerIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scopeSelectorContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surface.primary,
+    alignItems: 'flex-start',
     borderBottomWidth: 1,
     borderBottomColor: colors.border.light,
   },
-  welcomeTitle: {
-    color: 'white',
-    fontSize: 28,
-    fontWeight: '700',
+  greeting: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.tertiary,
     marginBottom: 4,
   },
-  welcomeSubtitle: {
-    color: 'white',
-    fontSize: 16,
-    opacity: 0.9,
-    marginBottom: 12,
-  },
-  roleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  userName: {
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
   },
   roleBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    borderRadius: 20,
+    backgroundColor: colors.primary[50],
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.full,
   },
   roleText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  schoolInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  schoolText: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 14,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.primary[700],
   },
   scrollView: {
     flex: 1,
   },
+  scopeContainer: {
+    padding: spacing.md,
+    backgroundColor: colors.surface.primary,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
   statsContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    gap: 12,
+    padding: spacing.md,
+    gap: spacing.sm,
   },
   statCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    ...shadows.sm,
   },
-  statIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  statIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: spacing.sm,
   },
   statContent: {
     flex: 1,
   },
   statValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
     marginBottom: 2,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
+    fontSize: typography.fontSize.sm,
+    color: colors.text.tertiary,
   },
-  actionsContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 30,
+  section: {
+    padding: spacing.md,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 16,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.md,
   },
   actionsGrid: {
-    gap: 12,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
   actionCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    width: '48%',
+    ...shadows.sm,
   },
-  actionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  actionIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
-  },
-  actionText: {
-    flex: 1,
+    marginBottom: spacing.sm,
   },
   actionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
     marginBottom: 2,
   },
   actionDescription: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  activityContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 30,
-    paddingBottom: 30,
+    fontSize: typography.fontSize.sm,
+    color: colors.text.tertiary,
   },
   activityCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    ...shadows.sm,
   },
   activityItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    paddingVertical: spacing.sm,
   },
   activityIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: spacing.sm,
   },
   activityContent: {
     flex: 1,
   },
   activityTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.primary,
     marginBottom: 2,
   },
-  activitySubtitle: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  loadingText: {
-    marginTop: 16,
-    color: '#6B7280',
-    fontSize: 16,
+  activityTime: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.tertiary,
   },
   errorContainer: {
     flex: 1,
+    backgroundColor: colors.background.app,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
-    backgroundColor: '#F8FAFC',
+    padding: spacing.xl,
   },
   errorTitle: {
-    marginTop: 24,
-    marginBottom: 8,
-    color: '#1F2937',
-    textAlign: 'center',
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
   },
   errorMessage: {
-    color: '#6B7280',
+    fontSize: typography.fontSize.base,
+    color: colors.text.tertiary,
     textAlign: 'center',
-    marginBottom: 32,
-    fontSize: 16,
+    marginBottom: spacing.lg,
   },
   retryButton: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
+    backgroundColor: colors.primary[500],
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
   },
   retryButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.inverse,
   },
 });

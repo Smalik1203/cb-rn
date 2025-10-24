@@ -7,7 +7,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { useClassSelection } from '@/src/contexts/ClassSelectionContext';
 import { ClassSelector } from '@/src/components/ClassSelector';
 import { Calendar } from '@/src/components/calendar/Calendar';
-import { colors, typography, spacing, borderRadius, shadows, gradients } from '@/lib/design-system';
+import { colors, typography, spacing, borderRadius, shadows } from '@/lib/design-system';
 
 export default function CalendarScreen() {
   const { profile } = useAuth();

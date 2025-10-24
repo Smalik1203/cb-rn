@@ -12,7 +12,7 @@ import { FeeAnalytics } from '@/src/components/fees/FeeAnalytics';
 import { useStudentFees, useClassStudentsFees } from '@/src/features/fees/hooks/useFees';
 import { ThreeStateView } from '@/src/components/common/ThreeStateView';
 import { useThreeStateQuery, emptyConditions } from '@/src/hooks/useThreeStateQuery';
-import { colors, spacing, borderRadius, shadows, gradients, typography } from '@/lib/design-system';
+import { colors, spacing, borderRadius, shadows, typography } from '@/lib/design-system';
 
 export default function FeesScreen() {
   const { profile } = useAuth();

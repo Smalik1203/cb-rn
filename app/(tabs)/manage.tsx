@@ -4,7 +4,7 @@ import { Text, Card, Button, SegmentedButtons, Chip, List, ActivityIndicator } f
 import { LinearGradient } from 'expo-linear-gradient';
 import { Users, UserPlus, Settings, Shield, BookOpen, Calendar, TrendingUp, Activity, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '@/src/contexts/AuthContext';
-import { colors, typography, spacing, borderRadius, shadows, gradients } from '@/lib/design-system';
+import { colors, typography, spacing, borderRadius, shadows } from '@/lib/design-system';
 import { useUserStats, useRecentUsers } from '@/src/features/users/hooks/useUsers';
 import { useClassStats, useClassesList } from '@/src/features/classes/hooks/useClasses';
 

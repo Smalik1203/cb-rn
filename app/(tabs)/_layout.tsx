@@ -1,8 +1,7 @@
-// @ts-nocheck
 import { Tabs } from 'expo-router';
-import { Home, Calendar, CheckSquare, DollarSign, MessageSquare, BarChart3, Users, Settings, CalendarDays, BookOpen } from 'lucide-react-native';
+import { Home, Calendar, CheckSquare, DollarSign, BarChart3, Users, Settings, CalendarDays, BookOpen } from 'lucide-react-native';
 import { useAuth } from '@/src/contexts/AuthContext';
-import { colors, typography } from '@/lib/design-system';
+import { colors, typography, spacing } from '@/lib/design-system';
 
 export default function TabLayout() {
   const { profile } = useAuth();
@@ -15,19 +14,19 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary[500],
-        tabBarInactiveTintColor: colors.neutral[400],
+        tabBarActiveTintColor: colors.primary[600],
+        tabBarInactiveTintColor: colors.neutral[500],
         tabBarStyle: {
           backgroundColor: colors.surface.primary,
           borderTopWidth: 1,
-          borderTopColor: colors.neutral[200],
-          paddingTop: 8,
-          paddingBottom: 8,
-          height: 70,
+          borderTopColor: colors.border.light,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing.sm,
+          height: 65,
         },
         tabBarLabelStyle: {
           fontSize: typography.fontSize.xs,
-          fontWeight: typography.fontWeight.medium,
+          fontWeight: typography.fontWeight.semibold,
           marginTop: 4,
         },
         tabBarIconStyle: {

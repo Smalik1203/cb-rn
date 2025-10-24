@@ -7,7 +7,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { useClassSelection } from '@/src/contexts/ClassSelectionContext';
 import { ClassSelector } from '@/src/components/ClassSelector';
 import { AnalyticsDashboard } from '@/src/components/analytics/AnalyticsDashboard';
-import { colors, typography, spacing, borderRadius, shadows, gradients } from '@/lib/design-system';
+import { colors, typography, spacing, borderRadius, shadows } from '@/lib/design-system';
 
 export default function AnalyticsScreen() {
   const { profile } = useAuth();

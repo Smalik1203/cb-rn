@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { GraduationCap, Eye, EyeOff, Mail, Lock } from 'lucide-react-native';
-import { colors, typography, spacing, borderRadius, shadows, gradients } from '@/lib/design-system';
+import { colors, typography, spacing, borderRadius, shadows } from '@/lib/design-system';
 
 const { width, height } = Dimensions.get('window');
 
@@ -56,7 +56,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <LinearGradient colors={gradients.ocean} style={styles.container}>
+    <View style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -65,9 +65,9 @@ export default function LoginScreen() {
           <View style={styles.formContainer}>
             <View style={styles.logoSection}>
               <View style={styles.logoContainer}>
-                <GraduationCap size={80} color={colors.text.inverse} />
+                <GraduationCap size={80} color={colors.primary[600]} />
               </View>
-              
+
               <Text variant="displayMedium" style={styles.title}>
                 ClassBridge
               </Text>
@@ -146,18 +146,11 @@ export default function LoginScreen() {
                 style={[styles.loginButton, loading && styles.loginButtonDisabled]}
                 activeOpacity={0.8}
               >
-                <LinearGradient
-                  colors={loading ? [colors.neutral[400], colors.neutral[500]] : gradients.primary}
-                  style={styles.loginButtonGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                >
-                  {loading ? (
-                    <ActivityIndicator color={colors.text.inverse} size="small" />
-                  ) : (
-                    <Text style={styles.loginButtonText}>Sign In</Text>
-                  )}
-                </LinearGradient>
+                {loading ? (
+                  <ActivityIndicator color={colors.text.inverse} size="small" />
+                ) : (
+                  <Text style={styles.loginButtonText}>Sign In</Text>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotPassword}>
@@ -167,13 +160,14 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background.primary,
   },
   keyboardView: {
     flex: 1,
@@ -197,27 +191,25 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: colors.primary[50],
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing['6'],
-    ...shadows.lg,
+    ...shadows.md,
   },
   title: {
-    color: colors.text.inverse,
+    color: colors.text.primary,
     fontWeight: typography.fontWeight.bold,
     marginBottom: spacing['2'],
     textAlign: 'center',
   },
   subtitle: {
-    color: colors.text.inverse,
+    color: colors.text.secondary,
     marginBottom: spacing['2'],
-    opacity: 0.9,
     textAlign: 'center',
   },
   description: {
-    color: colors.text.inverse,
-    opacity: 0.8,
+    color: colors.text.tertiary,
     fontSize: typography.fontSize.base,
     textAlign: 'center',
     fontWeight: typography.fontWeight.medium,
@@ -253,19 +245,18 @@ const styles = StyleSheet.create({
     padding: spacing['1'],
   },
   loginButton: {
-    borderRadius: borderRadius.xl,
-    overflow: 'hidden',
-    marginBottom: spacing['6'],
-    ...shadows.lg,
-  },
-  loginButtonDisabled: {
-    opacity: 0.7,
-  },
-  loginButtonGradient: {
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.primary[500],
     paddingVertical: spacing['4'],
     paddingHorizontal: spacing['6'],
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: spacing['6'],
+    ...shadows.md,
+  },
+  loginButtonDisabled: {
+    opacity: 0.6,
+    backgroundColor: colors.neutral[400],
   },
   loginButtonText: {
     color: colors.text.inverse,
@@ -277,9 +268,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing['2'],
   },
   forgotPasswordText: {
-    color: colors.text.inverse,
+    color: colors.primary[600],
     fontSize: typography.fontSize.base,
-    opacity: 0.9,
     fontWeight: typography.fontWeight.medium,
   },
 });
