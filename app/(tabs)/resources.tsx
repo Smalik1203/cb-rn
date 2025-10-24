@@ -1,15 +1,20 @@
-import React from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'react-native';
 import { Text } from 'react-native-paper';
-import { BookOpen, FileText, Video, ExternalLink, Download } from 'lucide-react-native';
+import { BookOpen, FileText, Video as VideoIcon, ExternalLink } from 'lucide-react-native';
 import { colors, typography, spacing, borderRadius } from '@/lib/design-system';
 import { useProfile } from '@/src/hooks/useProfile';
 import { useAllResources } from '@/src/hooks/useResources';
 import { Card, LoadingView, ErrorView, EmptyState } from '@/src/components/ui';
+import { VideoPlayer } from '@/src/components/resources/VideoPlayer';
+import { PDFViewer } from '@/src/components/resources/PDFViewer';
+import { LearningResource } from '@/src/services/api';
 
 export default function ResourcesScreen() {
   const { data: profile } = useProfile();
   const { data: resources, isLoading, error } = useAllResources(profile?.school_code || undefined);
+  const [selectedResource, setSelectedResource] = useState<LearningResource | null>(null);
+  const [viewerType, setViewerType] = useState<'video' | 'pdf' | null>(null);
 
   const getResourceIcon = (type: string) => {
     switch (type.toLowerCase()) {
@@ -17,7 +22,7 @@ export default function ResourcesScreen() {
       case 'document':
         return <FileText size={20} color={colors.error[600]} />;
       case 'video':
-        return <Video size={20} color={colors.primary[600]} />;
+        return <VideoIcon size={20} color={colors.primary[600]} />;
       default:
         return <BookOpen size={20} color={colors.info[600]} />;
     }
@@ -35,10 +40,23 @@ export default function ResourcesScreen() {
     }
   };
 
-  const handleOpenResource = async (url: string | null) => {
-    if (url) {
-      await Linking.openURL(url);
+  const handleOpenResource = (resource: LearningResource) => {
+    if (!resource.content_url) return;
+
+    const type = resource.resource_type.toLowerCase();
+
+    if (type === 'video') {
+      setSelectedResource(resource);
+      setViewerType('video');
+    } else if (type === 'pdf' || type === 'document') {
+      setSelectedResource(resource);
+      setViewerType('pdf');
     }
+  };
+
+  const handleCloseViewer = () => {
+    setSelectedResource(null);
+    setViewerType(null);
   };
 
   if (isLoading) {
@@ -75,8 +93,9 @@ export default function ResourcesScreen() {
         {resources.map((resource) => (
           <Card key={resource.id} style={styles.resourceCard}>
             <TouchableOpacity
-              onPress={() => handleOpenResource(resource.content_url)}
+              onPress={() => handleOpenResource(resource)}
               activeOpacity={0.7}
+              disabled={!resource.content_url}
             >
               <View style={styles.resourceHeader}>
                 <View style={[styles.resourceIcon, { backgroundColor: getResourceColor(resource.resource_type) }]}>
@@ -86,7 +105,9 @@ export default function ResourcesScreen() {
                   <Text style={styles.resourceTitle}>{resource.title}</Text>
                   <Text style={styles.resourceType}>{resource.resource_type.toUpperCase()}</Text>
                 </View>
-                <ExternalLink size={20} color={colors.text.tertiary} />
+                {resource.content_url && (
+                  <ExternalLink size={20} color={colors.text.tertiary} />
+                )}
               </View>
               {resource.description && (
                 <Text style={styles.resourceDescription}>{resource.description}</Text>
@@ -105,6 +126,27 @@ export default function ResourcesScreen() {
           </Card>
         ))}
       </ScrollView>
+
+      <Modal
+        visible={!!selectedResource && !!viewerType}
+        animationType="slide"
+        onRequestClose={handleCloseViewer}
+      >
+        {selectedResource && viewerType === 'video' && selectedResource.content_url && (
+          <VideoPlayer
+            uri={selectedResource.content_url}
+            title={selectedResource.title}
+            onClose={handleCloseViewer}
+          />
+        )}
+        {selectedResource && viewerType === 'pdf' && selectedResource.content_url && (
+          <PDFViewer
+            uri={selectedResource.content_url}
+            title={selectedResource.title}
+            onClose={handleCloseViewer}
+          />
+        )}
+      </Modal>
     </View>
   );
 }
