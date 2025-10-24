@@ -3,7 +3,7 @@
     "name": "ClassBridge Mobile",
     "slug": "classbridge-mobile",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "scheme": "classbridge",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,

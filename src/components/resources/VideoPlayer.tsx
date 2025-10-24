@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { Text } from 'react-native-paper';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { X } from 'lucide-react-native';
 import { WebView } from 'react-native-webview';
-import { colors, spacing, borderRadius } from '@/lib/design-system';
+import { colors, spacing } from '@/lib/design-system';
 
 interface VideoPlayerProps {
   uri: string;
@@ -32,15 +32,15 @@ function isYouTubeUrl(url: string): boolean {
 
 export function VideoPlayer({ uri, title, onClose }: VideoPlayerProps) {
   const video = useRef<Video>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [status, setStatus] = useState<AVPlaybackStatus>();
 
   const isYouTube = isYouTubeUrl(uri);
   const youtubeVideoId = isYouTube ? getYouTubeVideoId(uri) : null;
 
   const youtubeEmbedUrl = youtubeVideoId
-    ? `https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&playsinline=1`
+    ? `https://www.youtube.com/embed/${youtubeVideoId}?autoplay=0&playsinline=1&controls=1&rel=0`
     : null;
+
+  const { width, height } = Dimensions.get('window');
 
   return (
     <View style={styles.container}>
@@ -51,12 +51,13 @@ export function VideoPlayer({ uri, title, onClose }: VideoPlayerProps) {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.videoContainer}>
+      <View style={styles.videoWrapper}>
         {isYouTube && youtubeEmbedUrl ? (
           <WebView
             source={{ uri: youtubeEmbedUrl }}
-            style={styles.webview}
+            style={[styles.video, { width, height: height - 100 }]}
             allowsFullscreenVideo
+            allowsInlineMediaPlayback
             mediaPlaybackRequiresUserAction={false}
             javaScriptEnabled
             domStorageEnabled
@@ -65,10 +66,10 @@ export function VideoPlayer({ uri, title, onClose }: VideoPlayerProps) {
           <Video
             ref={video}
             source={{ uri }}
-            style={styles.video}
+            style={[styles.video, { width, height: height - 100 }]}
             useNativeControls
             resizeMode={ResizeMode.CONTAIN}
-            onPlaybackStatusUpdate={status => setStatus(() => status)}
+            shouldPlay={false}
           />
         )}
       </View>
@@ -79,15 +80,17 @@ export function VideoPlayer({ uri, title, onClose }: VideoPlayerProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surface.primary,
+    backgroundColor: colors.neutral[900],
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: spacing.md,
+    backgroundColor: colors.surface.primary,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.light,
+    height: 60,
   },
   title: {
     flex: 1,
@@ -99,19 +102,13 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: spacing.xs,
   },
-  videoContainer: {
+  videoWrapper: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.neutral[900],
   },
   video: {
-    width: Dimensions.get('window').width,
-    height: Dimensions.get('window').height * 0.5,
-  },
-  webview: {
-    width: Dimensions.get('window').width,
-    height: Dimensions.get('window').height * 0.5,
     backgroundColor: colors.neutral[900],
   },
 });
