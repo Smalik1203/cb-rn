@@ -99,10 +99,8 @@ export default function ManageScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
       }
     >
-      <LinearGradient
+      <View
         style={styles.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
       >
         <View style={styles.headerContent}>
           <View style={styles.headerText}>
@@ -138,10 +136,8 @@ export default function ManageScreen() {
           ) : userStats ? (
             <>
               <View style={styles.summaryCard}>
-                <LinearGradient
+                <View
                   style={styles.summaryGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
                 >
                   <View style={styles.summaryHeader}>
                     <View style={styles.summaryIconContainer}>
@@ -232,10 +228,8 @@ export default function ManageScreen() {
           ) : classStats ? (
             <>
               <View style={styles.summaryCard}>
-                <LinearGradient
+                <View
                   style={styles.summaryGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
                 >
                   <View style={styles.summaryHeader}>
                     <View style={styles.summaryIconContainer}>

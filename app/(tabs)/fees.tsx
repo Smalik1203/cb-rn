@@ -80,10 +80,8 @@ export default function FeesScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
-        <LinearGradient
+        <View
           style={styles.header}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
         >
           <View style={styles.headerContent}>
             <View style={styles.headerText}>

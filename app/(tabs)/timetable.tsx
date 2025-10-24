@@ -17,11 +17,8 @@ export default function TimetableScreen() {
   return (
     <View style={styles.container}>
       {/* Modern Header */}
-      <LinearGradient
-        colors={['#10B981', '#059669']}
+      <View
         style={styles.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
       >
         <View style={styles.headerContent}>
           <View style={styles.headerLeft}>
