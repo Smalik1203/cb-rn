@@ -6,6 +6,15 @@ export function useClassStudents(classId?: string) {
     queryKey: ['students', 'class', classId],
     queryFn: () => api.students.getByClass(classId!),
     enabled: !!classId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function useSchoolStudents(schoolCode?: string) {
+  return useQuery({
+    queryKey: ['students', 'school', schoolCode],
+    queryFn: () => api.students.getBySchool(schoolCode!),
+    enabled: !!schoolCode,
+    staleTime: 10 * 60 * 1000,
   });
 }

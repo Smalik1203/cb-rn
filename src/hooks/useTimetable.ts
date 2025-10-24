@@ -9,3 +9,12 @@ export function useTimetable(classId?: string) {
     staleTime: 10 * 60 * 1000,
   });
 }
+
+export function useSchoolTimetable(schoolCode?: string) {
+  return useQuery({
+    queryKey: ['timetable', 'school', schoolCode],
+    queryFn: () => api.timetable.getBySchool(schoolCode!),
+    enabled: !!schoolCode,
+    staleTime: 10 * 60 * 1000,
+  });
+}

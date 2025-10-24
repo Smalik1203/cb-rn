@@ -6,7 +6,16 @@ export function useClassAttendance(classId?: string, date?: string) {
     queryKey: ['attendance', 'class', classId, date],
     queryFn: () => api.attendance.getByClass(classId!, date),
     enabled: !!classId,
-    staleTime: 1 * 60 * 1000,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useSchoolAttendance(schoolCode?: string, date?: string) {
+  return useQuery({
+    queryKey: ['attendance', 'school', schoolCode, date],
+    queryFn: () => api.attendance.getBySchool(schoolCode!, date),
+    enabled: !!schoolCode,
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -15,7 +24,7 @@ export function useStudentAttendance(studentId?: string) {
     queryKey: ['attendance', 'student', studentId],
     queryFn: () => api.attendance.getByStudent(studentId!),
     enabled: !!studentId,
-    staleTime: 1 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

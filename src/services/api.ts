@@ -70,6 +70,30 @@ export interface LearningResource {
   updated_at: string;
 }
 
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description: string | null;
+  event_date: string;
+  event_type: string;
+  school_code: string;
+  class_instance_id: string | null;
+  created_at: string;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description: string | null;
+  due_date: string | null;
+  priority: string;
+  status: string;
+  assigned_to: string;
+  created_by: string;
+  school_code: string;
+  created_at: string;
+}
+
 export const api = {
   users: {
     async getCurrentProfile(): Promise<UserProfile | null> {
@@ -178,6 +202,31 @@ export const api = {
       return data || [];
     },
 
+    async getBySchool(schoolCode: string, date?: string): Promise<AttendanceRecord[]> {
+      const { data: classes } = await supabase
+        .from('class_instances')
+        .select('id')
+        .eq('school_code', schoolCode);
+
+      if (!classes || classes.length === 0) return [];
+
+      const classIds = classes.map(c => c.id);
+
+      let query = supabase
+        .from('attendance')
+        .select('*')
+        .in('class_instance_id', classIds);
+
+      if (date) {
+        query = query.eq('date', date);
+      }
+
+      const { data, error } = await query.order('date', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
+
     async getByStudent(studentId: string): Promise<AttendanceRecord[]> {
       const { data, error } = await supabase
         .from('attendance')
@@ -230,6 +279,26 @@ export const api = {
       if (error) throw error;
       return data || [];
     },
+
+    async getSchoolPayments(schoolCode: string): Promise<FeePayment[]> {
+      const { data: students } = await supabase
+        .from('student')
+        .select('id')
+        .eq('school_code', schoolCode);
+
+      if (!students || students.length === 0) return [];
+
+      const studentIds = students.map(s => s.id);
+
+      const { data, error } = await supabase
+        .from('fee_payments')
+        .select('*')
+        .in('student_id', studentIds)
+        .order('payment_date', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
   },
 
   timetable: {
@@ -244,6 +313,27 @@ export const api = {
       if (error) throw error;
       return data || [];
     },
+
+    async getBySchool(schoolCode: string): Promise<TimetableSlot[]> {
+      const { data: classes } = await supabase
+        .from('class_instances')
+        .select('id')
+        .eq('school_code', schoolCode);
+
+      if (!classes || classes.length === 0) return [];
+
+      const classIds = classes.map(c => c.id);
+
+      const { data, error } = await supabase
+        .from('timetable_slots')
+        .select('*')
+        .in('class_instance_id', classIds)
+        .order('day_of_week', { ascending: true })
+        .order('start_time', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    },
   },
 
   students: {
@@ -252,6 +342,17 @@ export const api = {
         .from('student')
         .select('id, full_name, student_code, class_instance_id, school_code')
         .eq('class_instance_id', classId)
+        .order('full_name', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    },
+
+    async getBySchool(schoolCode: string) {
+      const { data, error } = await supabase
+        .from('student')
+        .select('id, full_name, student_code, class_instance_id, school_code')
+        .eq('school_code', schoolCode)
         .order('full_name', { ascending: true });
 
       if (error) throw error;
@@ -284,6 +385,54 @@ export const api = {
         .select('*')
         .eq('school_code', schoolCode)
         .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
+  },
+
+  calendar: {
+    async getByClass(classId: string): Promise<CalendarEvent[]> {
+      const { data, error } = await supabase
+        .from('calendar_events')
+        .select('*')
+        .eq('class_instance_id', classId)
+        .order('event_date', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    },
+
+    async getBySchool(schoolCode: string): Promise<CalendarEvent[]> {
+      const { data, error } = await supabase
+        .from('calendar_events')
+        .select('*')
+        .eq('school_code', schoolCode)
+        .order('event_date', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    },
+  },
+
+  tasks: {
+    async getByUser(userId: string): Promise<Task[]> {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('assigned_to', userId)
+        .order('due_date', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    },
+
+    async getBySchool(schoolCode: string): Promise<Task[]> {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('school_code', schoolCode)
+        .order('due_date', { ascending: true });
 
       if (error) throw error;
       return data || [];

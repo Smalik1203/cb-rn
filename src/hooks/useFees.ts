@@ -18,3 +18,12 @@ export function useClassFeePayments(classId?: string) {
     staleTime: 5 * 60 * 1000,
   });
 }
+
+export function useSchoolFeePayments(schoolCode?: string) {
+  return useQuery({
+    queryKey: ['fees', 'school', schoolCode],
+    queryFn: () => api.fees.getSchoolPayments(schoolCode!),
+    enabled: !!schoolCode,
+    staleTime: 5 * 60 * 1000,
+  });
+}
