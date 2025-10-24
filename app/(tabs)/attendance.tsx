@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Text, SegmentedButtons, Surface } from 'react-native-paper';
-import { LinearGradient } from 'expo-linear-gradient';
-import { CheckSquare, Users, TrendingUp, Clock } from 'lucide-react-native';
+import { Text, Surface } from 'react-native-paper';
+import { CheckSquare, TrendingUp } from 'lucide-react-native';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useClassSelection } from '@/src/contexts/ClassSelectionContext';
 import { ClassSelector } from '@/src/components/ClassSelector';
 import { UnifiedAttendance } from '@/src/components/attendance/UnifiedAttendance';
 import { AttendanceAnalytics } from '@/src/components/attendance/AttendanceAnalytics';
+import { colors, typography, spacing, borderRadius } from '@/lib/design-system';
 
 export default function AttendanceScreen() {
   const { profile } = useAuth();
@@ -30,42 +30,32 @@ export default function AttendanceScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Modern Header */}
-      <LinearGradient
-        colors={['#F59E0B', '#D97706']}
-        style={styles.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
+      <View style={styles.header}>
         <View style={styles.headerContent}>
-          <View style={styles.headerLeft}>
-            <View style={styles.iconContainer}>
-              <CheckSquare size={28} color="white" />
-            </View>
-            <View style={styles.headerText}>
-              <Text style={styles.headerTitle}>Attendance</Text>
-              <Text style={styles.headerSubtitle}>
-                {canMark ? 'Mark and track attendance' : 'View your attendance'}
-              </Text>
-            </View>
+          <View style={styles.iconContainer}>
+            <CheckSquare size={24} color={colors.success[600]} />
+          </View>
+          <View style={styles.headerText}>
+            <Text style={styles.headerTitle}>Attendance</Text>
+            <Text style={styles.headerSubtitle}>
+              {canMark ? 'Mark and track attendance' : 'View your attendance'}
+            </Text>
           </View>
         </View>
-      </LinearGradient>
+      </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Class Selector */}
         <View style={styles.selectorContainer}>
           <ClassSelector />
         </View>
 
-        {/* Tab Navigation */}
         <View style={styles.tabContainer}>
-          <Surface style={styles.tabSurface} elevation={2}>
+          <Surface style={styles.tabSurface} elevation={1}>
             <TouchableOpacity
               style={[styles.tabButton, activeTab === 'mark' && styles.activeTab]}
               onPress={() => setActiveTab('mark')}
             >
-              <CheckSquare size={20} color={activeTab === 'mark' ? '#F59E0B' : '#6B7280'} />
+              <CheckSquare size={20} color={activeTab === 'mark' ? colors.success[600] : colors.neutral[500]} />
               <Text style={[styles.tabText, activeTab === 'mark' && styles.activeTabText]}>
                 Mark Attendance
               </Text>
@@ -75,7 +65,7 @@ export default function AttendanceScreen() {
                 style={[styles.tabButton, activeTab === 'analytics' && styles.activeTab]}
                 onPress={() => setActiveTab('analytics')}
               >
-                <TrendingUp size={20} color={activeTab === 'analytics' ? '#F59E0B' : '#6B7280'} />
+                <TrendingUp size={20} color={activeTab === 'analytics' ? colors.success[600] : colors.neutral[500]} />
                 <Text style={[styles.tabText, activeTab === 'analytics' && styles.activeTabText]}>
                   Analytics
                 </Text>
@@ -84,7 +74,6 @@ export default function AttendanceScreen() {
           </Surface>
         </View>
 
-        {/* Content */}
         <View style={styles.contentContainer}>
           {renderTabContent()}
         </View>
@@ -96,100 +85,81 @@ export default function AttendanceScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background.app,
   },
   header: {
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
+    backgroundColor: colors.surface.primary,
+    paddingTop: spacing.xl + 20,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
   },
   headerContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
   },
   iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.success[50],
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: spacing.sm,
   },
   headerText: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: 'white',
-    marginBottom: 4,
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: 2,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  headerStats: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statText: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontWeight: '500',
+    fontSize: typography.fontSize.sm,
+    color: colors.text.tertiary,
   },
   scrollView: {
     flex: 1,
   },
   selectorContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    padding: spacing.md,
   },
   tabContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
   },
   tabSurface: {
-    backgroundColor: 'white',
-    borderRadius: 16,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.surface.primary,
     flexDirection: 'row',
-    padding: 4,
+    padding: spacing.xs,
   },
   tabButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    gap: 8,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    gap: spacing.xs,
   },
   activeTab: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.success[50],
   },
   tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.secondary,
   },
   activeTabText: {
-    color: '#F59E0B',
+    color: colors.success[700],
+    fontWeight: typography.fontWeight.semibold,
   },
   contentContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 30,
+    padding: spacing.md,
   },
 });

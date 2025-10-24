@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text, SegmentedButtons } from 'react-native-paper';
-import { LinearGradient } from 'expo-linear-gradient';
 import { CalendarDays } from 'lucide-react-native';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useClassSelection } from '@/src/contexts/ClassSelectionContext';
@@ -47,7 +46,6 @@ export default function CalendarScreen() {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={gradients.primary}
         style={styles.header}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -67,7 +65,7 @@ export default function CalendarScreen() {
             </View>
           </View>
         </View>
-      </LinearGradient>
+      </View>
 
       <ClassSelector />
 

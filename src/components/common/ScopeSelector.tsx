@@ -82,7 +82,7 @@ export const ScopeSelector: React.FC<ScopeSelectorProps> = ({
     return (
       <View style={styles.compactContainer}>
         <Chip 
-          icon={() => <School size={16} color={colors.primary} />}
+          icon={() => <School size={16} color={colors.primary[500]} />}
           onPress={loadClasses}
           style={styles.compactChip}
         >
@@ -90,7 +90,7 @@ export const ScopeSelector: React.FC<ScopeSelectorProps> = ({
         </Chip>
         {showYearSelector && (
           <Chip 
-            icon={() => <Calendar size={16} color={colors.primary} />}
+            icon={() => <Calendar size={16} color={colors.primary[500]} />}
             onPress={loadAcademicYears}
             style={styles.compactChip}
           >
@@ -114,7 +114,7 @@ export const ScopeSelector: React.FC<ScopeSelectorProps> = ({
                 loadClasses();
                 setShowClassMenu(true);
               }}
-              icon={() => <Users size={16} color={colors.primary} />}
+              icon={() => <Users size={16} color={colors.primary[500]} />}
               contentStyle={styles.buttonContent}
             >
               {getCurrentClassName()}
@@ -149,7 +149,7 @@ export const ScopeSelector: React.FC<ScopeSelectorProps> = ({
                 loadAcademicYears();
                 setShowYearMenu(true);
               }}
-              icon={() => <Calendar size={16} color={colors.primary} />}
+              icon={() => <Calendar size={16} color={colors.primary[500]} />}
               contentStyle={styles.buttonContent}
             >
               {getCurrentYearName()}

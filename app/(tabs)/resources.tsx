@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
-import { LinearGradient } from 'expo-linear-gradient';
 import { BookOpen } from 'lucide-react-native';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useClassSelection } from '@/src/contexts/ClassSelectionContext';
@@ -19,7 +18,6 @@ export default function ResourcesScreen() {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={gradients.primary}
         style={styles.header}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -39,7 +37,7 @@ export default function ResourcesScreen() {
             </View>
           </View>
         </View>
-      </LinearGradient>
+      </View>
 
       <ClassSelector />
 

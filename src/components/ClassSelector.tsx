@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     textAlign: 'center',
-    color: colors.error,
+    color: colors.error[500],
     paddingVertical: spacing['4'],
   },
   emptyText: {

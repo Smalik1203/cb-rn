@@ -39,7 +39,7 @@ export const ThreeStateView: React.FC<ThreeStateViewProps> = ({
       case 'loading':
         return (
           <View style={styles.centerContent}>
-            <ActivityIndicator size="large" color={colors.primary} />
+            <ActivityIndicator size="large" color={colors.primary[500]} />
             <Text style={styles.loadingText}>{loadingMessage}</Text>
             {timeout > 0 && (
               <Text style={styles.timeoutText}>
@@ -52,7 +52,7 @@ export const ThreeStateView: React.FC<ThreeStateViewProps> = ({
       case 'error':
         return (
           <View style={styles.centerContent}>
-            <AlertCircle size={48} color={colors.error} />
+            <AlertCircle size={48} color={colors.error[500]} />
             <Text style={styles.errorTitle}>{errorMessage}</Text>
             {errorDetails && (
               <Text style={styles.errorDetails}>{errorDetails}</Text>
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     ...commonStyles.subheading,
-    color: colors.error,
+    color: colors.error[500],
     marginTop: spacing.md,
     textAlign: 'center',
   },

@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, Surface } from 'react-native-paper';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Calendar, Clock, Users, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useClassSelection } from '@/src/contexts/ClassSelectionContext';
@@ -37,7 +36,7 @@ export default function TimetableScreen() {
             </View>
           </View>
         </View>
-      </LinearGradient>
+      </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Class Selector */}

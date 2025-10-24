@@ -67,7 +67,7 @@ class ErrorBoundary extends Component<Props, State> {
         <View style={styles.container}>
           <View style={styles.content}>
             <View style={styles.iconContainer}>
-              <AlertCircle size={80} color={colors.error} />
+              <AlertCircle size={80} color={colors.error[500]} />
             </View>
             
             <Text variant="headlineMedium" style={styles.title}>
@@ -148,12 +148,12 @@ const styles = StyleSheet.create({
     maxHeight: 200,
   },
   errorDetailsTitle: {
-    color: colors.error,
+    color: colors.error[500],
     fontWeight: typography.fontWeight.semibold,
     marginBottom: spacing['2'],
   },
   errorDetailsText: {
-    color: colors.error,
+    color: colors.error[500],
     fontSize: typography.fontSize.xs,
     fontFamily: 'monospace',
     marginBottom: spacing['2'],

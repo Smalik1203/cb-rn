@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { Text, Card, Button, SegmentedButtons } from 'react-native-paper';
-import { LinearGradient } from 'expo-linear-gradient';
 import { DollarSign, Calendar, CheckCircle, Clock, AlertCircle, Users } from 'lucide-react-native';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useClassSelection } from '@/src/contexts/ClassSelectionContext';
@@ -82,7 +81,6 @@ export default function FeesScreen() {
         }
       >
         <LinearGradient
-          colors={gradients.warning}
           style={styles.header}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -105,7 +103,7 @@ export default function FeesScreen() {
               <ClassSelector />
             </View>
           )}
-        </LinearGradient>
+        </View>
 
         <View style={styles.content}>
           <SegmentedButtons
@@ -248,13 +246,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.primary + '20',
+    backgroundColor: colors.primary[500] + '20',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.sm,
   },
   avatarText: {
-    color: colors.primary,
+    color: colors.primary[500],
     fontWeight: 'bold',
   },
   studentName: {

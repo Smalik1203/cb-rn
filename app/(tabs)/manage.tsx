@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert, TouchableOpacity, RefreshControl } from 'react-native';
 import { Text, Card, Button, SegmentedButtons, Chip, List, ActivityIndicator } from 'react-native-paper';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Users, UserPlus, Settings, Shield, BookOpen, Calendar, TrendingUp, Activity, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { colors, typography, spacing, borderRadius, shadows } from '@/lib/design-system';
@@ -65,7 +64,7 @@ export default function ManageScreen() {
   if (activeTab === 'users' && userStatsError) {
     return (
       <View style={styles.errorContainer}>
-        <AlertCircle size={64} color={colors.error} />
+        <AlertCircle size={64} color={colors.error[500]} />
         <Text variant="titleLarge" style={styles.errorTitle}>Unable to load user data</Text>
         <Text variant="bodyMedium" style={styles.errorMessage}>
           {userStatsError instanceof Error ? userStatsError.message : 'Something went wrong'}
@@ -80,7 +79,7 @@ export default function ManageScreen() {
   if (activeTab === 'classes' && classStatsError) {
     return (
       <View style={styles.errorContainer}>
-        <AlertCircle size={64} color={colors.error} />
+        <AlertCircle size={64} color={colors.error[500]} />
         <Text variant="titleLarge" style={styles.errorTitle}>Unable to load class data</Text>
         <Text variant="bodyMedium" style={styles.errorMessage}>
           {classStatsError instanceof Error ? classStatsError.message : 'Something went wrong'}
@@ -101,7 +100,6 @@ export default function ManageScreen() {
       }
     >
       <LinearGradient
-        colors={gradients.primary}
         style={styles.header}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -117,7 +115,7 @@ export default function ManageScreen() {
             <Activity size={32} color={colors.text.inverse} />
           </View>
         </View>
-      </LinearGradient>
+      </View>
 
       <SegmentedButtons
         value={activeTab}
@@ -141,7 +139,6 @@ export default function ManageScreen() {
             <>
               <View style={styles.summaryCard}>
                 <LinearGradient
-                  colors={gradients.ocean}
                   style={styles.summaryGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
@@ -163,15 +160,15 @@ export default function ManageScreen() {
                       <Text style={styles.statLabel}>Students</Text>
                     </View>
                     <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: colors.success }]}>{userStats.teachers}</Text>
+                      <Text style={[styles.statValue, { color: colors.success[500] }]}>{userStats.teachers}</Text>
                       <Text style={styles.statLabel}>Teachers</Text>
                     </View>
                     <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: colors.warning }]}>{userStats.admins}</Text>
+                      <Text style={[styles.statValue, { color: colors.warning[500] }]}>{userStats.admins}</Text>
                       <Text style={styles.statLabel}>Admins</Text>
                     </View>
                   </View>
-                </LinearGradient>
+                </View>
               </View>
 
               <View style={styles.card}>
@@ -236,7 +233,6 @@ export default function ManageScreen() {
             <>
               <View style={styles.summaryCard}>
                 <LinearGradient
-                  colors={gradients.secondary}
                   style={styles.summaryGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
@@ -254,7 +250,7 @@ export default function ManageScreen() {
                       <Text style={styles.statLabel}>Total Classes</Text>
                     </View>
                     <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: colors.success }]}>{classStats.active}</Text>
+                      <Text style={[styles.statValue, { color: colors.success[500] }]}>{classStats.active}</Text>
                       <Text style={styles.statLabel}>Active</Text>
                     </View>
                     <View style={styles.statItem}>
@@ -262,11 +258,11 @@ export default function ManageScreen() {
                       <Text style={styles.statLabel}>Students</Text>
                     </View>
                     <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: colors.warning }]}>{classStats.teachers}</Text>
+                      <Text style={[styles.statValue, { color: colors.warning[500] }]}>{classStats.teachers}</Text>
                       <Text style={styles.statLabel}>Teachers</Text>
                     </View>
                   </View>
-                </LinearGradient>
+                </View>
               </View>
 
               <View style={styles.card}>
@@ -342,7 +338,7 @@ export default function ManageScreen() {
             
             <TouchableOpacity style={styles.settingItem} onPress={() => Alert.alert('Settings', 'Academic year settings functionality will be implemented soon.')}>
               <View style={styles.settingIcon}>
-                <Calendar size={24} color={colors.success} />
+                <Calendar size={24} color={colors.success[500]} />
               </View>
               <View style={styles.settingContent}>
                 <Text variant="titleMedium" style={styles.settingTitle}>Academic Year</Text>
@@ -368,7 +364,7 @@ export default function ManageScreen() {
             
             <TouchableOpacity style={styles.settingItem} onPress={() => Alert.alert('Settings', 'Fee structure settings functionality will be implemented soon.')}>
               <View style={styles.settingIcon}>
-                <TrendingUp size={24} color={colors.warning} />
+                <TrendingUp size={24} color={colors.warning[500]} />
               </View>
               <View style={styles.settingContent}>
                 <Text variant="titleMedium" style={styles.settingTitle}>Fee Structure</Text>
@@ -381,7 +377,7 @@ export default function ManageScreen() {
             
             <TouchableOpacity style={styles.settingItem} onPress={() => Alert.alert('Settings', 'Notification settings functionality will be implemented soon.')}>
               <View style={styles.settingIcon}>
-                <Settings size={24} color={colors.error} />
+                <Settings size={24} color={colors.error[500]} />
               </View>
               <View style={styles.settingContent}>
                 <Text variant="titleMedium" style={styles.settingTitle}>Notifications</Text>
@@ -617,7 +613,7 @@ const styles = StyleSheet.create({
     marginLeft: spacing['4'],
   },
   activeBadge: {
-    backgroundColor: colors.success + '20',
+    backgroundColor: colors.success[500] + '20',
     paddingVertical: spacing['1'],
     paddingHorizontal: spacing['3'],
     borderRadius: borderRadius.full,
@@ -625,7 +621,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   activeText: {
-    color: colors.success,
+    color: colors.success[500],
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
   },
