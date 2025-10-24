@@ -1,45 +1,110 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
 import { Text } from 'react-native-paper';
-import { BookOpen } from 'lucide-react-native';
-import { useAuth } from '@/src/contexts/AuthContext';
-import { useClassSelection } from '@/src/contexts/ClassSelectionContext';
-import { ClassSelector } from '@/src/components/ClassSelector';
-import { LearningResources } from '@/src/components/learning-resources/LearningResources';
-import { colors, typography, spacing, borderRadius, shadows } from '@/lib/design-system';
+import { BookOpen, FileText, Video, ExternalLink, Download } from 'lucide-react-native';
+import { colors, typography, spacing, borderRadius } from '@/lib/design-system';
+import { useProfile } from '@/src/hooks/useProfile';
+import { useAllResources } from '@/src/hooks/useResources';
+import { Card, LoadingView, ErrorView, EmptyState } from '@/src/components/ui';
 
 export default function ResourcesScreen() {
-  const { profile } = useAuth();
-  const { isSuperAdmin } = useClassSelection();
+  const { data: profile } = useProfile();
+  const { data: resources, isLoading, error } = useAllResources(profile?.school_code || undefined);
 
-  const role = profile?.role || 'student';
-  const canManageResources = role === 'admin' || role === 'superadmin' || role === 'cb_admin';
+  const getResourceIcon = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'pdf':
+      case 'document':
+        return <FileText size={20} color={colors.error[600]} />;
+      case 'video':
+        return <Video size={20} color={colors.primary[600]} />;
+      default:
+        return <BookOpen size={20} color={colors.info[600]} />;
+    }
+  };
+
+  const getResourceColor = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'pdf':
+      case 'document':
+        return colors.error[50];
+      case 'video':
+        return colors.primary[50];
+      default:
+        return colors.info[50];
+    }
+  };
+
+  const handleOpenResource = async (url: string | null) => {
+    if (url) {
+      await Linking.openURL(url);
+    }
+  };
+
+  if (isLoading) {
+    return <LoadingView message="Loading resources..." />;
+  }
+
+  if (error) {
+    return <ErrorView message={error.message} />;
+  }
+
+  if (!resources || resources.length === 0) {
+    return (
+      <EmptyState
+        title="No Resources"
+        message="No learning resources available yet"
+        icon={<BookOpen size={64} color={colors.neutral[300]} />}
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <View
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <View style={styles.headerLeft}>
-            <View style={styles.iconContainer}>
-              <BookOpen size={32} color={colors.text.inverse} />
-            </View>
-            <View>
-              <Text variant="headlineSmall" style={styles.headerTitle}>
-                Learning Resources
-              </Text>
-              <Text variant="bodyLarge" style={styles.headerSubtitle}>
-                {canManageResources ? 'Manage and access learning materials' : 'Access learning materials and assignments'}
-              </Text>
-            </View>
-          </View>
+      <View style={styles.header}>
+        <View style={styles.iconContainer}>
+          <BookOpen size={24} color={colors.info[600]} />
+        </View>
+        <View>
+          <Text style={styles.headerTitle}>Learning Resources</Text>
+          <Text style={styles.headerSubtitle}>{resources.length} resources available</Text>
         </View>
       </View>
 
-      <ClassSelector />
-
-      <LearningResources />
+      <ScrollView style={styles.scrollView}>
+        {resources.map((resource) => (
+          <Card key={resource.id} style={styles.resourceCard}>
+            <TouchableOpacity
+              onPress={() => handleOpenResource(resource.content_url)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.resourceHeader}>
+                <View style={[styles.resourceIcon, { backgroundColor: getResourceColor(resource.resource_type) }]}>
+                  {getResourceIcon(resource.resource_type)}
+                </View>
+                <View style={styles.resourceInfo}>
+                  <Text style={styles.resourceTitle}>{resource.title}</Text>
+                  <Text style={styles.resourceType}>{resource.resource_type.toUpperCase()}</Text>
+                </View>
+                <ExternalLink size={20} color={colors.text.tertiary} />
+              </View>
+              {resource.description && (
+                <Text style={styles.resourceDescription}>{resource.description}</Text>
+              )}
+              <View style={styles.resourceFooter}>
+                <Text style={styles.resourceDate}>
+                  {new Date(resource.created_at).toLocaleDateString()}
+                </Text>
+                {resource.file_size && (
+                  <Text style={styles.resourceSize}>
+                    {(resource.file_size / 1024).toFixed(2)} KB
+                  </Text>
+                )}
+              </View>
+            </TouchableOpacity>
+          </Card>
+        ))}
+      </ScrollView>
     </View>
   );
 }
@@ -47,38 +112,89 @@ export default function ResourcesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.secondary,
+    backgroundColor: colors.background.app,
   },
   header: {
-    paddingTop: spacing['12'],
-    paddingBottom: spacing['8'],
-    paddingHorizontal: spacing['6'],
+    backgroundColor: colors.surface.primary,
+    padding: spacing.lg,
+    paddingTop: spacing.xl + 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
   },
-  headerContent: {
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.info[50],
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+  },
+  headerTitle: {
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+  },
+  headerSubtitle: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.tertiary,
+  },
+  scrollView: {
+    flex: 1,
+    padding: spacing.md,
+  },
+  resourceCard: {
+    marginBottom: spacing.md,
+  },
+  resourceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  resourceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+  },
+  resourceInfo: {
+    flex: 1,
+  },
+  resourceTitle: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    marginBottom: 2,
+  },
+  resourceType: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
+    fontWeight: typography.fontWeight.medium,
+  },
+  resourceDescription: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginBottom: spacing.sm,
+    lineHeight: 20,
+  },
+  resourceFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing['4'],
+  resourceDate: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
   },
-  iconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: borderRadius.xl,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.inverse,
-    marginBottom: spacing['1'],
-  },
-  headerSubtitle: {
-    color: colors.text.inverse,
-    opacity: 0.9,
+  resourceSize: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
   },
 });

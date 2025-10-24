@@ -55,6 +55,21 @@ export interface TimetableSlot {
   teacher_id?: string;
 }
 
+export interface LearningResource {
+  id: string;
+  title: string;
+  description: string | null;
+  resource_type: string;
+  content_url: string | null;
+  file_size: number | null;
+  school_code: string;
+  class_instance_id: string | null;
+  subject_id: string | null;
+  uploaded_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export const api = {
   users: {
     async getCurrentProfile(): Promise<UserProfile | null> {
@@ -238,6 +253,37 @@ export const api = {
         .select('id, full_name, student_code, class_instance_id, school_code')
         .eq('class_instance_id', classId)
         .order('full_name', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    },
+  },
+
+  resources: {
+    async getByClass(classId?: string, schoolCode?: string): Promise<LearningResource[]> {
+      let query = supabase
+        .from('learning_resources')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (classId) {
+        query = query.eq('class_instance_id', classId);
+      } else if (schoolCode) {
+        query = query.eq('school_code', schoolCode);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      return data || [];
+    },
+
+    async getAll(schoolCode: string): Promise<LearningResource[]> {
+      const { data, error } = await supabase
+        .from('learning_resources')
+        .select('*')
+        .eq('school_code', schoolCode)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       return data || [];
