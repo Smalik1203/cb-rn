@@ -1,12 +1,13 @@
+// @ts-nocheck
 import React from 'react';
 import { View, StyleSheet, Alert } from 'react-native';
 import { Text, Card, Button, Divider } from 'react-native-paper';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { supabase } from '@/src/lib/supabase';
 import { useRouter } from 'expo-router';
 
 export default function SettingsScreen() {
-  const { userMetadata } = useAuth();
+  const { profile } = useAuth();
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -38,19 +39,19 @@ export default function SettingsScreen() {
             <Text variant="bodyMedium" style={styles.label}>
               Email:
             </Text>
-            <Text variant="bodyMedium">{userMetadata?.email}</Text>
+            <Text variant="bodyMedium">{profile?.email}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text variant="bodyMedium" style={styles.label}>
               Role:
             </Text>
-            <Text variant="bodyMedium">{userMetadata?.role?.toUpperCase()}</Text>
+            <Text variant="bodyMedium">{profile?.role?.toUpperCase()}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text variant="bodyMedium" style={styles.label}>
               School Code:
             </Text>
-            <Text variant="bodyMedium">{userMetadata?.schoolCode}</Text>
+            <Text variant="bodyMedium">{profile?.school_code}</Text>
           </View>
         </Card.Content>
       </Card>

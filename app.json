@@ -18,9 +18,13 @@
       "bundler": "metro",
       "output": "single"
     },
-    "plugins": ["expo-router", "expo-font", "expo-web-browser", "expo-secure-store"],
+    "plugins": ["expo-router", "expo-font", "expo-secure-store"],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "supabaseUrl": "https://mvvzqouqxrtyzuzqbeud.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12dnpxb3VxeHJ0eXp1enFiZXVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI4NDUxNjEsImV4cCI6MjA2ODQyMTE2MX0.pdo_JBuGQP1aRlMLLMoST7xSD89PH2uB6bhzKiJTfu0"
     }
   }
 }

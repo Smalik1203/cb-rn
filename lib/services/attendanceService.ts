@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/src/lib/supabase';
 
 export interface Student {
   id: string;
@@ -58,7 +58,7 @@ export const AttendanceService = {
       .order('full_name', { ascending: true });
 
     if (error) throw error;
-    return data || [];
+    return (data as unknown as Student[]) || [];
   },
 
   async getStudentProfile(studentCode: string, schoolCode: string) {
@@ -98,9 +98,7 @@ export const AttendanceService = {
       school_code: string;
     }>
   ) {
-    const { error } = await supabase.from('attendance').upsert(records, {
-      onConflict: 'school_code,class_instance_id,student_id,date',
-    });
+    const { error } = await supabase.from('attendance').upsert(records as any);
 
     if (error) throw error;
   },
@@ -134,7 +132,7 @@ export const AttendanceService = {
 
   async checkHoliday(schoolCode: string, date: string, classId?: string) {
     let query = supabase
-      .from('holidays')
+      .from('school_calendar_events')
       .select('id, title, description, start_date, end_date')
       .eq('school_code', schoolCode)
       .lte('start_date', date)

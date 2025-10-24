@@ -2,11 +2,20 @@ import { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { PaperProvider } from 'react-native-paper';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/src/lib/queryClient';
+import { AuthProvider, useAuth } from '@/src/contexts/AuthContext';
+import { AppScopeProvider } from '@/src/contexts/AppScopeContext';
+import { ClassSelectionProvider } from '@/src/contexts/ClassSelectionContext';
+import { FeesProvider } from '@/src/contexts/FeesContext';
+import { AttendanceProvider } from '@/src/contexts/AttendanceContext';
+import { AnalyticsProvider } from '@/src/contexts/AnalyticsContext';
+import { CalendarProvider } from '@/src/contexts/CalendarContext';
+import { LearningResourcesProvider } from '@/src/contexts/LearningResourcesContext';
+import { TaskManagementProvider } from '@/src/contexts/TaskManagementContext';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
+import ErrorBoundary from '@/src/components/ErrorBoundary';
 
-const queryClient = new QueryClient();
 
 function RootLayoutContent() {
   const { user, loading } = useAuth();
@@ -28,6 +37,7 @@ function RootLayoutContent() {
   return (
     <>
       <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
         <Stack.Screen name="login" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="+not-found" />
@@ -41,12 +51,30 @@ export default function RootLayout() {
   useFrameworkReady();
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <PaperProvider>
-        <AuthProvider>
-          <RootLayoutContent />
-        </AuthProvider>
-      </PaperProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <PaperProvider>
+                 <AuthProvider>
+                   <AppScopeProvider>
+                     <ClassSelectionProvider>
+                     <FeesProvider>
+                       <AttendanceProvider>
+                         <AnalyticsProvider>
+                           <CalendarProvider>
+                             <LearningResourcesProvider>
+                               <TaskManagementProvider>
+                                 <RootLayoutContent />
+                               </TaskManagementProvider>
+                             </LearningResourcesProvider>
+                           </CalendarProvider>
+                         </AnalyticsProvider>
+                       </AttendanceProvider>
+                     </FeesProvider>
+                     </ClassSelectionProvider>
+                   </AppScopeProvider>
+                 </AuthProvider>
+        </PaperProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
