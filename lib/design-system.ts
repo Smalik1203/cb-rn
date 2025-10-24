@@ -2,29 +2,29 @@ import { ViewStyle, TextStyle } from 'react-native';
 
 export const colors = {
   primary: {
-    50: '#eff6ff',
-    100: '#dbeafe',
-    200: '#bfdbfe',
-    300: '#93c5fd',
-    400: '#60a5fa',
-    500: '#3b82f6',
-    600: '#2563eb',
-    700: '#1d4ed8',
-    800: '#1e40af',
-    900: '#1e3a8a',
+    50: '#eef2ff',
+    100: '#e0e7ff',
+    200: '#c7d2fe',
+    300: '#a5b4fc',
+    400: '#818cf8',
+    500: '#6366f1',
+    600: '#4f46e5',
+    700: '#4338ca',
+    800: '#3730a3',
+    900: '#312e81',
   },
 
   secondary: {
-    50: '#f8fafc',
-    100: '#f1f5f9',
-    200: '#e2e8f0',
-    300: '#cbd5e1',
-    400: '#94a3b8',
-    500: '#64748b',
-    600: '#475569',
-    700: '#334155',
-    800: '#1e293b',
-    900: '#0f172a',
+    50: '#f0fdf4',
+    100: '#dcfce7',
+    200: '#bbf7d0',
+    300: '#86efac',
+    400: '#4ade80',
+    500: '#22c55e',
+    600: '#16a34a',
+    700: '#15803d',
+    800: '#166534',
+    900: '#14532d',
   },
 
   success: {
@@ -67,143 +67,100 @@ export const colors = {
   },
 
   info: {
-    50: '#f0f9ff',
-    100: '#e0f2fe',
-    200: '#bae6fd',
-    300: '#7dd3fc',
-    400: '#38bdf8',
-    500: '#0ea5e9',
-    600: '#0284c7',
-    700: '#0369a1',
-    800: '#075985',
-    900: '#0c4a6e',
+    50: '#eff6ff',
+    100: '#dbeafe',
+    200: '#bfdbfe',
+    300: '#93c5fd',
+    400: '#60a5fa',
+    500: '#3b82f6',
+    600: '#2563eb',
+    700: '#1d4ed8',
+    800: '#1e40af',
+    900: '#1e3a8a',
   },
 
   neutral: {
     50: '#fafafa',
-    100: '#f4f4f5',
-    200: '#e4e4e7',
-    300: '#d4d4d8',
-    400: '#a1a1aa',
-    500: '#71717a',
-    600: '#52525b',
-    700: '#3f3f46',
-    800: '#27272a',
-    900: '#18181b',
+    100: '#f5f5f5',
+    200: '#e5e5e5',
+    300: '#d4d4d4',
+    400: '#a3a3a3',
+    500: '#737373',
+    600: '#525252',
+    700: '#404040',
+    800: '#262626',
+    900: '#171717',
   },
 
   background: {
     primary: '#ffffff',
-    secondary: '#fafafa',
-    tertiary: '#f4f4f5',
-    dark: '#18181b',
-    app: '#f8fafc',
-  },
-
-  text: {
-    primary: '#18181b',
-    secondary: '#52525b',
-    tertiary: '#71717a',
-    inverse: '#ffffff',
-    muted: '#a1a1aa',
-    disabled: '#d4d4d8',
+    secondary: '#f9fafb',
+    tertiary: '#f3f4f6',
+    dark: '#111827',
+    app: '#f9fafb',
+    elevated: '#ffffff',
   },
 
   surface: {
     primary: '#ffffff',
-    secondary: '#fafafa',
+    secondary: '#f9fafb',
     elevated: '#ffffff',
-    overlay: 'rgba(24, 24, 27, 0.75)',
-    hover: 'rgba(59, 130, 246, 0.08)',
+    overlay: 'rgba(0, 0, 0, 0.5)',
   },
 
   border: {
-    light: '#e4e4e7',
-    medium: '#d4d4d8',
-    dark: '#a1a1aa',
-    focus: '#3b82f6',
-  },
-};
-
-export const typography = {
-  fontFamily: {
-    regular: 'System',
-    medium: 'System',
-    semibold: 'System',
-    bold: 'System',
+    light: '#e5e7eb',
+    DEFAULT: '#d1d5db',
+    dark: '#9ca3af',
   },
 
-  fontSize: {
-    xs: 12,
-    sm: 14,
-    base: 16,
-    lg: 18,
-    xl: 20,
-    '2xl': 24,
-    '3xl': 30,
-    '4xl': 36,
-    '5xl': 48,
+  text: {
+    primary: '#111827',
+    secondary: '#6b7280',
+    tertiary: '#9ca3af',
+    inverse: '#ffffff',
+    disabled: '#d1d5db',
   },
 
-  fontWeight: {
-    normal: '400' as const,
-    medium: '500' as const,
-    semibold: '600' as const,
-    bold: '700' as const,
-  },
-
-  lineHeight: {
-    tight: 1.25,
-    normal: 1.5,
-    relaxed: 1.75,
-  },
-
-  letterSpacing: {
-    tight: -0.025,
-    normal: 0,
-    wide: 0.025,
+  gradient: {
+    primary: ['#6366f1', '#8b5cf6'],
+    secondary: ['#10b981', '#059669'],
+    warm: ['#f59e0b', '#ef4444'],
+    cool: ['#3b82f6', '#6366f1'],
   },
 };
 
 export const spacing = {
-  px: 1,
-  0.5: 2,
+  0: 0,
   1: 4,
-  1.5: 6,
   2: 8,
-  2.5: 10,
   3: 12,
-  3.5: 14,
   4: 16,
   5: 20,
   6: 24,
-  7: 28,
   8: 32,
-  9: 36,
   10: 40,
   12: 48,
-  14: 56,
   16: 64,
   20: 80,
   24: 96,
-
   xs: 4,
   sm: 8,
   md: 16,
   lg: 24,
   xl: 32,
   '2xl': 48,
+  '3xl': 64,
 };
 
 export const borderRadius = {
   none: 0,
   sm: 4,
-  base: 6,
-  md: 8,
-  lg: 12,
-  xl: 16,
-  '2xl': 20,
-  '3xl': 24,
+  DEFAULT: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  '2xl': 32,
   full: 9999,
 };
 
@@ -216,43 +173,101 @@ export const shadows = {
     elevation: 0,
   },
   sm: {
-    shadowColor: '#000',
+    shadowColor: colors.neutral[900],
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 2,
   },
-  base: {
-    shadowColor: '#000',
+  DEFAULT: {
+    shadowColor: colors.neutral[900],
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
   md: {
-    shadowColor: '#000',
+    shadowColor: colors.neutral[900],
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
     elevation: 4,
   },
   lg: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 15,
-    elevation: 8,
+    shadowColor: colors.neutral[900],
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 6,
   },
   xl: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.15,
-    shadowRadius: 25,
-    elevation: 12,
+    shadowColor: colors.neutral[900],
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 8,
   },
 };
 
-export const commonStyles = {
+export const typography = {
+  fontFamily: {
+    regular: 'System',
+    medium: 'System',
+    semibold: 'System',
+    bold: 'System',
+  },
+  fontSize: {
+    xs: 12,
+    sm: 14,
+    base: 16,
+    lg: 18,
+    xl: 20,
+    '2xl': 24,
+    '3xl': 30,
+    '4xl': 36,
+    '5xl': 48,
+  },
+  fontWeight: {
+    normal: '400' as TextStyle['fontWeight'],
+    medium: '500' as TextStyle['fontWeight'],
+    semibold: '600' as TextStyle['fontWeight'],
+    bold: '700' as TextStyle['fontWeight'],
+    extrabold: '800' as TextStyle['fontWeight'],
+  },
+  lineHeight: {
+    tight: 1.2,
+    normal: 1.5,
+    relaxed: 1.75,
+  },
+};
+
+export const animation = {
+  duration: {
+    fast: 150,
+    normal: 300,
+    slow: 500,
+  },
+  easing: {
+    ease: 'ease',
+    easeIn: 'ease-in',
+    easeOut: 'ease-out',
+    easeInOut: 'ease-in-out',
+  },
+};
+
+export const layout = {
+  maxWidth: {
+    sm: 640,
+    md: 768,
+    lg: 1024,
+    xl: 1280,
+  },
+  container: {
+    padding: spacing.md,
+  },
+};
+
+export const componentStyles = {
   card: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
@@ -260,92 +275,61 @@ export const commonStyles = {
     ...shadows.sm,
   } as ViewStyle,
 
-  cardElevated: {
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    ...shadows.md,
-  } as ViewStyle,
-
   button: {
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.sm + 4,
-    paddingHorizontal: spacing.md,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-  } as ViewStyle,
+    primary: {
+      backgroundColor: colors.primary[600],
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: borderRadius.md,
+      ...shadows.sm,
+    } as ViewStyle,
 
-  buttonPrimary: {
-    backgroundColor: colors.primary[500],
-  } as ViewStyle,
+    secondary: {
+      backgroundColor: colors.secondary[600],
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: borderRadius.md,
+      ...shadows.sm,
+    } as ViewStyle,
 
-  buttonSecondary: {
-    backgroundColor: colors.secondary[100],
-  } as ViewStyle,
+    outline: {
+      backgroundColor: 'transparent',
+      borderWidth: 1.5,
+      borderColor: colors.primary[600],
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: borderRadius.md,
+    } as ViewStyle,
+
+    ghost: {
+      backgroundColor: 'transparent',
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: borderRadius.md,
+    } as ViewStyle,
+  },
 
   input: {
+    backgroundColor: colors.background.secondary,
     borderWidth: 1,
     borderColor: colors.border.light,
     borderRadius: borderRadius.md,
-    paddingVertical: spacing.sm + 2,
+    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    backgroundColor: colors.surface.primary,
     fontSize: typography.fontSize.base,
     color: colors.text.primary,
   } as ViewStyle,
-
-  heading: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    lineHeight: typography.lineHeight.tight * typography.fontSize['2xl'],
-  } as TextStyle,
-
-  subheading: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    lineHeight: typography.lineHeight.normal * typography.fontSize.lg,
-  } as TextStyle,
-
-  body: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.normal,
-    color: colors.text.primary,
-    lineHeight: typography.lineHeight.normal * typography.fontSize.base,
-  } as TextStyle,
-
-  caption: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.normal,
-    color: colors.text.secondary,
-    lineHeight: typography.lineHeight.normal * typography.fontSize.sm,
-  } as TextStyle,
-
-  label: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.secondary,
-    marginBottom: spacing.xs,
-  } as TextStyle,
 
   badge: {
-    paddingVertical: spacing.xs - 2,
+    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
     borderRadius: borderRadius.full,
-    alignSelf: 'flex-start' as const,
-  } as ViewStyle,
-
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.app,
-  } as ViewStyle,
-
-  screenPadding: {
-    paddingHorizontal: spacing.md,
-  } as ViewStyle,
-
-  section: {
-    marginBottom: spacing.lg,
+    alignSelf: 'flex-start',
   } as ViewStyle,
 };
+
+export const createGradient = (colors: string[]) => ({
+  colors,
+  start: { x: 0, y: 0 },
+  end: { x: 1, y: 1 },
+});
