@@ -1,50 +1,66 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text, Surface } from 'react-native-paper';
-import { Calendar, Clock, Users, ChevronLeft, ChevronRight } from 'lucide-react-native';
-import { useAuth } from '@/src/contexts/AuthContext';
-import { useClassSelection } from '@/src/contexts/ClassSelectionContext';
-import { ClassSelector } from '@/src/components/ClassSelector';
-import { EnhancedTimetable } from '@/src/components/timetable/EnhancedTimetable';
+import { Text } from 'react-native-paper';
+import { Clock } from 'lucide-react-native';
+import { colors, typography, spacing, borderRadius } from '@/lib/design-system';
+import { useProfile } from '@/src/hooks/useProfile';
+import { useTimetable } from '@/src/hooks/useTimetable';
+import { Card, LoadingView, ErrorView, EmptyState } from '@/src/components/ui';
+
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 export default function TimetableScreen() {
-  const { profile } = useAuth();
-  const { isSuperAdmin } = useClassSelection();
+  const { data: profile } = useProfile();
+  const { data: slots, isLoading, error } = useTimetable(profile?.class_instance_id);
 
-  const role = profile?.role || 'student';
-  const canManageTimetable = role === 'admin' || role === 'superadmin' || role === 'cb_admin';
+  if (isLoading) {
+    return <LoadingView message="Loading timetable..." />;
+  }
+
+  if (error) {
+    return <ErrorView message={error.message} />;
+  }
+
+  if (!slots || slots.length === 0) {
+    return <EmptyState title="No Timetable" message="No classes scheduled yet" />;
+  }
+
+  const slotsByDay = slots.reduce((acc, slot) => {
+    if (!acc[slot.day_of_week]) acc[slot.day_of_week] = [];
+    acc[slot.day_of_week].push(slot);
+    return acc;
+  }, {} as Record<number, typeof slots>);
 
   return (
     <View style={styles.container}>
-      {/* Modern Header */}
-      <View
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <View style={styles.headerLeft}>
-            <View style={styles.iconContainer}>
-              <Calendar size={28} color="white" />
-            </View>
-            <View style={styles.headerText}>
-              <Text style={styles.headerTitle}>Timetable</Text>
-              <Text style={styles.headerSubtitle}>
-                {canManageTimetable ? 'Manage class schedules' : 'View your schedule'}
-              </Text>
-            </View>
-          </View>
+      <View style={styles.header}>
+        <View style={styles.iconContainer}>
+          <Clock size={24} color={colors.primary[600]} />
+        </View>
+        <View>
+          <Text style={styles.headerTitle}>Timetable</Text>
+          <Text style={styles.headerSubtitle}>Weekly Schedule</Text>
         </View>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Class Selector */}
-        <View style={styles.selectorContainer}>
-          <ClassSelector />
-        </View>
-
-        {/* Timetable Content */}
-        <View style={styles.contentContainer}>
-          <EnhancedTimetable />
-        </View>
+      <ScrollView style={styles.scrollView}>
+        {DAYS.map((day, index) => (
+          <Card key={index} style={styles.dayCard}>
+            <Text style={styles.dayTitle}>{day}</Text>
+            {slotsByDay[index + 1]?.length > 0 ? (
+              slotsByDay[index + 1].map((slot, i) => (
+                <View key={i} style={styles.slot}>
+                  <Text style={styles.timeText}>
+                    {slot.start_time} - {slot.end_time}
+                  </Text>
+                  <Text style={styles.subjectText}>Subject {slot.subject_id}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.noClassText}>No classes</Text>
+            )}
+          </Card>
+        ))}
       </ScrollView>
     </View>
   );
@@ -53,68 +69,68 @@ export default function TimetableScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background.app,
   },
   header: {
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerLeft: {
+    backgroundColor: colors.surface.primary,
+    padding: spacing.lg,
+    paddingTop: spacing.xl + 20,
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
   },
   iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primary[50],
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
-  },
-  headerText: {
-    flex: 1,
+    marginRight: spacing.sm,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: 'white',
-    marginBottom: 4,
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  headerStats: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statText: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontWeight: '500',
+    fontSize: typography.fontSize.sm,
+    color: colors.text.tertiary,
   },
   scrollView: {
     flex: 1,
+    padding: spacing.md,
   },
-  selectorContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
+  dayCard: {
+    marginBottom: spacing.md,
   },
-  contentContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 30,
+  dayTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
+  },
+  slot: {
+    paddingVertical: spacing.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary[500],
+    paddingLeft: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  timeText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.tertiary,
+    marginBottom: 2,
+  },
+  subjectText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.primary,
+  },
+  noClassText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.tertiary,
+    fontStyle: 'italic',
   },
 });
