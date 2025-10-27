@@ -2,16 +2,16 @@ import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'react-native';
 import { Text } from 'react-native-paper';
 import { BookOpen, FileText, Video as VideoIcon, ExternalLink } from 'lucide-react-native';
-import { colors, typography, spacing, borderRadius } from '@/lib/design-system';
-import { useProfile } from '@/src/hooks/useProfile';
-import { useAllResources } from '@/src/hooks/useResources';
-import { Card, LoadingView, ErrorView, EmptyState } from '@/src/components/ui';
-import { VideoPlayer } from '@/src/components/resources/VideoPlayer';
-import { PDFViewer } from '@/src/components/resources/PDFViewer';
-import { LearningResource } from '@/src/services/api';
+import { colors, typography, spacing, borderRadius } from '../../lib/design-system';
+import { useAuth } from '../../src/contexts/AuthContext';
+import { useAllResources } from '../../src/hooks/useResources';
+import { Card, LoadingView, ErrorView, EmptyState } from '../../src/components/ui';
+import { VideoPlayer } from '../../src/components/resources/VideoPlayer';
+import { PDFViewer } from '../../src/components/resources/PDFViewer';
+import { LearningResource } from '../../src/services/api';
 
 export default function ResourcesScreen() {
-  const { data: profile } = useProfile();
+  const { profile } = useAuth();
   const { data: resources, isLoading, error } = useAllResources(profile?.school_code || undefined);
   const [selectedResource, setSelectedResource] = useState<LearningResource | null>(null);
   const [viewerType, setViewerType] = useState<'video' | 'pdf' | null>(null);
@@ -185,7 +185,8 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    padding: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   resourceCard: {
     marginBottom: spacing.md,

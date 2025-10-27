@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import { Inbox } from 'lucide-react-native';
-import { colors, spacing, typography } from '@/lib/design-system';
+import { colors, spacing, typography } from '../../../lib/design-system';
 import { Button } from './Button';
 
 interface EmptyStateProps {

@@ -1,80 +1,62 @@
-import { useEffect } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import 'react-native-gesture-handler';
+import { Drawer } from 'expo-router/drawer';
 import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { PaperProvider } from 'react-native-paper';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { queryClient } from '@/src/lib/queryClient';
-import { AuthProvider, useAuth } from '@/src/contexts/AuthContext';
-import { AppScopeProvider } from '@/src/contexts/AppScopeContext';
-import { ClassSelectionProvider } from '@/src/contexts/ClassSelectionContext';
-import { FeesProvider } from '@/src/contexts/FeesContext';
-import { AttendanceProvider } from '@/src/contexts/AttendanceContext';
-import { AnalyticsProvider } from '@/src/contexts/AnalyticsContext';
-import { CalendarProvider } from '@/src/contexts/CalendarContext';
-import { LearningResourcesProvider } from '@/src/contexts/LearningResourcesContext';
-import { TaskManagementProvider } from '@/src/contexts/TaskManagementContext';
-import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-import ErrorBoundary from '@/src/components/ErrorBoundary';
-
-
-function RootLayoutContent() {
-  const { user, loading } = useAuth();
-  const segments = useSegments();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (loading) return;
-
-    const inAuthGroup = segments[0] === '(tabs)';
-
-    if (!user && inAuthGroup) {
-      router.replace('/login');
-    } else if (user && !inAuthGroup) {
-      router.replace('/(tabs)');
-    }
-  }, [user, loading, segments]);
-
-  return (
-    <>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="login" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </>
-  );
-}
+import { queryClient } from '../src/lib/queryClient';
+import { AuthProvider } from '../src/contexts/AuthContext';
+import { ClassSelectionProvider } from '../src/contexts/ClassSelectionContext';
+import { useFrameworkReady } from '../hooks/useFrameworkReady';
+import ErrorBoundary from '../src/components/ErrorBoundary';
+import { NetworkStatus } from '../src/components/ui/NetworkStatus';
+import { DrawerContent } from '../src/components/layout/DrawerContent';
 
 export default function RootLayout() {
   useFrameworkReady();
 
   return (
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <PaperProvider>
-                 <AuthProvider>
-                   <AppScopeProvider>
-                     <ClassSelectionProvider>
-                     <FeesProvider>
-                       <AttendanceProvider>
-                         <AnalyticsProvider>
-                           <CalendarProvider>
-                             <LearningResourcesProvider>
-                               <TaskManagementProvider>
-                                 <RootLayoutContent />
-                               </TaskManagementProvider>
-                             </LearningResourcesProvider>
-                           </CalendarProvider>
-                         </AnalyticsProvider>
-                       </AttendanceProvider>
-                     </FeesProvider>
-                     </ClassSelectionProvider>
-                   </AppScopeProvider>
-                 </AuthProvider>
-        </PaperProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ErrorBoundary>
+          <QueryClientProvider client={queryClient}>
+            <PaperProvider>
+              <AuthProvider>
+                <ClassSelectionProvider>
+                  <Drawer
+                    drawerContent={(props) => <DrawerContent {...props} />}
+                    screenOptions={{
+                      headerShown: false,
+                      drawerStyle: {
+                        backgroundColor: '#ffffff',
+                        width: 280,
+                      },
+                    }}
+                  >
+                    <Drawer.Screen
+                      name="(tabs)"
+                      options={{
+                        drawerLabel: () => null, // Hide from drawer since we have custom navigation
+                        title: 'ClassBridge',
+                      }}
+                    />
+                    <Drawer.Screen
+                      name="login"
+                      options={{
+                        drawerLabel: () => null, // Hide from drawer
+                        title: 'Login',
+                      }}
+                    />
+                  </Drawer>
+                  <StatusBar style="auto" />
+                  <NetworkStatus />
+                </ClassSelectionProvider>
+              </AuthProvider>
+            </PaperProvider>
+          </QueryClientProvider>
+        </ErrorBoundary>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

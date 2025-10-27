@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text, Button, ActivityIndicator } from 'react-native-paper';
 import { RefreshCw, AlertCircle, Inbox } from 'lucide-react-native';
-import { colors, spacing, commonStyles } from '@/lib/design-system';
+import { colors, spacing, typography } from '../../../lib/design-system';
 
 export interface ThreeStateViewProps {
   state: 'loading' | 'error' | 'empty' | 'success';
@@ -111,25 +111,27 @@ const styles = StyleSheet.create({
     maxWidth: 300,
   },
   loadingText: {
-    ...commonStyles.body,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
     color: colors.text.primary,
     marginTop: spacing.md,
     textAlign: 'center',
   },
   timeoutText: {
-    ...commonStyles.caption,
+    fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
     marginTop: spacing.sm,
     textAlign: 'center',
   },
   errorTitle: {
-    ...commonStyles.subheading,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.error[500],
     marginTop: spacing.md,
     textAlign: 'center',
   },
   errorDetails: {
-    ...commonStyles.caption,
+    fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
     marginTop: spacing.sm,
     textAlign: 'center',
@@ -139,7 +141,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   emptyTitle: {
-    ...commonStyles.subheading,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.secondary,
     marginTop: spacing.md,
     textAlign: 'center',

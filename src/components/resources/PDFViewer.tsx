@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Dimensions, Platform, ActivityIndicator } from 'react-native';
 import { Text } from 'react-native-paper';
 import { X } from 'lucide-react-native';
-import { colors, spacing } from '@/lib/design-system';
+import { colors, spacing } from '../../../lib/design-system';
 import { WebView } from 'react-native-webview';
 
 interface PDFViewerProps {

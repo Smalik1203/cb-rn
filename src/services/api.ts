@@ -1,5 +1,5 @@
-import { supabase } from '@/src/lib/supabase';
-import { Database } from '@/src/types/database.types';
+import { supabase } from '../lib/supabase';
+import { Database } from '../types/database.types';
 
 type Tables = Database['public']['Tables'];
 
@@ -30,8 +30,10 @@ export interface AttendanceRecord {
   student_id: string;
   class_instance_id: string;
   date: string;
-  status: 'present' | 'absent' | 'late' | 'excused';
+  status: string; // Changed from union type to string to match database
   marked_by: string;
+  marked_by_role_code: string; // Added missing field
+  school_code: string | null; // Added missing field
   created_at: string;
 }
 
@@ -40,19 +42,52 @@ export interface FeePayment {
   student_id: string;
   amount_paise: number;
   payment_date: string;
-  payment_method: string;
-  status: string;
-  created_at: string;
+  payment_method: string | null;
+  component_type_id: string;
+  plan_id: string | null;
+  receipt_number: string | null;
+  remarks: string | null;
+  school_code: string;
+  transaction_id: string | null;
+  created_by: string;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 export interface TimetableSlot {
   id: string;
+  school_code: string;
   class_instance_id: string;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  subject_id: string;
-  teacher_id?: string;
+  class_date: string; // YYYY-MM-DD
+  period_number: number;
+  slot_type: 'period' | 'break' | string;
+  name: string | null;
+  start_time: string; // HH:MM:SS
+  end_time: string;   // HH:MM:SS
+  subject_id: string | null;
+  teacher_id: string | null;
+  syllabus_item_id?: string | null;
+  plan_text?: string | null;
+  status: 'planned' | 'done' | 'cancelled' | string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  syllabus_chapter_id?: string | null;
+  syllabus_topic_id?: string | null;
+  // Enriched properties added by useUnifiedTimetable hook
+  subject_name?: string | null;
+  teacher_name?: string | null;
+  // Legacy nested objects (for backward compatibility)
+  subject?: {
+    id: string;
+    subject_name: string;
+  };
+  teacher?: {
+    id: string;
+    full_name: string;
+  };
+  // Legacy properties for backward compatibility
+  day_of_week?: number;
 }
 
 export interface LearningResource {
@@ -74,24 +109,44 @@ export interface CalendarEvent {
   id: string;
   title: string;
   description: string | null;
-  event_date: string;
   event_type: string;
+  start_date: string;
+  end_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  is_all_day: boolean | null;
+  is_recurring: boolean | null;
+  recurrence_pattern: string | null;
+  recurrence_interval: number | null;
+  recurrence_end_date: string | null;
+  color: string | null;
+  is_active: boolean | null;
   school_code: string;
   class_instance_id: string | null;
-  created_at: string;
+  academic_year_id: string | null;
+  created_by: string;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 export interface Task {
   id: string;
   title: string;
   description: string | null;
-  due_date: string | null;
-  priority: string;
-  status: string;
-  assigned_to: string;
-  created_by: string;
+  instructions: string | null;
+  assigned_date: string;
+  due_date: string;
+  priority: string | null;
+  max_marks: number | null;
+  attachments: any | null;
+  is_active: boolean | null;
+  academic_year_id: string | null;
+  class_instance_id: string | null;
+  subject_id: string | null;
   school_code: string;
-  created_at: string;
+  created_by: string;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 export const api = {
@@ -140,7 +195,7 @@ export const api = {
           profile.admin = adminData;
           profile.full_name = adminData.full_name;
           profile.email = adminData.email;
-          profile.phone = adminData.phone;
+          profile.phone = adminData.phone?.toString();
         }
       }
 
@@ -394,10 +449,10 @@ export const api = {
   calendar: {
     async getByClass(classId: string): Promise<CalendarEvent[]> {
       const { data, error } = await supabase
-        .from('calendar_events')
+        .from('school_calendar_events')
         .select('*')
         .eq('class_instance_id', classId)
-        .order('event_date', { ascending: true });
+        .order('start_date', { ascending: true });
 
       if (error) throw error;
       return data || [];
@@ -405,10 +460,10 @@ export const api = {
 
     async getBySchool(schoolCode: string): Promise<CalendarEvent[]> {
       const { data, error } = await supabase
-        .from('calendar_events')
+        .from('school_calendar_events')
         .select('*')
         .eq('school_code', schoolCode)
-        .order('event_date', { ascending: true });
+        .order('start_date', { ascending: true });
 
       if (error) throw error;
       return data || [];
@@ -420,7 +475,7 @@ export const api = {
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
-        .eq('assigned_to', userId)
+        .eq('created_by', userId)
         .order('due_date', { ascending: true });
 
       if (error) throw error;

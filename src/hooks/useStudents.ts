@@ -1,20 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/src/services/api';
+import { listStudents } from '../data/queries';
 
-export function useClassStudents(classId?: string) {
+export function useStudents(classInstanceId?: string, schoolCode?: string) {
   return useQuery({
-    queryKey: ['students', 'class', classId],
-    queryFn: () => api.students.getByClass(classId!),
-    enabled: !!classId,
-    staleTime: 10 * 60 * 1000,
-  });
-}
-
-export function useSchoolStudents(schoolCode?: string) {
-  return useQuery({
-    queryKey: ['students', 'school', schoolCode],
-    queryFn: () => api.students.getBySchool(schoolCode!),
-    enabled: !!schoolCode,
-    staleTime: 10 * 60 * 1000,
+    queryKey: ['students', classInstanceId, schoolCode],
+    queryFn: async () => {
+      if (!classInstanceId || !schoolCode) {
+        return [];
+      }
+      const result = await listStudents(classInstanceId, schoolCode);
+      if (result.error) throw result.error;
+      return result.data || [];
+    },
+    enabled: !!classInstanceId && !!schoolCode,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   });
 }

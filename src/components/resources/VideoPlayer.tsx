@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { Text } from 'react-native-paper';
-import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { X } from 'lucide-react-native';
 import { WebView } from 'react-native-webview';
-import { colors, spacing } from '@/lib/design-system';
+import { colors, spacing } from '../../../lib/design-system';
+import { removeYouTubeBranding } from '../../utils/youtubeBrandingRemoval';
 
 interface VideoPlayerProps {
   uri: string;
@@ -31,16 +32,20 @@ function isYouTubeUrl(url: string): boolean {
 }
 
 export function VideoPlayer({ uri, title, onClose }: VideoPlayerProps) {
-  const video = useRef<Video>(null);
-
   const isYouTube = isYouTubeUrl(uri);
   const youtubeVideoId = isYouTube ? getYouTubeVideoId(uri) : null;
 
   const youtubeEmbedUrl = youtubeVideoId
-    ? `https://www.youtube.com/embed/${youtubeVideoId}?autoplay=0&playsinline=1&controls=1&rel=0`
+    ? `https://www.youtube.com/embed/${youtubeVideoId}?autoplay=0&playsinline=1&controls=1&rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&fs=0&cc_load_policy=0&disablekb=1&enablejsapi=1`
     : null;
 
   const { width, height } = Dimensions.get('window');
+
+  // Use the new expo-video player for non-YouTube videos
+  const player = useVideoPlayer(isYouTube ? null : uri, (player) => {
+    player.loop = false;
+    player.muted = false;
+  });
 
   return (
     <View style={styles.container}>
@@ -61,15 +66,20 @@ export function VideoPlayer({ uri, title, onClose }: VideoPlayerProps) {
             mediaPlaybackRequiresUserAction={false}
             javaScriptEnabled
             domStorageEnabled
+            injectedJavaScript={removeYouTubeBranding}
+            startInLoadingState
+            scalesPageToFit={false}
+            bounces={false}
+            scrollEnabled={false}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
           />
         ) : (
-          <Video
-            ref={video}
-            source={{ uri }}
+          <VideoView
+            player={player}
             style={[styles.video, { width, height: height - 100 }]}
-            useNativeControls
-            resizeMode={ResizeMode.CONTAIN}
-            shouldPlay={false}
+            allowsFullscreen
+            allowsPictureInPicture
           />
         )}
       </View>

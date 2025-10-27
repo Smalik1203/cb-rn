@@ -2,8 +2,8 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Text, Card, Chip } from 'react-native-paper';
 import { Users, ChevronDown } from 'lucide-react-native';
-import { useClassSelection } from '@/src/contexts/ClassSelectionContext';
-import { colors, typography, spacing, borderRadius, shadows } from '@/lib/design-system';
+import { useClassSelection } from '../contexts/ClassSelectionContext';
+import { colors, typography, spacing, borderRadius, shadows } from '../../lib/design-system';
 
 interface ClassSelectorProps {
   style?: any;
@@ -75,27 +75,29 @@ export const ClassSelector: React.FC<ClassSelectorProps> = ({ style }) => {
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* All Classes Option */}
-          <TouchableOpacity
-            style={[
-              styles.classChip,
-              !selectedClass && styles.classChipSelected
-            ]}
-            onPress={() => setSelectedClass(null)}
-          >
-            <Text style={[
-              styles.classChipText,
-              !selectedClass && styles.classChipTextSelected
-            ]}>
-              All Classes
-            </Text>
-            <Text style={[
-              styles.studentCount,
-              !selectedClass && styles.studentCountSelected
-            ]}>
-              {classes.reduce((total, cls) => total + (cls.student_count || 0), 0)} students
-            </Text>
-          </TouchableOpacity>
+          {/* All Classes Option - only for superadmin/cb_admin */}
+          {shouldShowClassSelector && (
+            <TouchableOpacity
+              style={[
+                styles.classChip,
+                !selectedClass && styles.classChipSelected
+              ]}
+              onPress={() => setSelectedClass(null)}
+            >
+              <Text style={[
+                styles.classChipText,
+                !selectedClass && styles.classChipTextSelected
+              ]}>
+                All Classes
+              </Text>
+              <Text style={[
+                styles.studentCount,
+                !selectedClass && styles.studentCountSelected
+              ]}>
+                {classes.reduce((total, cls) => total + (cls.student_count || 0), 0)} students
+              </Text>
+            </TouchableOpacity>
+          )}
           
           {classes.map((classItem) => (
             <TouchableOpacity

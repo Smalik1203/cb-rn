@@ -1,30 +1,138 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { Text, Card, Button, SegmentedButtons, Chip, List, ActivityIndicator } from 'react-native-paper';
 import { Users, UserPlus, Settings, Shield, BookOpen, Calendar, TrendingUp, Activity, AlertCircle } from 'lucide-react-native';
-import { useAuth } from '@/src/contexts/AuthContext';
-import { colors, typography, spacing, borderRadius, shadows } from '@/lib/design-system';
-import { useUserStats, useRecentUsers } from '@/src/features/users/hooks/useUsers';
-import { useClassStats, useClassesList } from '@/src/features/classes/hooks/useClasses';
+import { useAuth } from '../../src/contexts/AuthContext';
+import { colors, typography, spacing, borderRadius, shadows } from '../../lib/design-system';
+import { useClasses } from '../../src/hooks/useClasses';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../../src/lib/supabase';
+import { DB } from '../../src/types/db.constants';
+
+interface UserStats {
+  totalUsers: number;
+  students: number;
+  teachers: number;
+  admins: number;
+}
+
+interface ClassStats {
+  totalClasses: number;
+  activeClasses: number;
+  totalStudents: number;
+}
 
 export default function ManageScreen() {
   const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState<'users' | 'classes' | 'settings'>('users');
   const [refreshing, setRefreshing] = useState(false);
 
-  const { data: userStats, isLoading: userStatsLoading, error: userStatsError, refetch: refetchUserStats } = useUserStats();
-  const { data: recentUsers, isLoading: recentUsersLoading, error: recentUsersError, refetch: refetchRecentUsers } = useRecentUsers();
-  const { data: classStats, isLoading: classStatsLoading, error: classStatsError, refetch: refetchClassStats } = useClassStats();
-  const { data: classList, isLoading: classListLoading, error: classListError, refetch: refetchClassList } = useClassesList(0, 10);
+  const role = profile?.role || 'student';
+  const canManage = role === 'admin' || role === 'superadmin' || role === 'cb_admin';
+
+  if (!canManage) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <View style={styles.headerLeft}>
+              <View style={styles.iconContainer}>
+                <Users size={32} color={colors.text.inverse} />
+              </View>
+              <View>
+                <Text variant="headlineSmall" style={styles.headerTitle}>
+                  Management
+                </Text>
+                <Text variant="bodyLarge" style={styles.headerSubtitle}>
+                  Access restricted to administrators
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+        <View style={styles.restrictedContainer}>
+          <Shield size={64} color={colors.text.tertiary} />
+          <Text variant="titleLarge" style={styles.restrictedTitle}>Access Restricted</Text>
+          <Text variant="bodyMedium" style={styles.restrictedMessage}>
+            Management features are only available to administrators.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Fetch user statistics
+  const { data: userStats, isLoading: userStatsLoading, error: userStatsError, refetch: refetchUserStats } = useQuery({
+    queryKey: ['user-stats', profile?.school_code],
+    queryFn: async (): Promise<UserStats> => {
+      if (!profile?.school_code) throw new Error('No school selected');
+
+      const { data: studentsData, error: studentsError } = await supabase
+        .from(DB.tables.student)
+        .select('id')
+        .eq('school_code', profile.school_code);
+      
+      if (studentsError) throw studentsError;
+
+      const { data: adminsData, error: adminsError } = await supabase
+        .from(DB.tables.admin)
+        .select('id, role')
+        .eq('school_code', profile.school_code);
+      
+      if (adminsError) throw adminsError;
+
+      const teachers = adminsData?.filter(admin => admin.role === 'teacher').length || 0;
+      const admins = adminsData?.filter(admin => admin.role === 'admin').length || 0;
+
+      return {
+        totalUsers: (studentsData?.length || 0) + (adminsData?.length || 0),
+        students: studentsData?.length || 0,
+        teachers,
+        admins,
+      };
+    },
+    enabled: !!profile?.school_code,
+  });
+
+  // Fetch class statistics
+  const { data: classStats, isLoading: classStatsLoading, error: classStatsError, refetch: refetchClassStats } = useQuery({
+    queryKey: ['class-stats', profile?.school_code],
+    queryFn: async (): Promise<ClassStats> => {
+      if (!profile?.school_code) throw new Error('No school selected');
+
+      const { data: classesData, error: classesError } = await supabase
+        .from(DB.tables.classInstances)
+        .select('id')
+        .eq('school_code', profile.school_code);
+      
+      if (classesError) throw classesError;
+
+      const { data: studentsData, error: studentsError } = await supabase
+        .from(DB.tables.student)
+        .select('id')
+        .eq('school_code', profile.school_code);
+      
+      if (studentsError) throw studentsError;
+
+      return {
+        totalClasses: classesData?.length || 0,
+        activeClasses: classesData?.length || 0, // Assuming all classes are active for now
+        totalStudents: studentsData?.length || 0,
+      };
+    },
+    enabled: !!profile?.school_code,
+  });
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    if (activeTab === 'users') {
-      await Promise.all([refetchUserStats(), refetchRecentUsers()]);
-    } else if (activeTab === 'classes') {
-      await Promise.all([refetchClassStats(), refetchClassList()]);
+    try {
+      await Promise.all([
+        refetchUserStats(),
+        refetchClassStats(),
+      ]);
+    } finally {
+      setRefreshing(false);
     }
-    setRefreshing(false);
   };
 
   const getRoleIcon = (role: string) => {
@@ -53,661 +161,451 @@ export default function ManageScreen() {
     }
   };
 
-  const handleAddUser = () => {
-    Alert.alert('Add User', 'User management functionality will be implemented soon.');
-  };
+  const renderUsersTab = () => {
+    if (userStatsLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary[600]} />
+          <Text style={styles.loadingText}>Loading user statistics...</Text>
+        </View>
+      );
+    }
 
-  const handleAddClass = () => {
-    Alert.alert('Add Class', 'Class management functionality will be implemented soon.');
-  };
+    if (userStatsError) {
+      return (
+        <View style={styles.errorContainer}>
+          <AlertCircle size={64} color={colors.error[500]} />
+          <Text variant="titleLarge" style={styles.errorTitle}>Unable to load user data</Text>
+          <Text variant="bodyMedium" style={styles.errorMessage}>
+            {userStatsError instanceof Error ? userStatsError.message : 'Something went wrong'}
+          </Text>
+          <Button mode="contained" onPress={() => refetchUserStats()} style={styles.retryButton}>
+            Try Again
+          </Button>
+        </View>
+      );
+    }
 
-  if (activeTab === 'users' && userStatsError) {
     return (
-      <View style={styles.errorContainer}>
-        <AlertCircle size={64} color={colors.error[500]} />
-        <Text variant="titleLarge" style={styles.errorTitle}>Unable to load user data</Text>
-        <Text variant="bodyMedium" style={styles.errorMessage}>
-          {userStatsError instanceof Error ? userStatsError.message : 'Something went wrong'}
-        </Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => { refetchUserStats(); refetchRecentUsers(); }}>
-          <Text style={styles.retryButtonText}>Try Again</Text>
-        </TouchableOpacity>
+      <View style={styles.tabContent}>
+        {/* User Statistics */}
+        <View style={styles.statsGrid}>
+          <Card style={styles.statCard}>
+            <View style={styles.statContent}>
+              <View style={[styles.statIcon, { backgroundColor: colors.primary[50] }]}>
+                <Users size={24} color={colors.primary[600]} />
+              </View>
+              <View style={styles.statText}>
+                <Text variant="headlineSmall" style={styles.statValue}>
+                  {userStats?.totalUsers || 0}
+                </Text>
+                <Text variant="bodyMedium" style={styles.statLabel}>
+                  Total Users
+                </Text>
+              </View>
+            </View>
+          </Card>
+
+          <Card style={styles.statCard}>
+            <View style={styles.statContent}>
+              <View style={[styles.statIcon, { backgroundColor: colors.success[50] }]}>
+                <Users size={24} color={colors.success[600]} />
+              </View>
+              <View style={styles.statText}>
+                <Text variant="headlineSmall" style={styles.statValue}>
+                  {userStats?.students || 0}
+                </Text>
+                <Text variant="bodyMedium" style={styles.statLabel}>
+                  Students
+                </Text>
+              </View>
+            </View>
+          </Card>
+
+          <Card style={styles.statCard}>
+            <View style={styles.statContent}>
+              <View style={[styles.statIcon, { backgroundColor: colors.warning[50] }]}>
+                <BookOpen size={24} color={colors.warning[600]} />
+              </View>
+              <View style={styles.statText}>
+                <Text variant="headlineSmall" style={styles.statValue}>
+                  {userStats?.teachers || 0}
+                </Text>
+                <Text variant="bodyMedium" style={styles.statLabel}>
+                  Teachers
+                </Text>
+              </View>
+            </View>
+          </Card>
+
+          <Card style={styles.statCard}>
+            <View style={styles.statContent}>
+              <View style={[styles.statIcon, { backgroundColor: colors.error[50] }]}>
+                <Shield size={24} color={colors.error[600]} />
+              </View>
+              <View style={styles.statText}>
+                <Text variant="headlineSmall" style={styles.statValue}>
+                  {userStats?.admins || 0}
+                </Text>
+                <Text variant="bodyMedium" style={styles.statLabel}>
+                  Admins
+                </Text>
+              </View>
+            </View>
+          </Card>
+        </View>
+
+        {/* User Management Actions */}
+        <Card style={styles.actionCard}>
+          <Text variant="titleMedium" style={styles.actionTitle}>User Management</Text>
+          <View style={styles.actionButtons}>
+            <Button 
+              mode="contained" 
+              icon={() => <UserPlus size={20} color={colors.text.inverse} />}
+              style={styles.actionButton}
+              onPress={() => {/* TODO: Implement add user */}}
+            >
+              Add User
+            </Button>
+            <Button 
+              mode="outlined" 
+              icon={() => <Users size={20} color={colors.primary[600]} />}
+              style={styles.actionButton}
+              onPress={() => {/* TODO: Implement view users */}}
+            >
+              View Users
+            </Button>
+          </View>
+        </Card>
       </View>
     );
-  }
+  };
 
-  if (activeTab === 'classes' && classStatsError) {
+  const renderClassesTab = () => {
+    if (classStatsLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary[600]} />
+          <Text style={styles.loadingText}>Loading class statistics...</Text>
+        </View>
+      );
+    }
+
+    if (classStatsError) {
+      return (
+        <View style={styles.errorContainer}>
+          <AlertCircle size={64} color={colors.error[500]} />
+          <Text variant="titleLarge" style={styles.errorTitle}>Unable to load class data</Text>
+          <Text variant="bodyMedium" style={styles.errorMessage}>
+            {classStatsError instanceof Error ? classStatsError.message : 'Something went wrong'}
+          </Text>
+          <Button mode="contained" onPress={() => refetchClassStats()} style={styles.retryButton}>
+            Try Again
+          </Button>
+        </View>
+      );
+    }
+
     return (
-      <View style={styles.errorContainer}>
-        <AlertCircle size={64} color={colors.error[500]} />
-        <Text variant="titleLarge" style={styles.errorTitle}>Unable to load class data</Text>
-        <Text variant="bodyMedium" style={styles.errorMessage}>
-          {classStatsError instanceof Error ? classStatsError.message : 'Something went wrong'}
-        </Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => { refetchClassStats(); refetchClassList(); }}>
-          <Text style={styles.retryButtonText}>Try Again</Text>
-        </TouchableOpacity>
+      <View style={styles.tabContent}>
+        {/* Class Statistics */}
+        <View style={styles.statsGrid}>
+          <Card style={styles.statCard}>
+            <View style={styles.statContent}>
+              <View style={[styles.statIcon, { backgroundColor: colors.primary[50] }]}>
+                <BookOpen size={24} color={colors.primary[600]} />
+              </View>
+              <View style={styles.statText}>
+                <Text variant="headlineSmall" style={styles.statValue}>
+                  {classStats?.totalClasses || 0}
+                </Text>
+                <Text variant="bodyMedium" style={styles.statLabel}>
+                  Total Classes
+                </Text>
+              </View>
+            </View>
+          </Card>
+
+          <Card style={styles.statCard}>
+            <View style={styles.statContent}>
+              <View style={[styles.statIcon, { backgroundColor: colors.success[50] }]}>
+                <Activity size={24} color={colors.success[600]} />
+              </View>
+              <View style={styles.statText}>
+                <Text variant="headlineSmall" style={styles.statValue}>
+                  {classStats?.activeClasses || 0}
+                </Text>
+                <Text variant="bodyMedium" style={styles.statLabel}>
+                  Active Classes
+                </Text>
+              </View>
+            </View>
+          </Card>
+
+          <Card style={styles.statCard}>
+            <View style={styles.statContent}>
+              <View style={[styles.statIcon, { backgroundColor: colors.warning[50] }]}>
+                <Users size={24} color={colors.warning[600]} />
+              </View>
+              <View style={styles.statText}>
+                <Text variant="headlineSmall" style={styles.statValue}>
+                  {classStats?.totalStudents || 0}
+                </Text>
+                <Text variant="bodyMedium" style={styles.statLabel}>
+                  Total Students
+                </Text>
+              </View>
+            </View>
+          </Card>
+        </View>
+
+        {/* Class Management Actions */}
+        <Card style={styles.actionCard}>
+          <Text variant="titleMedium" style={styles.actionTitle}>Class Management</Text>
+          <View style={styles.actionButtons}>
+            <Button 
+              mode="contained" 
+              icon={() => <BookOpen size={20} color={colors.text.inverse} />}
+              style={styles.actionButton}
+              onPress={() => {/* TODO: Implement add class */}}
+            >
+              Add Class
+            </Button>
+            <Button 
+              mode="outlined" 
+              icon={() => <Calendar size={20} color={colors.primary[600]} />}
+              style={styles.actionButton}
+              onPress={() => {/* TODO: Implement manage classes */}}
+            >
+              Manage Classes
+            </Button>
+          </View>
+        </Card>
       </View>
     );
-  }
+  };
+
+  const renderSettingsTab = () => {
+    return (
+      <View style={styles.tabContent}>
+        <Card style={styles.actionCard}>
+          <Text variant="titleMedium" style={styles.actionTitle}>School Settings</Text>
+          <Text variant="bodyMedium" style={styles.comingSoonText}>
+            School settings and configuration options will be available in the next update.
+          </Text>
+        </Card>
+
+        <Card style={styles.actionCard}>
+          <Text variant="titleMedium" style={styles.actionTitle}>Academic Settings</Text>
+          <Text variant="bodyMedium" style={styles.comingSoonText}>
+            Academic year, curriculum, and fee structure settings will be available in the next update.
+          </Text>
+        </Card>
+
+        <Card style={styles.actionCard}>
+          <Text variant="titleMedium" style={styles.actionTitle}>System Settings</Text>
+          <Text variant="bodyMedium" style={styles.comingSoonText}>
+            Notification preferences and system configuration will be available in the next update.
+          </Text>
+        </Card>
+      </View>
+    );
+  };
 
   return (
-    <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-      }
-    >
-      <View
-        style={styles.header}
-      >
+    <View style={styles.container}>
+      <View style={styles.header}>
         <View style={styles.headerContent}>
-          <View style={styles.headerText}>
-            <Text variant="headlineLarge" style={styles.title}>Manage</Text>
-            <Text variant="bodyLarge" style={styles.subtitle}>
-              {profile?.school_name || 'School Administration'}
-            </Text>
-          </View>
-          <View style={styles.headerIcon}>
-            <Activity size={32} color={colors.text.inverse} />
+          <View style={styles.headerLeft}>
+            <View style={styles.iconContainer}>
+              <Users size={32} color={colors.text.inverse} />
+            </View>
+            <View>
+              <Text variant="headlineSmall" style={styles.headerTitle}>
+                Management
+              </Text>
+              <Text variant="bodyLarge" style={styles.headerSubtitle}>
+                User and class management
+              </Text>
+            </View>
           </View>
         </View>
       </View>
 
-      <SegmentedButtons
-        value={activeTab}
-        onValueChange={(value) => setActiveTab(value as 'users' | 'classes' | 'settings')}
-        buttons={[
-          { value: 'users', label: 'Users', icon: 'account-group' },
-          { value: 'classes', label: 'Classes', icon: 'school' },
-          { value: 'settings', label: 'Settings', icon: 'cog' },
-        ]}
-        style={styles.tabs}
-      />
+      <View style={styles.tabContainer}>
+        <SegmentedButtons
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value as 'users' | 'classes' | 'settings')}
+          buttons={[
+            { value: 'users', label: 'Users' },
+            { value: 'classes', label: 'Classes' },
+            { value: 'settings', label: 'Settings' },
+          ]}
+          style={styles.segmentedButtons}
+        />
+      </View>
 
-      {activeTab === 'users' && (
-        <>
-          {userStatsLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary[500]} />
-              <Text style={styles.loadingText}>Loading user data...</Text>
-            </View>
-          ) : userStats ? (
-            <>
-              <View style={styles.summaryCard}>
-                <View
-                  style={styles.summaryGradient}
-                >
-                  <View style={styles.summaryHeader}>
-                    <View style={styles.summaryIconContainer}>
-                      <Users size={28} color={colors.text.inverse} />
-                    </View>
-                    <Text variant="titleLarge" style={styles.summaryTitle}>User Overview</Text>
-                  </View>
-                  
-                  <View style={styles.summaryStats}>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{userStats.total}</Text>
-                      <Text style={styles.statLabel}>Total Users</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: colors.primary[200] }]}>{userStats.students}</Text>
-                      <Text style={styles.statLabel}>Students</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: colors.success[500] }]}>{userStats.teachers}</Text>
-                      <Text style={styles.statLabel}>Teachers</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: colors.warning[500] }]}>{userStats.admins}</Text>
-                      <Text style={styles.statLabel}>Admins</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <Text variant="titleLarge" style={styles.cardTitle}>Recent Users</Text>
-                  <TouchableOpacity style={styles.addButton} onPress={handleAddUser}>
-                    <UserPlus size={20} color={colors.text.inverse} />
-                    <Text style={styles.addButtonText}>Add User</Text>
-                  </TouchableOpacity>
-                </View>
-                
-                {recentUsersLoading ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color={colors.primary[500]} />
-                  </View>
-                ) : !recentUsers || recentUsers.length === 0 ? (
-                  <View style={styles.emptyContainer}>
-                    <Users size={48} color={colors.neutral[400]} />
-                    <Text variant="bodyMedium" style={styles.emptyText}>No users found</Text>
-                  </View>
-                ) : (
-                  <View style={styles.userList}>
-                    {recentUsers.map((user) => (
-                      <TouchableOpacity key={user.id} style={styles.userItem}>
-                        <View style={styles.userAvatar}>
-                          {getRoleIcon(user.role)}
-                        </View>
-                        <View style={styles.userInfo}>
-                          <Text variant="titleMedium" style={styles.userName}>{user.full_name}</Text>
-                          <Text style={styles.userDetails}>
-                            {user.role} {user.class_info ? `• ${user.class_info}` : ''}
-                          </Text>
-                          <Text style={styles.userDate}>
-                            Joined {new Date(user.created_at).toLocaleDateString('en-IN')}
-                          </Text>
-                        </View>
-                        <View style={styles.userStatus}>
-                          <View style={[styles.roleBadge, { backgroundColor: getRoleColor(user.role) + '15' }]}>
-                            <Text style={[styles.roleText, { color: getRoleColor(user.role) }]}>
-                              {user.role.toUpperCase()}
-                            </Text>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
-            </>
-          ) : null}
-        </>
-      )}
-
-      {activeTab === 'classes' && (
-        <>
-          {classStatsLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary[500]} />
-              <Text style={styles.loadingText}>Loading class data...</Text>
-            </View>
-          ) : classStats ? (
-            <>
-              <View style={styles.summaryCard}>
-                <View
-                  style={styles.summaryGradient}
-                >
-                  <View style={styles.summaryHeader}>
-                    <View style={styles.summaryIconContainer}>
-                      <BookOpen size={28} color={colors.text.inverse} />
-                    </View>
-                    <Text variant="titleLarge" style={styles.summaryTitle}>Class Overview</Text>
-                  </View>
-                  
-                  <View style={styles.summaryStats}>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{classStats.total}</Text>
-                      <Text style={styles.statLabel}>Total Classes</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: colors.success[500] }]}>{classStats.active}</Text>
-                      <Text style={styles.statLabel}>Active</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: colors.primary[200] }]}>{classStats.students}</Text>
-                      <Text style={styles.statLabel}>Students</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: colors.warning[500] }]}>{classStats.teachers}</Text>
-                      <Text style={styles.statLabel}>Teachers</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <Text variant="titleLarge" style={styles.cardTitle}>Class List</Text>
-                  <TouchableOpacity style={styles.addButton} onPress={handleAddClass}>
-                    <UserPlus size={20} color={colors.text.inverse} />
-                    <Text style={styles.addButtonText}>Add Class</Text>
-                  </TouchableOpacity>
-                </View>
-                
-                {classListLoading ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color={colors.primary[500]} />
-                  </View>
-                ) : !classList || classList.length === 0 ? (
-                  <View style={styles.emptyContainer}>
-                    <BookOpen size={48} color={colors.neutral[400]} />
-                    <Text variant="bodyMedium" style={styles.emptyText}>No classes found</Text>
-                  </View>
-                ) : (
-                  <View style={styles.classList}>
-                    {classList.map((classItem) => (
-                      <TouchableOpacity key={classItem.id} style={styles.classItem}>
-                        <View style={styles.classIcon}>
-                          <Calendar size={24} color={colors.primary[500]} />
-                        </View>
-                        <View style={styles.classInfo}>
-                          <Text variant="titleMedium" style={styles.className}>
-                            Grade {classItem.grade}-{classItem.section}
-                          </Text>
-                          <Text style={styles.classDetails}>
-                            {classItem.student_count} students
-                          </Text>
-                          {classItem.class_teacher_name && (
-                            <Text style={styles.classTeacher}>
-                              Teacher: {classItem.class_teacher_name}
-                            </Text>
-                          )}
-                        </View>
-                        <View style={styles.classActions}>
-                          <View style={styles.activeBadge}>
-                            <Text style={styles.activeText}>ACTIVE</Text>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
-            </>
-          ) : null}
-        </>
-      )}
-
-      {activeTab === 'settings' && (
-        <View style={styles.card}>
-          <Text variant="titleLarge" style={styles.cardTitle}>School Settings</Text>
-          
-          <View style={styles.settingsList}>
-            <TouchableOpacity style={styles.settingItem} onPress={() => Alert.alert('Settings', 'School settings functionality will be implemented soon.')}>
-              <View style={styles.settingIcon}>
-                <Shield size={24} color={colors.primary[500]} />
-              </View>
-              <View style={styles.settingContent}>
-                <Text variant="titleMedium" style={styles.settingTitle}>School Information</Text>
-                <Text style={styles.settingDescription}>Update school details and contact information</Text>
-              </View>
-              <View style={styles.settingArrow}>
-                <Text style={styles.arrowText}>›</Text>
-              </View>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.settingItem} onPress={() => Alert.alert('Settings', 'Academic year settings functionality will be implemented soon.')}>
-              <View style={styles.settingIcon}>
-                <Calendar size={24} color={colors.success[500]} />
-              </View>
-              <View style={styles.settingContent}>
-                <Text variant="titleMedium" style={styles.settingTitle}>Academic Year</Text>
-                <Text style={styles.settingDescription}>Manage academic year and terms</Text>
-              </View>
-              <View style={styles.settingArrow}>
-                <Text style={styles.arrowText}>›</Text>
-              </View>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.settingItem} onPress={() => Alert.alert('Settings', 'Curriculum settings functionality will be implemented soon.')}>
-              <View style={styles.settingIcon}>
-                <BookOpen size={24} color={colors.secondary[500]} />
-              </View>
-              <View style={styles.settingContent}>
-                <Text variant="titleMedium" style={styles.settingTitle}>Subjects & Curriculum</Text>
-                <Text style={styles.settingDescription}>Configure subjects and curriculum</Text>
-              </View>
-              <View style={styles.settingArrow}>
-                <Text style={styles.arrowText}>›</Text>
-              </View>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.settingItem} onPress={() => Alert.alert('Settings', 'Fee structure settings functionality will be implemented soon.')}>
-              <View style={styles.settingIcon}>
-                <TrendingUp size={24} color={colors.warning[500]} />
-              </View>
-              <View style={styles.settingContent}>
-                <Text variant="titleMedium" style={styles.settingTitle}>Fee Structure</Text>
-                <Text style={styles.settingDescription}>Manage fee components and structure</Text>
-              </View>
-              <View style={styles.settingArrow}>
-                <Text style={styles.arrowText}>›</Text>
-              </View>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.settingItem} onPress={() => Alert.alert('Settings', 'Notification settings functionality will be implemented soon.')}>
-              <View style={styles.settingIcon}>
-                <Settings size={24} color={colors.error[500]} />
-              </View>
-              <View style={styles.settingContent}>
-                <Text variant="titleMedium" style={styles.settingTitle}>Notifications</Text>
-                <Text style={styles.settingDescription}>Configure notification preferences</Text>
-              </View>
-              <View style={styles.settingArrow}>
-                <Text style={styles.arrowText}>›</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-    </ScrollView>
+      <ScrollView 
+        style={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
+        {activeTab === 'users' && renderUsersTab()}
+        {activeTab === 'classes' && renderClassesTab()}
+        {activeTab === 'settings' && renderSettingsTab()}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.secondary,
+    backgroundColor: colors.background.app,
   },
   header: {
-    paddingTop: spacing['12'],
-    paddingBottom: spacing['8'],
-    paddingHorizontal: spacing['6'],
+    backgroundColor: colors.primary[600],
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.lg,
   },
   headerContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  headerText: {
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
   },
-  headerIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.lg,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: spacing.md,
   },
-  title: {
+  headerTitle: {
     color: colors.text.inverse,
     fontWeight: typography.fontWeight.bold,
-    marginBottom: spacing['1'],
   },
-  subtitle: {
+  headerSubtitle: {
     color: colors.text.inverse,
     opacity: 0.9,
   },
-  tabs: {
-    margin: spacing['6'],
-    marginBottom: spacing['2'],
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.xl,
-    ...shadows.sm,
-  },
-  summaryCard: {
-    margin: spacing['6'],
-    marginBottom: spacing['3'],
-    borderRadius: borderRadius['2xl'],
-    overflow: 'hidden',
-    ...shadows.lg,
-  },
-  summaryGradient: {
-    padding: spacing['6'],
-  },
-  summaryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing['6'],
-  },
-  summaryIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  restrictedContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing['3'],
+    paddingHorizontal: spacing.lg,
   },
-  summaryTitle: {
-    color: colors.text.inverse,
-    fontWeight: typography.fontWeight.semibold,
-    flex: 1,
-  },
-  summaryStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.inverse,
-    marginBottom: spacing['1'],
-  },
-  statLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.inverse,
-    opacity: 0.8,
-    fontWeight: typography.fontWeight.medium,
-  },
-  card: {
-    margin: spacing['6'],
-    marginBottom: spacing['3'],
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius['2xl'],
-    padding: spacing['6'],
-    ...shadows.md,
-    borderWidth: 1,
-    borderColor: colors.neutral[100],
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing['6'],
-  },
-  cardTitle: {
-    fontWeight: typography.fontWeight.semibold,
+  restrictedTitle: {
     color: colors.text.primary,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
   },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary[500],
-    paddingVertical: spacing['2'],
-    paddingHorizontal: spacing['4'],
-    borderRadius: borderRadius.lg,
-    ...shadows.sm,
-  },
-  addButtonText: {
-    color: colors.text.inverse,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    marginLeft: spacing['2'],
-  },
-  userList: {
-    gap: spacing['3'],
-  },
-  userItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing['4'],
-    backgroundColor: colors.background.secondary,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-    borderColor: colors.neutral[200],
-  },
-  userAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primary[100],
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing['4'],
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    marginBottom: spacing['1'],
-  },
-  userDetails: {
-    fontSize: typography.fontSize.sm,
+  restrictedMessage: {
     color: colors.text.secondary,
-    marginBottom: spacing['0.5'],
+    textAlign: 'center',
   },
-  userDate: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.tertiary,
+  tabContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
-  userStatus: {
-    marginLeft: spacing['4'],
+  segmentedButtons: {
+    backgroundColor: colors.surface.secondary,
   },
-  roleBadge: {
-    paddingVertical: spacing['1'],
-    paddingHorizontal: spacing['3'],
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  roleText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  classList: {
-    gap: spacing['3'],
-  },
-  classItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing['4'],
-    backgroundColor: colors.background.secondary,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-    borderColor: colors.neutral[200],
-  },
-  classIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primary[100],
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing['4'],
-  },
-  classInfo: {
+  content: {
     flex: 1,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
-  className: {
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    marginBottom: spacing['1'],
-  },
-  classDetails: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    marginBottom: spacing['0.5'],
-  },
-  classTeacher: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.tertiary,
-  },
-  classActions: {
-    marginLeft: spacing['4'],
-  },
-  activeBadge: {
-    backgroundColor: colors.success[500] + '20',
-    paddingVertical: spacing['1'],
-    paddingHorizontal: spacing['3'],
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activeText: {
-    color: colors.success[500],
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  settingsList: {
-    gap: spacing['2'],
-  },
-  settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing['4'],
-    backgroundColor: colors.background.secondary,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-    borderColor: colors.neutral[200],
-  },
-  settingIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.neutral[100],
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing['4'],
-  },
-  settingContent: {
-    flex: 1,
-  },
-  settingTitle: {
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    marginBottom: spacing['0.5'],
-  },
-  settingDescription: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-  },
-  settingArrow: {
-    marginLeft: spacing['4'],
-  },
-  arrowText: {
-    fontSize: typography.fontSize.xl,
-    color: colors.text.tertiary,
-    fontWeight: typography.fontWeight.bold,
+  tabContent: {
+    paddingBottom: spacing.xl,
   },
   loadingContainer: {
-    alignItems: 'center',
+    flex: 1,
     justifyContent: 'center',
-    paddingVertical: spacing['20'],
-    marginTop: spacing['12'],
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
   },
   loadingText: {
-    marginTop: spacing['4'],
+    marginTop: spacing.md,
     color: colors.text.secondary,
-    fontSize: typography.fontSize.base,
   },
   errorContainer: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing['8'],
-    backgroundColor: colors.background.secondary,
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
   },
   errorTitle: {
-    marginTop: spacing['6'],
-    marginBottom: spacing['2'],
     color: colors.text.primary,
-    textAlign: 'center',
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
   },
   errorMessage: {
     color: colors.text.secondary,
     textAlign: 'center',
-    marginBottom: spacing['8'],
+    marginBottom: spacing.lg,
   },
   retryButton: {
-    backgroundColor: colors.primary[500],
-    paddingHorizontal: spacing['6'],
-    paddingVertical: spacing['3'],
-    borderRadius: borderRadius.lg,
-    ...shadows.md,
+    marginTop: spacing.md,
   },
-  retryButtonText: {
-    color: colors.text.inverse,
-    fontWeight: typography.fontWeight.semibold,
-    fontSize: typography.fontSize.base,
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginBottom: spacing.xl,
   },
-  emptyContainer: {
+  statCard: {
+    width: '48%',
+    padding: spacing.lg,
+  },
+  statContent: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing['12'],
   },
-  emptyText: {
-    marginTop: spacing['4'],
+  statIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  statText: {
+    flex: 1,
+  },
+  statValue: {
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+  },
+  statLabel: {
     color: colors.text.secondary,
+  },
+  actionCard: {
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  actionTitle: {
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing.lg,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  actionButton: {
+    flex: 1,
+  },
+  comingSoonText: {
+    color: colors.text.secondary,
+    lineHeight: 24,
   },
 });

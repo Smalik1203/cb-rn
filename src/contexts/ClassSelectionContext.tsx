@@ -1,7 +1,21 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
-import { useClassesList } from '@/src/features/classes/hooks/useClasses';
-import { ClassListItem } from '@/src/features/classes/hooks/useClasses';
+import { useClasses } from '../hooks/useClasses';
+import { getActiveAcademicYear } from '../data/queries';
+
+const SCOPE_STORAGE_KEY = '@classbridge_app_scope';
+
+interface ClassListItem {
+  id: string;
+  grade: number;
+  section: string;
+  school_code: string;
+  academic_year_id: string | null;
+  class_teacher_name?: string;
+  student_count?: number;
+  created_at?: string;
+}
 
 interface ClassSelectionContextType {
   selectedClass: ClassListItem | null;
@@ -11,6 +25,15 @@ interface ClassSelectionContextType {
   error: Error | null;
   isSuperAdmin: boolean;
   shouldShowClassSelector: boolean;
+  // Academic year scope
+  academicYearId: string | null;
+  setAcademicYearId: (yearId: string | null) => Promise<void>;
+  // Full scope
+  scope: {
+    school_code: string | null;
+    academic_year_id: string | null;
+    class_instance_id: string | null;
+  };
 }
 
 const ClassSelectionContext = createContext<ClassSelectionContextType>({
@@ -21,6 +44,13 @@ const ClassSelectionContext = createContext<ClassSelectionContextType>({
   error: null,
   isSuperAdmin: false,
   shouldShowClassSelector: false,
+  academicYearId: null,
+  setAcademicYearId: async () => {},
+  scope: {
+    school_code: null,
+    academic_year_id: null,
+    class_instance_id: null,
+  },
 });
 
 export const useClassSelection = () => {
@@ -32,14 +62,63 @@ export const useClassSelection = () => {
 };
 
 export const ClassSelectionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [selectedClass, setSelectedClass] = useState<ClassListItem | null>(null);
+  const [academicYearId, setAcademicYearIdState] = useState<string | null>(null);
+  const [scopeLoading, setScopeLoading] = useState(true);
   
   const isSuperAdmin = profile?.role === 'superadmin' || profile?.role === 'cb_admin';
-  const shouldShowClassSelector = isSuperAdmin;
+  // Show for superadmins/cb_admin and admins managing multiple classes
+  const shouldShowClassSelector = isSuperAdmin || profile?.role === 'admin';
   
-  const { data: classes = [], isLoading, error } = useClassesList();
+  const { data: classes = [], isLoading, error } = useClasses(profile?.school_code);
 
+  // Load scope from AsyncStorage on mount
+  useEffect(() => {
+    const loadScope = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(SCOPE_STORAGE_KEY);
+        if (stored) {
+          const parsedScope = JSON.parse(stored);
+          setAcademicYearIdState(parsedScope.academic_year_id);
+        }
+      } catch (error) {
+      }
+    };
+    loadScope();
+  }, []);
+
+  // Initialize academic year from user profile when auth is ready
+  useEffect(() => {
+    const initializeAcademicYear = async () => {
+      if (!user || !profile?.school_code) {
+        setScopeLoading(false);
+        return;
+      }
+
+      try {
+        if (academicYearId) {
+          setScopeLoading(false);
+          return;
+        }
+
+        const { data: academicYear } = await getActiveAcademicYear(profile.school_code);
+        if (academicYear) {
+          setAcademicYearIdState(academicYear.id);
+          await AsyncStorage.setItem(SCOPE_STORAGE_KEY, JSON.stringify({
+            school_code: profile.school_code,
+            academic_year_id: academicYear.id,
+            class_instance_id: selectedClass?.id || null,
+          }));
+        }
+      } catch (error) {
+      } finally {
+        setScopeLoading(false);
+      }
+    };
+
+    initializeAcademicYear();
+  }, [user, profile, academicYearId, selectedClass?.id]);
 
   // Auto-select first class for super admin if none selected
   useEffect(() => {
@@ -48,24 +127,56 @@ export const ClassSelectionProvider: React.FC<{ children: React.ReactNode }> = (
     }
   }, [isSuperAdmin, classes, selectedClass]);
 
-  // For non-super admins, use their assigned class
+  // For admins/students, if only one class, auto-select it
   useEffect(() => {
-    if (!isSuperAdmin && profile?.class_instance_id && classes.length > 0) {
+    if (!isSuperAdmin && classes.length === 1 && !selectedClass) {
+      setSelectedClass(classes[0]);
+    } else if (!isSuperAdmin && profile?.class_instance_id && classes.length > 0) {
       const userClass = classes.find(cls => cls.id === profile.class_instance_id);
-      if (userClass) {
-        setSelectedClass(userClass);
-      }
+      if (userClass) setSelectedClass(userClass);
     }
-  }, [isSuperAdmin, profile?.class_instance_id, classes]);
+  }, [isSuperAdmin, profile?.class_instance_id, classes, selectedClass]);
+
+  // Update AsyncStorage when scope changes
+  useEffect(() => {
+    const updateStorage = async () => {
+      if (profile?.school_code) {
+        await AsyncStorage.setItem(SCOPE_STORAGE_KEY, JSON.stringify({
+          school_code: profile.school_code,
+          academic_year_id: academicYearId,
+          class_instance_id: selectedClass?.id || null,
+        }));
+      }
+    };
+    updateStorage();
+  }, [profile?.school_code, academicYearId, selectedClass?.id]);
+
+  const setAcademicYearId = useCallback(async (yearId: string | null) => {
+    setAcademicYearIdState(yearId);
+    if (profile?.school_code) {
+      await AsyncStorage.setItem(SCOPE_STORAGE_KEY, JSON.stringify({
+        school_code: profile.school_code,
+        academic_year_id: yearId,
+        class_instance_id: selectedClass?.id || null,
+      }));
+    }
+  }, [profile?.school_code, selectedClass?.id]);
 
   const value: ClassSelectionContextType = {
     selectedClass,
     setSelectedClass,
     classes,
-    isLoading,
+    isLoading: isLoading || scopeLoading,
     error,
     isSuperAdmin,
     shouldShowClassSelector,
+    academicYearId,
+    setAcademicYearId,
+    scope: {
+      school_code: profile?.school_code || null,
+      academic_year_id: academicYearId,
+      class_instance_id: selectedClass?.id || null,
+    },
   };
 
   return (

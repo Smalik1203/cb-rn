@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { CardSkeleton, StatCardSkeleton, ListCardSkeleton } from './CardSkeleton';
-import { colors, spacing, borderRadius } from '@/lib/design-system';
+import { colors, spacing, borderRadius } from '../../../lib/design-system';
 
 export function DashboardSkeleton() {
   return (

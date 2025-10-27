@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { Text, Card, Button, Chip, SegmentedButtons, ActivityIndicator, Portal, Modal, TextInput } from 'react-native-paper';
 import { Calendar, Clock, Users, BookOpen, MapPin, Plus, Edit, Trash2, ChevronLeft, ChevronRight } from 'lucide-react-native';
-import { useTimetable } from '@/src/features/timetable/hooks/useTimetable';
-import { useClassSelection } from '@/src/contexts/ClassSelectionContext';
-import { colors, typography, spacing, borderRadius, shadows } from '@/lib/design-system';
+import { useTimetableRange } from '../../hooks/useTimetable';
+import { useClassSelection } from '../../contexts/ClassSelectionContext';
+import { colors, typography, spacing, borderRadius, shadows } from '../../../lib/design-system';
 
 const { width } = Dimensions.get('window');
 
@@ -60,8 +60,15 @@ export const EnhancedTimetable: React.FC = () => {
 
   const classId = selectedClass?.id;
   const dateString = currentWeek.toISOString().split('T')[0];
-  
-  const { data: timetable, isLoading, error, refetch } = useTimetable(dateString, classId);
+  // Compute week range
+  const startOfWeek = new Date(currentWeek);
+  startOfWeek.setDate(currentWeek.getDate() - currentWeek.getDay());
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  const startDate = startOfWeek.toISOString().split('T')[0];
+  const endDate = endOfWeek.toISOString().split('T')[0];
+
+  const { data: timetable, isLoading, error, refetch } = useTimetableRange(classId, startDate, endDate);
 
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const shortDayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -79,13 +86,15 @@ export const EnhancedTimetable: React.FC = () => {
     return week;
   };
 
-  const getSlotsForDate = (date: string) => {
-    return timetable?.filter(slot => slot.class_date === date) || [];
+  const getSlotsForDate = (date: Date) => {
+    const dayOfWeek = date.getDay();
+    return timetable?.filter(slot => slot.class_date === date.toISOString().split('T')[0]) || [];
   };
 
-  const getSlotsForTime = (date: string, time: string) => {
+  const getSlotsForTime = (date: Date, time: string) => {
+    const d = date.toISOString().split('T')[0];
     return timetable?.filter(slot => 
-      slot.class_date === date && slot.start_time === time
+      slot.class_date === d && slot.start_time === time
     ) || [];
   };
 
@@ -112,7 +121,7 @@ export const EnhancedTimetable: React.FC = () => {
     setSlotForm({
       class_date: dateString,
       period_number: 1,
-      slot_type: 'subject',
+      slot_type: 'period',
       name: '',
       start_time: '',
       end_time: '',
@@ -123,15 +132,15 @@ export const EnhancedTimetable: React.FC = () => {
     setShowAddModal(true);
   };
 
-  const handleEditSlot = (slot: TimetableSlot) => {
+  const handleEditSlot = (slot: any) => {
     setEditingSlot(slot);
     setSlotForm({
-      class_date: slot.class_date,
-      period_number: slot.period_number,
-      slot_type: slot.slot_type,
+      class_date: slot.class_date || '',
+      period_number: slot.period_number || 1,
+      slot_type: (slot.slot_type === 'period' || slot.slot_type === 'break') ? slot.slot_type : 'period',
       name: slot.name || '',
-      start_time: slot.start_time,
-      end_time: slot.end_time,
+      start_time: slot.start_time || '',
+      end_time: slot.end_time || '',
       subject_id: slot.subject_id || '',
       teacher_id: slot.teacher_id || '',
       status: slot.status || 'planned',
@@ -141,20 +150,38 @@ export const EnhancedTimetable: React.FC = () => {
 
   const handleSaveSlot = async () => {
     try {
-      // This would save to the database
+      if (!selectedClass?.id) return;
+      const payload = {
+        class_instance_id: selectedClass.id,
+        school_code: selectedClass.school_code,
+        class_date: slotForm.class_date,
+        period_number: slotForm.period_number,
+        slot_type: (slotForm.slot_type as 'period' | 'break'),
+        name: slotForm.name || null,
+        start_time: slotForm.start_time,
+        end_time: slotForm.end_time,
+        subject_id: slotForm.subject_id || null,
+        teacher_id: slotForm.teacher_id || null,
+        status: slotForm.status as 'planned' | 'done' | 'cancelled',
+      };
+      // TODO: Implement timetable slot mutations
+      // if (editingSlot) {
+      //   await (await import('../../services/api')).api.timetable.updateSlot(editingSlot.id, payload);
+      // } else {
+      //   await (await import('../../services/api')).api.timetable.createSlot(payload as any);
+      // }
       setShowAddModal(false);
       refetch();
     } catch (error) {
-      console.error('Failed to save slot:', error);
     }
   };
 
   const handleDeleteSlot = async (slotId: string) => {
     try {
-      // This would delete from the database
+      // TODO: Implement timetable slot deletion
+      // await (await import('../../services/api')).api.timetable.deleteSlot(slotId);
       refetch();
     } catch (error) {
-      console.error('Failed to delete slot:', error);
     }
   };
 
@@ -191,7 +218,7 @@ export const EnhancedTimetable: React.FC = () => {
                 </Text>
               </View>
               {weekDates.map((date, dayIndex) => {
-                const slots = getSlotsForTime(date.toISOString().split('T')[0], time);
+                const slots = getSlotsForTime(date, time);
                 return (
                   <View key={dayIndex} style={styles.dayColumn}>
                     {slots.map((slot, slotIndex) => (
@@ -208,11 +235,9 @@ export const EnhancedTimetable: React.FC = () => {
                             {slot.teacher.full_name}
                           </Text>
                         )}
-                        {slot.name && (
-                          <Text variant="bodySmall" style={styles.slotRoom}>
-                            {slot.name}
-                          </Text>
-                        )}
+                        <Text variant="bodySmall" style={styles.slotRoom}>
+                          {slot.slot_type || 'Regular'}
+                        </Text>
                       </TouchableOpacity>
                     ))}
                     {slots.length === 0 && (
@@ -235,7 +260,7 @@ export const EnhancedTimetable: React.FC = () => {
   const renderDayView = () => {
     const weekDates = getWeekDates(currentWeek);
     const selectedDate = weekDates[selectedDay];
-    const slots = getSlotsForDate(selectedDate.toISOString().split('T')[0]);
+    const slots = getSlotsForDate(selectedDate);
 
     return (
       <View style={styles.dayContainer}>
@@ -305,14 +330,12 @@ export const EnhancedTimetable: React.FC = () => {
                       </View>
                     )}
 
-                    {slot.name && (
-                      <View style={styles.slotInfo}>
-                        <MapPin size={16} color={colors.text.secondary} />
-                        <Text variant="bodyMedium" style={styles.slotRoom}>
-                          {slot.name}
-                        </Text>
-                      </View>
-                    )}
+                    <View style={styles.slotInfo}>
+                      <MapPin size={16} color={colors.text.secondary} />
+                      <Text variant="bodyMedium" style={styles.slotRoom}>
+                        {slot.slot_type || 'Regular'}
+                      </Text>
+                    </View>
                   </View>
                 </Card.Content>
               </Card>

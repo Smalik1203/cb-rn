@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, Alert, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { TextInput, Button, Text, ActivityIndicator, Chip } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { supabase } from '@/src/lib/supabase';
-import { useAuth } from '@/src/contexts/AuthContext';
+import { supabase } from '../src/lib/supabase';
+import { useAuth } from '../src/contexts/AuthContext';
 import { GraduationCap, Eye, EyeOff, Mail, Lock } from 'lucide-react-native';
-import { colors, typography, spacing, borderRadius, shadows } from '@/lib/design-system';
+import { colors, typography, spacing, borderRadius, shadows } from '../lib/design-system';
 
 const { width, height } = Dimensions.get('window');
 

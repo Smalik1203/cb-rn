@@ -1,109 +1,199 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Dimensions } from 'react-native';
 import { Text } from 'react-native-paper';
-import { Calendar, CheckSquare, DollarSign, BookOpen, Users, BarChart3 } from 'lucide-react-native';
+import { Calendar, CheckSquare, DollarSign, BookOpen, Users, BarChart3, TrendingUp, Clock, Award, Bell, Activity } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { colors, typography, spacing, borderRadius, shadows } from '@/lib/design-system';
-import { useProfile } from '@/src/hooks/useProfile';
-import { useClass } from '@/src/hooks/useClasses';
-import { Card, LoadingView, ErrorView } from '@/src/components/ui';
+import { colors, typography, spacing, borderRadius, shadows } from '../../lib/design-system';
+import { useAuth } from '../../src/contexts/AuthContext';
+import { useClass } from '../../src/hooks/useClasses';
+import { useDashboardStats, useRecentActivity } from '../../src/hooks/useDashboard';
+import { Card, Badge, Avatar } from '../../src/components/ui';
+import { ThreeStateView } from '../../src/components/common/ThreeStateView';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const { width } = Dimensions.get('window');
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { data: profile, isLoading, error, refetch } = useProfile();
+  const { profile, loading: authLoading } = useAuth();
   const { data: classData } = useClass(profile?.class_instance_id || undefined);
   const [refreshing, setRefreshing] = React.useState(false);
+  
+  // Real data hooks
+  const { data: stats, isLoading: statsLoading, error: statsError } = useDashboardStats(
+    profile?.id || '', 
+    profile?.class_instance_id || undefined
+  );
+  const { data: recentActivity, isLoading: activityLoading, error: activityError } = useRecentActivity(
+    profile?.id || '', 
+    profile?.class_instance_id || undefined
+  );
+  
+  console.log('📱 Dashboard Render:', {
+    hasProfile: !!profile,
+    profileName: profile?.full_name,
+    profileRole: profile?.role,
+    schoolCode: profile?.school_code,
+    authLoading,
+    statsLoading,
+    activityLoading,
+    hasStatsError: !!statsError,
+    hasActivityError: !!activityError,
+    statsData: stats,
+    activityData: recentActivity,
+  });
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
+    try {
+      // Refresh logic would go here - TanStack Query handles refetching automatically
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (err) {
+      console.error('Refresh error:', err);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
-  if (isLoading) {
-    return <LoadingView message="Loading dashboard..." />;
-  }
-
-  if (error || !profile) {
-    return (
-      <ErrorView
-        message={error?.message || 'Failed to load your profile'}
-        onRetry={() => refetch()}
-      />
-    );
-  }
 
   const quickActions = [
     {
       title: 'Timetable',
       subtitle: 'View schedule',
       icon: Calendar,
-      color: colors.primary[500],
+      color: colors.primary[600],
       bgColor: colors.primary[50],
       route: '/timetable',
+      gradient: colors.gradient.primary,
     },
     {
       title: 'Attendance',
       subtitle: 'Mark & track',
       icon: CheckSquare,
-      color: colors.success[500],
+      color: colors.success[600],
       bgColor: colors.success[50],
       route: '/attendance',
+      gradient: colors.gradient.success,
     },
     {
       title: 'Fees',
       subtitle: 'Payments',
       icon: DollarSign,
-      color: colors.warning[500],
+      color: colors.warning[600],
       bgColor: colors.warning[50],
       route: '/fees',
+      gradient: colors.gradient.warning,
     },
     {
       title: 'Resources',
       subtitle: 'Learning',
       icon: BookOpen,
-      color: colors.info[500],
+      color: colors.info[600],
       bgColor: colors.info[50],
       route: '/resources',
+      gradient: colors.gradient.ocean,
     },
   ];
 
+  // Dynamic stats based on real data
+  const dashboardStats = stats ? [
+    {
+      title: 'Today\'s Classes',
+      value: stats.todaysClasses.toString(),
+      change: stats.todaysClasses > 0 ? `+${stats.todaysClasses}` : '0',
+      icon: Calendar,
+      color: colors.primary[600],
+      bgColor: colors.primary[50],
+    },
+    {
+      title: 'Attendance',
+      value: `${stats.attendancePercentage}%`,
+      change: stats.attendancePercentage >= 90 ? '+Good' : stats.attendancePercentage >= 80 ? '+Fair' : 'Needs Improvement',
+      icon: TrendingUp,
+      color: stats.attendancePercentage >= 90 ? colors.success[600] : stats.attendancePercentage >= 80 ? colors.warning[600] : colors.error[600],
+      bgColor: stats.attendancePercentage >= 90 ? colors.success[50] : stats.attendancePercentage >= 80 ? colors.warning[50] : colors.error[50],
+    },
+    {
+      title: 'Assignments',
+      value: stats.pendingAssignments.toString(),
+      change: stats.pendingAssignments > 0 ? 'Due' : 'All Done',
+      icon: Clock,
+      color: stats.pendingAssignments > 0 ? colors.warning[600] : colors.success[600],
+      bgColor: stats.pendingAssignments > 0 ? colors.warning[50] : colors.success[50],
+    },
+    {
+      title: 'Achievements',
+      value: stats.achievements.toString(),
+      change: stats.achievements > 0 ? `+${stats.achievements}` : '0',
+      icon: Award,
+      color: colors.secondary[600],
+      bgColor: colors.secondary[50],
+    },
+  ] : [];
+
+  const viewState = (authLoading || statsLoading || activityLoading) ? 'loading' : (statsError || activityError) ? 'error' : !profile ? 'empty' : 'success';
+  
+  // Determine if user has incomplete profile (fallback profile)
+  const hasIncompleteProfile = profile && (!profile.school_code || !profile.class_instance_id);
+  
+  console.log('🎨 Dashboard ViewState:', viewState, {
+    authLoading,
+    statsLoading,
+    activityLoading,
+    hasStatsError: !!statsError,
+    hasActivityError: !!activityError,
+    hasProfile: !!profile,
+    hasIncompleteProfile,
+    statsDetails: stats ? {
+      todaysClasses: stats.todaysClasses,
+      attendancePercentage: stats.attendancePercentage,
+      pendingAssignments: stats.pendingAssignments,
+      achievements: stats.achievements
+    } : null
+  });
+
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Welcome back</Text>
-          <Text style={styles.userName}>{profile.full_name}</Text>
-        </View>
-        <View style={styles.roleBadge}>
-          <Text style={styles.roleText}>{profile.role.toUpperCase()}</Text>
-        </View>
-      </View>
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-      >
-        {classData && (
-          <Card style={styles.classCard}>
-            <View style={styles.classHeader}>
-              <View style={styles.classIconContainer}>
-                <Users size={24} color={colors.primary[600]} />
+    <ThreeStateView
+      state={viewState}
+      loadingMessage="Loading dashboard..."
+      errorMessage="Failed to load dashboard"
+      errorDetails={statsError?.message || activityError?.message}
+      emptyMessage={
+        hasIncompleteProfile 
+          ? "Profile setup required. Please contact your administrator to complete your account setup."
+          : "No profile data available"
+      }
+      onRetry={handleRefresh}
+    >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+        >
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          {dashboardStats.map((stat, index) => (
+            <Card key={index} variant="elevated" style={styles.statCard}>
+              <View style={styles.statContent}>
+                <View style={[styles.statIconContainer, { backgroundColor: stat.bgColor }]}>
+                  <stat.icon size={20} color={stat.color} />
+                </View>
+                <View style={styles.statText}>
+                  <Text style={styles.statValue}>{stat.value}</Text>
+                  <Text style={styles.statTitle}>{stat.title}</Text>
+                  <Text style={[styles.statChange, { color: stat.color }]}>
+                    {stat.change}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.classInfo}>
-                <Text style={styles.classLabel}>Your Class</Text>
-                <Text style={styles.className}>
-                  Grade {classData.grade} - Section {classData.section}
-                </Text>
-              </View>
-            </View>
-          </Card>
-        )}
+            </Card>
+          ))}
+        </View>
 
+        {/* Quick Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.actionsGrid}>
@@ -112,44 +202,56 @@ export default function DashboardScreen() {
                 key={index}
                 style={styles.actionCard}
                 onPress={() => router.push(action.route as any)}
-                activeOpacity={0.7}
+                activeOpacity={0.8}
               >
-                <View style={[styles.actionIconContainer, { backgroundColor: action.bgColor }]}>
-                  <action.icon size={24} color={action.color} />
-                </View>
-                <Text style={styles.actionTitle}>{action.title}</Text>
-                <Text style={styles.actionSubtitle}>{action.subtitle}</Text>
+                <LinearGradient
+                  colors={action.gradient as [string, string, ...string[]]}
+                  style={styles.actionGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <View style={styles.actionIconContainer}>
+                    <action.icon size={28} color={colors.text.inverse} />
+                  </View>
+                  <Text style={styles.actionTitle}>{action.title}</Text>
+                  <Text style={styles.actionSubtitle}>{action.subtitle}</Text>
+                </LinearGradient>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
+        {/* Recent Activity */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Today's Overview</Text>
-          <Card>
-            <View style={styles.overviewItem}>
-              <View style={[styles.overviewIcon, { backgroundColor: colors.primary[50] }]}>
-                <Calendar size={20} color={colors.primary[600]} />
+          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <Card variant="elevated" style={styles.activityCard}>
+            {recentActivity && recentActivity.length > 0 ? (
+              recentActivity.map((activity, index) => (
+                <View key={activity.id} style={styles.activityItem}>
+                  <View style={[styles.activityIcon, { backgroundColor: colors.success[50] }]}>
+                    <CheckSquare size={16} color={colors.success[600]} />
+                  </View>
+                  <View style={styles.activityContent}>
+                    <Text style={styles.activityTitle}>{activity.title}</Text>
+                    <Text style={styles.activitySubtitle}>{activity.subtitle}</Text>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <View style={styles.activityItem}>
+                <View style={[styles.activityIcon, { backgroundColor: colors.neutral[50] }]}>
+                  <Activity size={16} color={colors.neutral[400]} />
+                </View>
+                <View style={styles.activityContent}>
+                  <Text style={styles.activityTitle}>No recent activity</Text>
+                  <Text style={styles.activitySubtitle}>Your activity will appear here</Text>
+                </View>
               </View>
-              <View style={styles.overviewContent}>
-                <Text style={styles.overviewLabel}>Classes Today</Text>
-                <Text style={styles.overviewValue}>0</Text>
-              </View>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.overviewItem}>
-              <View style={[styles.overviewIcon, { backgroundColor: colors.success[50] }]}>
-                <CheckSquare size={20} color={colors.success[600]} />
-              </View>
-              <View style={styles.overviewContent}>
-                <Text style={styles.overviewLabel}>Attendance</Text>
-                <Text style={styles.overviewValue}>-</Text>
-              </View>
-            </View>
+            )}
           </Card>
         </View>
-      </ScrollView>
-    </View>
+        </ScrollView>
+      </ThreeStateView>
   );
 }
 
@@ -158,143 +260,132 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background.app,
   },
-  header: {
-    backgroundColor: colors.surface.primary,
-    padding: spacing.lg,
-    paddingTop: spacing.xl + 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-  },
-  greeting: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.tertiary,
-    marginBottom: 4,
-  },
-  userName: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  roleBadge: {
-    backgroundColor: colors.primary[50],
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    borderRadius: borderRadius.full,
-  },
-  roleText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.primary[700],
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
   },
-  classCard: {
-    marginBottom: spacing.md,
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginBottom: spacing.xl,
   },
-  classHeader: {
+  statCard: {
+    width: (width - spacing.lg * 3) / 2,
+    padding: spacing.lg,
+  },
+  statContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  classIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.primary[50],
+  statIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.lg,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.sm,
+    marginRight: spacing.md,
   },
-  classInfo: {
+  statText: {
     flex: 1,
   },
-  classLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.tertiary,
+  statValue: {
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
     marginBottom: 2,
   },
-  className: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
+  statTitle: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginBottom: 2,
+  },
+  statChange: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
   },
   section: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
   sectionTitle: {
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   actionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   actionCard: {
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    width: '48%',
-    minWidth: 150,
-    ...shadows.sm,
+    width: (width - spacing.lg * 3) / 2,
+    height: 140,
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
+    ...shadows.lg,
+  },
+  actionGradient: {
+    flex: 1,
+    padding: spacing.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   actionIconContainer: {
-    width: 48,
-    height: 48,
+    width: 56,
+    height: 56,
+    borderRadius: borderRadius.xl,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  actionTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.inverse,
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
+  actionSubtitle: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.inverse,
+    opacity: 0.9,
+    textAlign: 'center',
+  },
+  activityCard: {
+    padding: spacing.lg,
+  },
+  activityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  activityIcon: {
+    width: 32,
+    height: 32,
     borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginRight: spacing.md,
   },
-  actionTitle: {
+  activityContent: {
+    flex: 1,
+  },
+  activityTitle: {
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
     marginBottom: 2,
   },
-  actionSubtitle: {
+  activitySubtitle: {
     fontSize: typography.fontSize.sm,
-    color: colors.text.tertiary,
-  },
-  overviewItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-  },
-  overviewIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.sm,
-  },
-  overviewContent: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  overviewLabel: {
-    fontSize: typography.fontSize.base,
     color: colors.text.secondary,
-  },
-  overviewValue: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border.light,
-    marginVertical: spacing.xs,
   },
 });

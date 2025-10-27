@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { mapError, formatErrorForLog } from './errorMapper';
+import { DB } from '../types/db.constants';
 import type {
   Student,
   StudentInsert,
@@ -22,16 +23,20 @@ import type {
   User,
   AcademicYear,
   Subject,
-} from '@/src/types/database.types';
+} from '../types/database.types';
 
 export interface QueryResult<T> {
   data: T | null;
   error: ReturnType<typeof mapError> | null;
 }
 
+type StudentLite = Pick<Student,
+  'id' | 'student_code' | 'full_name' | 'email' | 'phone' | 'class_instance_id' | 'school_code' | 'created_at'
+>;
+
 // ==================== AUTH & CONTEXT ====================
 
-export async function getCurrentUserContext(): Promise<QueryResult<{
+export async function getCurrentUserContext(options?: { signal?: AbortSignal }): Promise<QueryResult<{
   auth_id: string;
   role: string;
   school_code: string | null;
@@ -48,12 +53,13 @@ export async function getCurrentUserContext(): Promise<QueryResult<{
     }
     
     const { data, error } = await supabase
-      .from('users')
+      .from(DB.tables.users)
       .select('id, role, school_code, class_instance_id')
       .eq('id', user.id)
-      .single();
+      .abortSignal(options?.signal as any)
+      .maybeSingle();
     
-    if (error) {
+    if (error && (error as any).code !== 'PGRST116') {
       return {
         data: null,
         error: mapError(error, { queryName: 'getCurrentUserContext', table: 'users' }),
@@ -71,20 +77,20 @@ export async function getCurrentUserContext(): Promise<QueryResult<{
     };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getCurrentUserContext' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
 
-export async function getUserProfile(userId: string): Promise<QueryResult<User>> {
+export async function getUserProfile(userId: string, options?: { signal?: AbortSignal }): Promise<QueryResult<User>> {
   try {
     const { data, error } = await supabase
-      .from('users')
+      .from(DB.tables.users)
       .select('*')
       .eq('id', userId)
-      .single();
+      .abortSignal(options?.signal as any)
+      .maybeSingle();
     
-    if (error) {
+    if (error && (error as any).code !== 'PGRST116') {
       return {
         data: null,
         error: mapError(error, { queryName: 'getUserProfile', table: 'users' }),
@@ -94,23 +100,23 @@ export async function getUserProfile(userId: string): Promise<QueryResult<User>>
     return { data, error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getUserProfile' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
 
 // ==================== ACADEMIC YEARS ====================
 
-export async function getActiveAcademicYear(schoolCode: string): Promise<QueryResult<AcademicYear>> {
+export async function getActiveAcademicYear(schoolCode: string, options?: { signal?: AbortSignal }): Promise<QueryResult<AcademicYear>> {
   try {
     const { data, error } = await supabase
-      .from('academic_years')
+      .from(DB.tables.academicYears)
       .select('*')
-      .eq('school_code', schoolCode)
+      .eq(DB.columns.schoolCode, schoolCode)
       .eq('is_active', true)
-      .single();
+      .abortSignal(options?.signal as any)
+      .maybeSingle();
     
-    if (error) {
+    if (error && (error as any).code !== 'PGRST116') {
       return {
         data: null,
         error: mapError(error, { queryName: 'getActiveAcademicYear', table: 'academic_years' }),
@@ -120,18 +126,19 @@ export async function getActiveAcademicYear(schoolCode: string): Promise<QueryRe
     return { data, error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getActiveAcademicYear' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
 
-export async function listAcademicYears(schoolCode: string): Promise<QueryResult<AcademicYear[]>> {
+export async function listAcademicYears(schoolCode: string, options?: { signal?: AbortSignal; from?: number; to?: number }): Promise<QueryResult<AcademicYear[]>> {
   try {
     const { data, error } = await supabase
-      .from('academic_years')
+      .from(DB.tables.academicYears)
       .select('*')
-      .eq('school_code', schoolCode)
-      .order('year_start', { ascending: false });
+      .eq(DB.columns.schoolCode, schoolCode)
+      .order('year_start', { ascending: false })
+      .range(options?.from ?? 0, options?.to ?? 99)
+      .abortSignal(options?.signal as any);
     
     if (error) {
       return {
@@ -143,7 +150,6 @@ export async function listAcademicYears(schoolCode: string): Promise<QueryResult
     return { data: data || [], error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'listAcademicYears' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
@@ -152,13 +158,14 @@ export async function listAcademicYears(schoolCode: string): Promise<QueryResult
 
 export async function listClasses(
   schoolCode: string,
-  academicYearId?: string
+  academicYearId?: string,
+  options?: { signal?: AbortSignal; from?: number; to?: number }
 ): Promise<QueryResult<ClassInstance[]>> {
   try {
     let query = supabase
-      .from('class_instances')
+      .from(DB.tables.classInstances)
       .select('*')
-      .eq('school_code', schoolCode)
+      .eq(DB.columns.schoolCode, schoolCode)
       .order('grade', { ascending: true })
       .order('section', { ascending: true });
     
@@ -166,7 +173,9 @@ export async function listClasses(
       query = query.eq('academic_year_id', academicYearId);
     }
     
-    const { data, error } = await query;
+    const { data, error } = await query
+      .range(options?.from ?? 0, options?.to ?? 199)
+      .abortSignal(options?.signal as any);
     
     if (error) {
       return {
@@ -178,20 +187,20 @@ export async function listClasses(
     return { data: data || [], error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'listClasses' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
 
-export async function getClassDetails(classInstanceId: string): Promise<QueryResult<ClassInstance>> {
+export async function getClassDetails(classInstanceId: string, options?: { signal?: AbortSignal }): Promise<QueryResult<ClassInstance>> {
   try {
     const { data, error } = await supabase
-      .from('class_instances')
+      .from(DB.tables.classInstances)
       .select('*')
       .eq('id', classInstanceId)
-      .single();
+      .abortSignal(options?.signal as any)
+      .maybeSingle();
     
-    if (error) {
+    if (error && (error as any).code !== 'PGRST116') {
       return {
         data: null,
         error: mapError(error, { queryName: 'getClassDetails', table: 'class_instances' }),
@@ -201,7 +210,6 @@ export async function getClassDetails(classInstanceId: string): Promise<QueryRes
     return { data, error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getClassDetails' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
@@ -213,9 +221,9 @@ export async function listAdmins(
 ): Promise<QueryResult<Admin[]>> {
   try {
     const { data, error } = await supabase
-      .from('admin')
+      .from(DB.tables.admin)
       .select('*')
-      .eq('school_code', schoolCode)
+      .eq(DB.columns.schoolCode, schoolCode)
       .order('full_name');
 
     if (error) {
@@ -230,15 +238,18 @@ export async function listAdmins(
 
 export async function listStudents(
   classInstanceId: string,
-  schoolCode: string
-): Promise<QueryResult<Student[]>> {
+  schoolCode: string,
+  options?: { signal?: AbortSignal; from?: number; to?: number }
+): Promise<QueryResult<StudentLite[]>> {
   try {
     const { data, error } = await supabase
-      .from('student')
+      .from(DB.tables.student)
       .select('id, student_code, full_name, email, phone, class_instance_id, school_code, created_at')
-      .eq('class_instance_id', classInstanceId)
-      .eq('school_code', schoolCode)
-      .order('full_name', { ascending: true });
+      .eq(DB.columns.classInstanceId, classInstanceId)
+      .eq(DB.columns.schoolCode, schoolCode)
+      .order('full_name', { ascending: true })
+      .range(options?.from ?? 0, options?.to ?? 499)
+      .abortSignal(options?.signal as any);
     
     if (error) {
       return {
@@ -247,23 +258,23 @@ export async function listStudents(
       };
     }
     
-    return { data: data || [], error: null };
+    return { data: (data as unknown as StudentLite[]) || [], error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'listStudents' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
 
-export async function getStudentDetails(studentId: string): Promise<QueryResult<Student>> {
+export async function getStudentDetails(studentId: string, options?: { signal?: AbortSignal }): Promise<QueryResult<Student>> {
   try {
     const { data, error } = await supabase
-      .from('student')
+      .from(DB.tables.student)
       .select('*')
       .eq('id', studentId)
-      .single();
+      .abortSignal(options?.signal as any)
+      .maybeSingle();
     
-    if (error) {
+    if (error && (error as any).code !== 'PGRST116') {
       return {
         data: null,
         error: mapError(error, { queryName: 'getStudentDetails', table: 'student' }),
@@ -273,7 +284,6 @@ export async function getStudentDetails(studentId: string): Promise<QueryResult<
     return { data, error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getStudentDetails' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
@@ -283,15 +293,18 @@ export async function getStudentDetails(studentId: string): Promise<QueryResult<
 export async function getAttendanceForDate(
   classInstanceId: string,
   date: string,
-  schoolCode: string
+  schoolCode: string,
+  options?: { signal?: AbortSignal; from?: number; to?: number }
 ): Promise<QueryResult<Attendance[]>> {
   try {
     const { data, error } = await supabase
-      .from('attendance')
+      .from(DB.tables.attendance)
       .select('*')
-      .eq('class_instance_id', classInstanceId)
+      .eq(DB.columns.classInstanceId, classInstanceId)
       .eq('date', date)
-      .eq('school_code', schoolCode);
+      .eq(DB.columns.schoolCode, schoolCode)
+      .range(options?.from ?? 0, options?.to ?? 499)
+      .abortSignal(options?.signal as any);
     
     if (error) {
       return {
@@ -303,7 +316,6 @@ export async function getAttendanceForDate(
     return { data: data || [], error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getAttendanceForDate' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
@@ -311,18 +323,21 @@ export async function getAttendanceForDate(
 export async function getAttendanceOverview(
   classInstanceId: string,
   dateRange: [string, string],
-  schoolCode: string
+  schoolCode: string,
+  options?: { signal?: AbortSignal; from?: number; to?: number }
 ): Promise<QueryResult<Attendance[]>> {
   try {
     const [startDate, endDate] = dateRange;
     const { data, error } = await supabase
-      .from('attendance')
+      .from(DB.tables.attendance)
       .select('*')
-      .eq('class_instance_id', classInstanceId)
-      .eq('school_code', schoolCode)
+      .eq(DB.columns.classInstanceId, classInstanceId)
+      .eq(DB.columns.schoolCode, schoolCode)
       .gte('date', startDate)
       .lte('date', endDate)
-      .order('date', { ascending: false });
+      .order('date', { ascending: false })
+      .range(options?.from ?? 0, options?.to ?? 999)
+      .abortSignal(options?.signal as any);
     
     if (error) {
       return {
@@ -334,7 +349,6 @@ export async function getAttendanceOverview(
     return { data: data || [], error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getAttendanceOverview' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
@@ -350,15 +364,15 @@ export async function saveAttendance(
     // Delete existing attendance for this class and date
     const { class_instance_id, date, school_code } = records[0];
     await supabase
-      .from('attendance')
+      .from(DB.tables.attendance)
       .delete()
-      .eq('class_instance_id', class_instance_id!)
+      .eq(DB.columns.classInstanceId, class_instance_id!)
       .eq('date', date)
-      .eq('school_code', school_code!);
+      .eq(DB.columns.schoolCode, school_code!);
     
     // Insert new records
     const { data, error } = await supabase
-      .from('attendance')
+      .from(DB.tables.attendance)
       .insert(records as any)
       .select();
     
@@ -372,7 +386,6 @@ export async function saveAttendance(
     return { data: data || [], error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'saveAttendance' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
@@ -380,13 +393,14 @@ export async function saveAttendance(
 export async function checkHoliday(
   schoolCode: string,
   date: string,
-  classInstanceId?: string
+  classInstanceId?: string,
+  options?: { signal?: AbortSignal }
 ): Promise<QueryResult<CalendarEvent | null>> {
   try {
     let query = supabase
-      .from('school_calendar_events')
+      .from(DB.tables.schoolCalendarEvents)
       .select('*')
-      .eq('school_code', schoolCode)
+      .eq(DB.columns.schoolCode, schoolCode)
       .eq('start_date', date)
       .eq('is_active', true);
     
@@ -396,9 +410,9 @@ export async function checkHoliday(
       query = query.is('class_instance_id', null);
     }
     
-    const { data, error } = await query.maybeSingle();
+    const { data, error } = await query.abortSignal(options?.signal as any).maybeSingle();
     
-    if (error && error.code !== 'PGRST116') {
+    if (error && (error as any).code !== 'PGRST116') {
       return {
         data: null,
         error: mapError(error, { queryName: 'checkHoliday', table: 'school_calendar_events' }),
@@ -408,7 +422,6 @@ export async function checkHoliday(
     return { data, error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'checkHoliday' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
@@ -429,29 +442,29 @@ export async function getStudentFees(
   try {
     // Get student's fee plan with items
     const { data: planData, error: planError } = await supabase
-      .from('fee_student_plans')
+      .from(DB.tables.feeStudentPlans)
       .select(`
         *,
-        items:fee_student_plan_items(
+        items:${DB.tables.feeStudentPlanItems}(
           *,
-          component:fee_component_types(*)
+          component:${DB.tables.feeComponentTypes}(*)
         )
       `)
       .eq('student_id', studentId)
-      .eq('academic_year_id', academicYearId)
-      .eq('school_code', schoolCode)
+      .eq(DB.columns.academicYearId, academicYearId)
+      .eq(DB.columns.schoolCode, schoolCode)
       .eq('status', 'active')
       .single();
     
     // Get all payments for this student
     const { data: paymentsData, error: paymentsError } = await supabase
-      .from('fee_payments')
+      .from(DB.tables.feePayments)
       .select(`
         *,
-        component_type:fee_component_types(*)
+        component_type:${DB.tables.feeComponentTypes}(*)
       `)
       .eq('student_id', studentId)
-      .eq('school_code', schoolCode)
+      .eq(DB.columns.schoolCode, schoolCode)
       .order('payment_date', { ascending: false });
     
     if (paymentsError) {
@@ -487,7 +500,6 @@ export async function getStudentFees(
     };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getStudentFees' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
@@ -500,10 +512,10 @@ export async function getClassStudentsFees(
   try {
     // Get all students in this class
     const { data: students, error: studentsError } = await supabase
-      .from('student')
+      .from(DB.tables.student)
       .select('id, student_code, full_name, class_instance_id')
-      .eq('class_instance_id', classInstanceId)
-      .eq('school_code', schoolCode)
+      .eq(DB.columns.classInstanceId, classInstanceId)
+      .eq(DB.columns.schoolCode, schoolCode)
       .order('full_name', { ascending: true });
     
     if (studentsError) {
@@ -521,25 +533,25 @@ export async function getClassStudentsFees(
     
     // Get all fee plans for these students
     const { data: plans } = await supabase
-      .from('fee_student_plans')
+      .from(DB.tables.feeStudentPlans)
       .select(`
         *,
-        items:fee_student_plan_items(*)
+        items:${DB.tables.feeStudentPlanItems}(*)
       `)
       .in('student_id', studentIds)
-      .eq('academic_year_id', academicYearId)
-      .eq('school_code', schoolCode)
+      .eq(DB.columns.academicYearId, academicYearId)
+      .eq(DB.columns.schoolCode, schoolCode)
       .eq('status', 'active');
     
     // Get all payments for these students
     const { data: payments } = await supabase
-      .from('fee_payments')
+      .from(DB.tables.feePayments)
       .select('*')
       .in('student_id', studentIds)
-      .eq('school_code', schoolCode);
+      .eq(DB.columns.schoolCode, schoolCode);
     
     // Combine student data with fee information
-    const studentsWithFees = students.map((student: any) => {
+    const studentsWithFees = (students as any[]).map((student: any) => {
       const studentPlan = plans?.find((p: any) => p.student_id === student.id);
       const studentPayments = payments?.filter((p: any) => p.student_id === student.id) || [];
       
@@ -571,18 +583,19 @@ export async function getClassStudentsFees(
     return { data: studentsWithFees, error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getClassStudentsFees' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
 
-export async function getFeeComponentTypes(schoolCode: string): Promise<QueryResult<FeeComponentType[]>> {
+export async function getFeeComponentTypes(schoolCode: string, options?: { signal?: AbortSignal; from?: number; to?: number }): Promise<QueryResult<FeeComponentType[]>> {
   try {
     const { data, error } = await supabase
-      .from('fee_component_types')
+      .from(DB.tables.feeComponentTypes)
       .select('*')
-      .eq('school_code', schoolCode)
-      .order('name', { ascending: true });
+      .eq(DB.columns.schoolCode, schoolCode)
+      .order('name', { ascending: true })
+      .range(options?.from ?? 0, options?.to ?? 99)
+      .abortSignal(options?.signal as any);
     
     if (error) {
       return {
@@ -594,7 +607,6 @@ export async function getFeeComponentTypes(schoolCode: string): Promise<QueryRes
     return { data: data || [], error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getFeeComponentTypes' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
@@ -602,7 +614,7 @@ export async function getFeeComponentTypes(schoolCode: string): Promise<QueryRes
 export async function recordPayment(payment: FeePaymentInsert): Promise<QueryResult<FeePayment>> {
   try {
     const { data, error } = await supabase
-      .from('fee_payments')
+      .from(DB.tables.feePayments)
       .insert(payment as any)
       .select()
       .single();
@@ -617,7 +629,6 @@ export async function recordPayment(payment: FeePaymentInsert): Promise<QueryRes
     return { data, error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'recordPayment' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
@@ -627,15 +638,18 @@ export async function recordPayment(payment: FeePaymentInsert): Promise<QueryRes
 export async function listResources(
   classInstanceId: string,
   schoolCode: string,
-  subjectId?: string
+  subjectId?: string,
+  options?: { signal?: AbortSignal; from?: number; to?: number }
 ): Promise<QueryResult<LearningResource[]>> {
   try {
     let query = supabase
-      .from('learning_resources')
+      .from(DB.tables.learningResources)
       .select('*')
-      .eq('class_instance_id', classInstanceId)
-      .eq('school_code', schoolCode)
-      .order('created_at', { ascending: false });
+      .eq(DB.columns.classInstanceId, classInstanceId)
+      .eq(DB.columns.schoolCode, schoolCode)
+      .order('created_at', { ascending: false })
+      .range(options?.from ?? 0, options?.to ?? 99)
+      .abortSignal(options?.signal as any);
     
     if (subjectId) {
       query = query.eq('subject_id', subjectId);
@@ -653,7 +667,6 @@ export async function listResources(
     return { data: data || [], error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'listResources' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
@@ -661,15 +674,18 @@ export async function listResources(
 export async function listQuizzes(
   classInstanceId: string,
   schoolCode: string,
-  subjectId?: string
+  subjectId?: string,
+  options?: { signal?: AbortSignal; from?: number; to?: number }
 ): Promise<QueryResult<Test[]>> {
   try {
     let query = supabase
-      .from('tests')
+      .from(DB.tables.tests)
       .select('*')
-      .eq('class_instance_id', classInstanceId)
-      .eq('school_code', schoolCode)
-      .order('created_at', { ascending: false });
+      .eq(DB.columns.classInstanceId, classInstanceId)
+      .eq(DB.columns.schoolCode, schoolCode)
+      .order('created_at', { ascending: false })
+      .range(options?.from ?? 0, options?.to ?? 49)
+      .abortSignal(options?.signal as any);
     
     if (subjectId) {
       query = query.eq('subject_id', subjectId);
@@ -687,23 +703,23 @@ export async function listQuizzes(
     return { data: data || [], error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'listQuizzes' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
 
-export async function getQuizDetails(testId: string): Promise<QueryResult<{
+export async function getQuizDetails(testId: string, options?: { signal?: AbortSignal }): Promise<QueryResult<{
   test: Test;
   questions: TestQuestion[];
 }>> {
   try {
     const { data: test, error: testError } = await supabase
-      .from('tests')
+      .from(DB.tables.tests)
       .select('*')
       .eq('id', testId)
-      .single();
+      .abortSignal(options?.signal as any)
+      .maybeSingle();
     
-    if (testError) {
+    if (testError && (testError as any).code !== 'PGRST116') {
       return {
         data: null,
         error: mapError(testError, { queryName: 'getQuizDetails', table: 'tests' }),
@@ -711,7 +727,7 @@ export async function getQuizDetails(testId: string): Promise<QueryResult<{
     }
     
     const { data: questions, error: questionsError } = await supabase
-      .from('test_questions')
+      .from(DB.tables.testQuestions)
       .select('*')
       .eq('test_id', testId)
       .order('order_index', { ascending: true });
@@ -732,7 +748,6 @@ export async function getQuizDetails(testId: string): Promise<QueryResult<{
     };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getQuizDetails' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
@@ -742,21 +757,24 @@ export async function getQuizDetails(testId: string): Promise<QueryResult<{
 export async function getTimetable(
   classInstanceId: string,
   date: string,
-  schoolCode: string
+  schoolCode: string,
+  options?: { signal?: AbortSignal; from?: number; to?: number }
 ): Promise<QueryResult<TimetableSlot[]>> {
   try {
     const { data, error } = await supabase
-      .from('timetable_slots')
+      .from(DB.tables.timetableSlots)
       .select(`
         *,
-        subject:subjects(id, subject_name),
-        teacher:admin!teacher_id(id, full_name)
+        subject:${DB.tables.subjects}(id, subject_name),
+        teacher:${DB.tables.admin}!teacher_id(id, full_name)
       `)
-      .eq('class_instance_id', classInstanceId)
+      .eq(DB.columns.classInstanceId, classInstanceId)
       .eq('class_date', date)
-      .eq('school_code', schoolCode)
+      .eq(DB.columns.schoolCode, schoolCode)
       .order('period_number', { ascending: true })
-      .order('start_time', { ascending: true });
+      .order('start_time', { ascending: true })
+      .range(options?.from ?? 0, options?.to ?? 49)
+      .abortSignal(options?.signal as any);
     
     if (error) {
       return {
@@ -768,7 +786,6 @@ export async function getTimetable(
     return { data: data as any[] || [], error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getTimetable' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
@@ -776,7 +793,8 @@ export async function getTimetable(
 export async function getTimetableWeek(
   classInstanceId: string,
   startDate: string,
-  schoolCode: string
+  schoolCode: string,
+  options?: { signal?: AbortSignal; from?: number; to?: number }
 ): Promise<QueryResult<TimetableSlot[]>> {
   try {
     // Calculate end date (7 days from start)
@@ -786,18 +804,20 @@ export async function getTimetableWeek(
     const endDate = end.toISOString().split('T')[0];
     
     const { data, error } = await supabase
-      .from('timetable_slots')
+      .from(DB.tables.timetableSlots)
       .select(`
         *,
-        subject:subjects(id, subject_name),
-        teacher:admin!teacher_id(id, full_name)
+        subject:${DB.tables.subjects}(id, subject_name),
+        teacher:${DB.tables.admin}!teacher_id(id, full_name)
       `)
-      .eq('class_instance_id', classInstanceId)
-      .eq('school_code', schoolCode)
+      .eq(DB.columns.classInstanceId, classInstanceId)
+      .eq(DB.columns.schoolCode, schoolCode)
       .gte('class_date', startDate)
       .lte('class_date', endDate)
       .order('class_date', { ascending: true })
-      .order('period_number', { ascending: true });
+      .order('period_number', { ascending: true })
+      .range(options?.from ?? 0, options?.to ?? 299)
+      .abortSignal(options?.signal as any);
     
     if (error) {
       return {
@@ -809,7 +829,6 @@ export async function getTimetableWeek(
     return { data: data as any[] || [], error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getTimetableWeek' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
@@ -819,7 +838,8 @@ export async function getTimetableWeek(
 export async function listCalendarEvents(
   schoolCode: string,
   month: string,
-  classInstanceId?: string
+  classInstanceId?: string,
+  options?: { signal?: AbortSignal; from?: number; to?: number }
 ): Promise<QueryResult<CalendarEvent[]>> {
   try {
     const [year, monthNum] = month.split('-');
@@ -828,12 +848,14 @@ export async function listCalendarEvents(
     const endDate = `${year}-${monthNum}-${lastDay.toString().padStart(2, '0')}`;
     
     let query = supabase
-      .from('school_calendar_events')
+      .from(DB.tables.schoolCalendarEvents)
       .select('*')
-      .eq('school_code', schoolCode)
+      .eq(DB.columns.schoolCode, schoolCode)
       .eq('is_active', true)
       .gte('start_date', startDate)
-      .lte('start_date', endDate);
+      .lte('start_date', endDate)
+      .range(options?.from ?? 0, options?.to ?? 199)
+      .abortSignal(options?.signal as any);
     
     if (classInstanceId) {
       query = query.or(`class_instance_id.is.null,class_instance_id.eq.${classInstanceId}`);
@@ -853,7 +875,6 @@ export async function listCalendarEvents(
     return { data: data || [], error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'listCalendarEvents' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
@@ -867,13 +888,14 @@ export async function listTasks(
 ): Promise<QueryResult<Task[]>> {
   try {
     const { data, error } = await supabase
-      .from('tasks')
+      .from(DB.tables.tasks)
       .select('*')
-      .eq('class_instance_id', classInstanceId)
-      .eq('academic_year_id', academicYearId)
-      .eq('school_code', schoolCode)
+      .eq(DB.columns.classInstanceId, classInstanceId)
+      .eq(DB.columns.academicYearId, academicYearId)
+      .eq(DB.columns.schoolCode, schoolCode)
       .eq('is_active', true)
-      .order('due_date', { ascending: true });
+      .order('due_date', { ascending: true })
+      .range(0, 199);
     
     if (error) {
       return {
@@ -885,20 +907,21 @@ export async function listTasks(
     return { data: data || [], error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'listTasks' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }
 
 // ==================== SUBJECTS ====================
 
-export async function listSubjects(schoolCode: string): Promise<QueryResult<Subject[]>> {
+export async function listSubjects(schoolCode: string, options?: { signal?: AbortSignal; from?: number; to?: number }): Promise<QueryResult<Subject[]>> {
   try {
     const { data, error } = await supabase
-      .from('subjects')
+      .from(DB.tables.subjects)
       .select('*')
-      .eq('school_code', schoolCode)
-      .order('subject_name', { ascending: true });
+      .eq(DB.columns.schoolCode, schoolCode)
+      .order('subject_name', { ascending: true })
+      .range(options?.from ?? 0, options?.to ?? 199)
+      .abortSignal(options?.signal as any);
     
     if (error) {
       return {
@@ -910,7 +933,6 @@ export async function listSubjects(schoolCode: string): Promise<QueryResult<Subj
     return { data: data || [], error: null };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'listSubjects' });
-    console.error(formatErrorForLog(mappedError, err));
     return { data: null, error: mappedError };
   }
 }

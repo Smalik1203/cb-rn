@@ -1,35 +1,74 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Animated } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AlertCircle } from 'lucide-react-native';
-import { colors, spacing, typography } from '@/lib/design-system';
+import { colors, spacing, typography } from '../../../lib/design-system';
 import { Button } from './Button';
 
 interface ErrorViewProps {
   title?: string;
   message: string;
   onRetry?: () => void;
+  retryLabel?: string;
 }
 
 export function ErrorView({
   title = 'Something went wrong',
   message,
   onRetry,
+  retryLabel = 'Try Again',
 }: ErrorViewProps) {
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const scaleAnim = React.useRef(new Animated.Value(0.8)).current;
+
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, scaleAnim]);
+
   return (
-    <View style={styles.container}>
-      <AlertCircle size={64} color={colors.error[500]} />
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.message}>{message}</Text>
+    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <AlertCircle 
+          size={64} 
+          color={colors.error[500]} 
+          accessibilityLabel="Error icon"
+        />
+      </Animated.View>
+      <Text 
+        style={styles.title}
+        accessibilityRole="header"
+        accessibilityLabel={`Error: ${title}`}
+      >
+        {title}
+      </Text>
+      <Text 
+        style={styles.message}
+        accessibilityLabel={`Error details: ${message}`}
+      >
+        {message}
+      </Text>
       {onRetry && (
         <Button
-          title="Try Again"
+          title={retryLabel}
           onPress={onRetry}
           variant="primary"
           style={styles.button}
+          accessibilityLabel={`${retryLabel} button`}
         />
       )}
-    </View>
+    </Animated.View>
   );
 }
 

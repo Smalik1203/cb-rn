@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Text, Card, Button, Chip, SegmentedButtons, ActivityIndicator, Portal, Modal, TextInput } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { Text, Card, Button, Chip, SegmentedButtons, ActivityIndicator, TextInput } from 'react-native-paper';
 import { Users, Calendar, CheckCircle, XCircle, Clock, AlertCircle, Save } from 'lucide-react-native';
-import { useAttendance } from '@/src/contexts/AttendanceContext';
-import { useClassSelection } from '@/src/contexts/ClassSelectionContext';
-import { DatePicker } from '@/src/components/DatePicker';
-import { colors, typography, spacing, borderRadius, shadows } from '@/lib/design-system';
+import { useClassSelection } from '../../contexts/ClassSelectionContext';
+import { useStudents } from '../../hooks/useStudents';
+import { useClassAttendance, useMarkAttendance } from '../../hooks/useAttendance';
+import { DatePicker } from '../DatePicker';
+import { colors, typography, spacing, borderRadius, shadows } from '../../../lib/design-system';
+import { useAuth } from '../../contexts/AuthContext';
 
-type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused' | null;
+type AttendanceStatus = 'present' | 'absent' | 'late' | null;
 
 interface StudentAttendanceData {
   studentId: string;
@@ -18,117 +20,103 @@ interface StudentAttendanceData {
 }
 
 export const UnifiedAttendance: React.FC = () => {
-  const { state, actions } = useAttendance();
-  const { selectedClass } = useClassSelection();
+  const { profile } = useAuth();
+  const { selectedClass, scope } = useClassSelection();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [attendanceData, setAttendanceData] = useState<StudentAttendanceData[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [showSaveModal, setShowSaveModal] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  useEffect(() => {
-    if (selectedClass?.id) {
-      actions.loadStudentsForClass(selectedClass.id);
-    }
-  }, [selectedClass?.id]);
+  const dateString = selectedDate.toISOString().split('T')[0];
+  
+  // Fetch students for selected class
+  const { data: students = [], isLoading: studentsLoading } = useStudents(
+    selectedClass?.id,
+    scope.school_code
+  );
 
-  useEffect(() => {
-    if (selectedClass?.id && state.students.length > 0) {
-      loadAttendanceForDate();
-    }
-  }, [selectedClass?.id, selectedDate, state.students]);
+  // Fetch attendance for selected date
+  const { data: attendanceRecords = [], isLoading: attendanceLoading } = useClassAttendance(
+    selectedClass?.id,
+    dateString
+  );
 
-  const loadAttendanceForDate = async () => {
-    if (!selectedClass?.id) {
-      // For "All Classes", we could load attendance for all classes
-      // For now, just return early
-      return;
+  // Mutation for saving attendance
+  const markAttendanceMutation = useMarkAttendance();
+
+  // Initialize attendance data when students or attendance records change
+  useEffect(() => {
+    if (students.length > 0) {
+      const initialData: StudentAttendanceData[] = students.map(student => {
+        const existingRecord = attendanceRecords.find(r => r.student_id === student.id);
+        return {
+          studentId: student.id,
+          studentName: student.full_name,
+          studentCode: student.student_code,
+          status: (existingRecord?.status as AttendanceStatus) || null,
+          remarks: undefined, // Notes/remarks field not available in database schema
+        };
+      });
+      setAttendanceData(initialData);
+      setHasChanges(false);
     }
-    
-    const dateString = selectedDate.toISOString().split('T')[0];
-    await actions.loadAttendanceForDate(selectedClass.id, dateString);
-    
-    // Initialize attendance data
-    const initialData: StudentAttendanceData[] = state.students.map(student => {
-      const existingAttendance = state.attendance.get(`${student.id}_${dateString}`);
-      const status = existingAttendance?.[0]?.status || null;
-      
-      return {
-        studentId: student.id,
-        studentName: student.full_name,
-        studentCode: student.student_code,
-        status,
-        remarks: existingAttendance?.[0]?.remarks || undefined,
-      };
-    });
-    
-    setAttendanceData(initialData);
-    setHasChanges(false);
-  };
+  }, [students, attendanceRecords]);
 
   const handleStatusChange = (studentId: string, status: AttendanceStatus) => {
-    setAttendanceData(prev => 
-      prev.map(student => 
-        student.studentId === studentId 
-          ? { ...student, status }
-          : student
+    setAttendanceData(prev =>
+      prev.map(student =>
+        student.studentId === studentId ? { ...student, status } : student
       )
     );
     setHasChanges(true);
   };
 
   const handleRemarksChange = (studentId: string, remarks: string) => {
-    setAttendanceData(prev => 
-      prev.map(student => 
-        student.studentId === studentId 
-          ? { ...student, remarks }
-          : student
+    setAttendanceData(prev =>
+      prev.map(student =>
+        student.studentId === studentId ? { ...student, remarks } : student
       )
     );
     setHasChanges(true);
   };
 
   const handleSave = async () => {
-    if (!selectedClass?.id) {
-      // Cannot save attendance without a specific class
+    if (!selectedClass?.id || !scope.school_code) {
+      Alert.alert('Error', 'Please select a class');
       return;
     }
-    
-    setSaving(true);
-    try {
-      const dateString = selectedDate.toISOString().split('T')[0];
-      const recordsToSave = attendanceData
-        .filter(student => student.status !== null)
-        .map(student => ({
-          studentId: student.studentId,
-          status: student.status!,
-          remarks: student.remarks || undefined,
-        }));
 
-      await actions.saveAttendance(selectedClass.id, dateString, recordsToSave);
-      
+    const recordsToSave = attendanceData
+      .filter(student => student.status !== null)
+      .map(student => ({
+        student_id: student.studentId,
+        class_instance_id: selectedClass.id,
+        date: dateString,
+        status: student.status!,
+        remarks: student.remarks || null,
+        school_code: scope.school_code!,
+        marked_by: profile?.id || '',
+        marked_by_role_code: profile?.role || 'admin',
+      }));
+
+    try {
+      await markAttendanceMutation.mutateAsync(recordsToSave as any);
       Alert.alert('Success', 'Attendance saved successfully');
-      setShowSaveModal(false);
       setHasChanges(false);
     } catch (error) {
       Alert.alert('Error', 'Failed to save attendance');
-    } finally {
-      setSaving(false);
     }
   };
 
   const getStatusIcon = (status: AttendanceStatus) => {
     switch (status) {
       case 'present':
-        return <CheckCircle size={16} color={colors.success[600]} />;
+        return <CheckCircle size={20} color={colors.success[600]} />;
       case 'absent':
-        return <XCircle size={16} color={colors.error[600]} />;
+        return <XCircle size={20} color={colors.error[600]} />;
       case 'late':
-        return <Clock size={16} color={colors.warning[600]} />;
-      case 'excused':
-        return <AlertCircle size={16} color={colors.info[600]} />;
+        return <Clock size={20} color={colors.warning[600]} />;
       default:
-        return null;
+        return <AlertCircle size={20} color={colors.text.tertiary} />;
     }
   };
 
@@ -140,270 +128,176 @@ export const UnifiedAttendance: React.FC = () => {
         return colors.error[600];
       case 'late':
         return colors.warning[600];
-      case 'excused':
-        return colors.info[600];
       default:
         return colors.text.secondary;
     }
   };
 
   const getStatusCounts = () => {
-    const counts = {
-      present: 0,
-      absent: 0,
-      late: 0,
-      excused: 0,
-      unmarked: 0,
+    return {
+      present: attendanceData.filter(s => s.status === 'present').length,
+      absent: attendanceData.filter(s => s.status === 'absent').length,
+      late: attendanceData.filter(s => s.status === 'late').length,
+      unmarked: attendanceData.filter(s => s.status === null).length,
     };
-
-    attendanceData.forEach(student => {
-      switch (student.status) {
-        case 'present':
-          counts.present++;
-          break;
-        case 'absent':
-          counts.absent++;
-          break;
-        case 'late':
-          counts.late++;
-          break;
-        case 'excused':
-          counts.excused++;
-          break;
-        default:
-          counts.unmarked++;
-      }
-    });
-
-    return counts;
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-GB', { 
-      day: '2-digit', 
-      month: 'short', 
-      year: 'numeric' 
-    });
-  };
+  const counts = getStatusCounts();
+  const isLoading = studentsLoading || attendanceLoading;
 
   if (!selectedClass) {
     return (
-      <View style={styles.container}>
-        <Card style={styles.emptyCard}>
-          <Card.Content>
-            <Text variant="bodyMedium" style={styles.emptyText}>
-              Please select a class to mark attendance.
-            </Text>
-          </Card.Content>
-        </Card>
+      <View style={styles.emptyContainer}>
+        <Users size={64} color={colors.text.tertiary} />
+        <Text variant="titleLarge" style={styles.emptyTitle}>No Class Selected</Text>
+        <Text variant="bodyMedium" style={styles.emptyText}>
+          Please select a class to mark attendance
+        </Text>
       </View>
     );
   }
-
-  if (state.loading) {
-    return (
-      <View style={styles.container}>
-        <Card style={styles.loadingCard}>
-          <Card.Content>
-            <ActivityIndicator size="large" color={colors.primary[500]} />
-            <Text variant="bodyMedium" style={styles.loadingText}>
-              Loading students...
-            </Text>
-          </Card.Content>
-        </Card>
-      </View>
-    );
-  }
-
-  if (state.error) {
-    return (
-      <View style={styles.container}>
-        <Card style={styles.errorCard}>
-          <Card.Content>
-            <Text variant="bodyMedium" style={styles.errorText}>
-              Error: {state.error}
-            </Text>
-            <Button mode="outlined" onPress={() => actions.loadStudentsForClass(selectedClass.id)} style={styles.retryButton}>
-              Retry
-            </Button>
-          </Card.Content>
-        </Card>
-      </View>
-    );
-  }
-
-  const statusCounts = getStatusCounts();
 
   return (
     <View style={styles.container}>
       <Card style={styles.headerCard}>
         <Card.Content>
-          <View style={styles.header}>
-            <Users size={24} color={colors.primary[600]} />
-            <Text variant="titleLarge" style={styles.title}>
-              Mark Attendance
-            </Text>
-          </View>
-          <Text variant="bodyMedium" style={styles.subtitle}>
-            Grade {selectedClass.grade}-{selectedClass.section}
-          </Text>
-        </Card.Content>
-      </Card>
-
-      <Card style={styles.dateCard}>
-        <Card.Content>
-          <View style={styles.dateHeader}>
+          <View style={styles.dateSelector}>
             <Calendar size={20} color={colors.primary[600]} />
-            <Text variant="titleMedium" style={styles.dateTitle}>
-              Date: {formatDate(selectedDate)}
+            <Text variant="titleMedium" style={styles.dateText}>
+              {selectedDate.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              })}
             </Text>
+            <DatePicker
+              selectedDate={selectedDate}
+              onDateChange={setSelectedDate}
+            />
           </View>
-          <DatePicker
-            selectedDate={selectedDate}
-            onDateChange={setSelectedDate}
-            style={styles.datePicker}
-          />
-        </Card.Content>
-      </Card>
 
-      <Card style={styles.summaryCard}>
-        <Card.Content>
-          <Text variant="titleMedium" style={styles.summaryTitle}>
-            Summary
-          </Text>
-          <View style={styles.summaryGrid}>
-            <View style={styles.summaryItem}>
-              <Text variant="titleLarge" style={[styles.summaryValue, { color: colors.success[600] }]}>
-                {statusCounts.present}
+          <View style={styles.statsRow}>
+            <View style={[styles.statChip, { backgroundColor: colors.success[50] }]}>
+              <CheckCircle size={16} color={colors.success[600]} />
+              <Text style={[styles.statText, { color: colors.success[700] }]}>
+                {counts.present} Present
               </Text>
-              <Text variant="bodySmall" style={styles.summaryLabel}>Present</Text>
             </View>
-            <View style={styles.summaryItem}>
-              <Text variant="titleLarge" style={[styles.summaryValue, { color: colors.error[600] }]}>
-                {statusCounts.absent}
+            <View style={[styles.statChip, { backgroundColor: colors.error[50] }]}>
+              <XCircle size={16} color={colors.error[600]} />
+              <Text style={[styles.statText, { color: colors.error[700] }]}>
+                {counts.absent} Absent
               </Text>
-              <Text variant="bodySmall" style={styles.summaryLabel}>Absent</Text>
             </View>
-            <View style={styles.summaryItem}>
-              <Text variant="titleLarge" style={[styles.summaryValue, { color: colors.warning[600] }]}>
-                {statusCounts.late}
+            <View style={[styles.statChip, { backgroundColor: colors.warning[50] }]}>
+              <Clock size={16} color={colors.warning[600]} />
+              <Text style={[styles.statText, { color: colors.warning[700] }]}>
+                {counts.late} Late
               </Text>
-              <Text variant="bodySmall" style={styles.summaryLabel}>Late</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text variant="titleLarge" style={[styles.summaryValue, { color: colors.info[600] }]}>
-                {statusCounts.excused}
-              </Text>
-              <Text variant="bodySmall" style={styles.summaryLabel}>Excused</Text>
             </View>
           </View>
         </Card.Content>
       </Card>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {attendanceData.map((student) => (
-          <Card key={student.studentId} style={styles.studentCard}>
-            <Card.Content>
-              <View style={styles.studentHeader}>
-                <View style={styles.studentInfo}>
-                  <Text variant="titleMedium" style={styles.studentName}>
-                    {student.studentName}
-                  </Text>
-                  <Text variant="bodySmall" style={styles.rollNumber}>
-                    Code: {student.studentCode}
-                  </Text>
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary[600]} />
+          <Text style={styles.loadingText}>Loading students...</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.scrollView}>
+          {attendanceData.map((student, index) => (
+            <Card key={student.studentId} style={styles.studentCard}>
+              <Card.Content>
+                <View style={styles.studentHeader}>
+                  <View style={styles.studentInfo}>
+                    <Text variant="titleMedium" style={styles.studentName}>
+                      {student.studentName}
+                    </Text>
+                    <Text variant="bodySmall" style={styles.studentCode}>
+                      {student.studentCode}
+                    </Text>
+                  </View>
+                  {getStatusIcon(student.status)}
                 </View>
-                <View style={styles.statusContainer}>
-                  {student.status && (
-                    <Chip
-                      mode="flat"
-                      style={[styles.statusChip, { backgroundColor: getStatusColor(student.status) + '20' }]}
-                      textStyle={[styles.statusText, { color: getStatusColor(student.status) }]}
-                      icon={() => getStatusIcon(student.status)}
-                    >
-                      {student.status.toUpperCase()}
-                    </Chip>
-                  )}
-                </View>
-              </View>
 
-              <View style={styles.statusButtons}>
                 <SegmentedButtons
                   value={student.status || ''}
-                  onValueChange={(value) => handleStatusChange(student.studentId, value as AttendanceStatus)}
+                  onValueChange={(value) =>
+                    handleStatusChange(student.studentId, value as AttendanceStatus)
+                  }
                   buttons={[
-                    { value: 'present', label: 'Present', icon: 'check' },
-                    { value: 'absent', label: 'Absent', icon: 'close' },
-                    { value: 'late', label: 'Late', icon: 'clock' },
-                    { value: 'excused', label: 'Excused', icon: 'alert' },
+                    {
+                      value: 'present',
+                      label: 'Present',
+                      icon: 'check-circle',
+                      style: {
+                        backgroundColor:
+                          student.status === 'present'
+                            ? colors.success[100]
+                            : undefined,
+                      },
+                    },
+                    {
+                      value: 'absent',
+                      label: 'Absent',
+                      icon: 'close-circle',
+                      style: {
+                        backgroundColor:
+                          student.status === 'absent'
+                            ? colors.error[100]
+                            : undefined,
+                      },
+                    },
+                    {
+                      value: 'late',
+                      label: 'Late',
+                      icon: 'clock-outline',
+                      style: {
+                        backgroundColor:
+                          student.status === 'late'
+                            ? colors.warning[100]
+                            : undefined,
+                      },
+                    },
                   ]}
                   style={styles.segmentedButtons}
                 />
-              </View>
 
-              {(student.status === 'absent' || student.status === 'late' || student.status === 'excused') && (
-                <View style={styles.remarksContainer}>
+                {student.status && (
                   <TextInput
                     label="Remarks (Optional)"
                     value={student.remarks || ''}
-                    onChangeText={(text) => handleRemarksChange(student.studentId, text)}
-                    style={styles.remarksInput}
+                    onChangeText={(text) =>
+                      handleRemarksChange(student.studentId, text)
+                    }
                     mode="outlined"
+                    style={styles.remarksInput}
                     multiline
                     numberOfLines={2}
                   />
-                </View>
-              )}
-            </Card.Content>
-          </Card>
-        ))}
-      </ScrollView>
+                )}
+              </Card.Content>
+            </Card>
+          ))}
+        </ScrollView>
+      )}
 
-      {hasChanges && (
+      {hasChanges && !isLoading && (
         <View style={styles.saveButtonContainer}>
           <Button
             mode="contained"
-            onPress={() => setShowSaveModal(true)}
-            icon={() => <Save size={16} color={colors.text.inverse} />}
+            onPress={handleSave}
+            loading={markAttendanceMutation.isPending}
+            disabled={markAttendanceMutation.isPending}
+            icon={() => <Save size={20} color={colors.text.inverse} />}
             style={styles.saveButton}
-            loading={saving}
           >
             Save Attendance
           </Button>
         </View>
       )}
-
-      <Portal>
-        <Modal
-          visible={showSaveModal}
-          onDismiss={() => setShowSaveModal(false)}
-          contentContainerStyle={styles.modal}
-        >
-          <Text variant="titleLarge" style={styles.modalTitle}>
-            Confirm Save
-          </Text>
-          <Text variant="bodyMedium" style={styles.modalText}>
-            Are you sure you want to save the attendance for {formatDate(selectedDate)}?
-          </Text>
-          <View style={styles.modalButtons}>
-            <Button
-              mode="outlined"
-              onPress={() => setShowSaveModal(false)}
-              style={styles.cancelButton}
-            >
-              Cancel
-            </Button>
-            <Button
-              mode="contained"
-              onPress={handleSave}
-              style={styles.confirmButton}
-              loading={saving}
-            >
-              Save
-            </Button>
-          </View>
-        </Modal>
-      </Portal>
     </View>
   );
 };
@@ -411,121 +305,57 @@ export const UnifiedAttendance: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.primary,
+    backgroundColor: colors.background.secondary,
   },
   headerCard: {
-    margin: spacing['4'],
+    margin: spacing.md,
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.xl,
     ...shadows.sm,
   },
-  header: {
+  dateSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing['2'],
-    marginBottom: spacing['2'],
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
-  title: {
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  subtitle: {
-    color: colors.text.secondary,
-  },
-  dateCard: {
-    marginHorizontal: spacing['4'],
-    marginBottom: spacing['4'],
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    ...shadows.sm,
-  },
-  dateHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing['2'],
-    marginBottom: spacing['3'],
-  },
-  dateTitle: {
+  dateText: {
+    flex: 1,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
   },
-  datePicker: {
-    marginTop: spacing['2'],
-  },
-  summaryCard: {
-    marginHorizontal: spacing['4'],
-    marginBottom: spacing['4'],
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    ...shadows.sm,
-  },
-  summaryTitle: {
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    marginBottom: spacing['3'],
-  },
-  summaryGrid: {
+  statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
   },
-  summaryItem: {
+  statChip: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
   },
-  summaryValue: {
-    fontWeight: typography.fontWeight.bold,
-    marginBottom: spacing['1'],
-  },
-  summaryLabel: {
-    color: colors.text.secondary,
+  statText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
   },
   scrollView: {
     flex: 1,
-    paddingHorizontal: spacing['4'],
-  },
-  loadingCard: {
-    margin: spacing['4'],
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-  },
-  loadingText: {
-    textAlign: 'center',
-    color: colors.text.secondary,
-    marginTop: spacing['2'],
-  },
-  errorCard: {
-    margin: spacing['4'],
-    backgroundColor: colors.error[50],
-    borderRadius: borderRadius.lg,
-    borderColor: colors.error[200],
-    borderWidth: 1,
-  },
-  errorText: {
-    color: colors.error[600],
-    marginBottom: spacing['2'],
-  },
-  retryButton: {
-    alignSelf: 'flex-start',
-  },
-  emptyCard: {
-    margin: spacing['4'],
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: colors.text.secondary,
+    padding: spacing.md,
   },
   studentCard: {
-    marginBottom: spacing['4'],
+    marginBottom: spacing.md,
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
-    ...shadows.sm,
+    ...shadows.xs,
   },
   studentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing['3'],
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
   studentInfo: {
     flex: 1,
@@ -533,68 +363,52 @@ const styles = StyleSheet.create({
   studentName: {
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
-    marginBottom: spacing['1'],
   },
-  rollNumber: {
+  studentCode: {
     color: colors.text.secondary,
-  },
-  statusContainer: {
-    alignItems: 'flex-end',
-  },
-  statusChip: {
-    borderRadius: borderRadius.md,
-  },
-  statusText: {
-    fontWeight: typography.fontWeight.medium,
-  },
-  statusButtons: {
-    marginBottom: spacing['3'],
+    marginTop: 2,
   },
   segmentedButtons: {
-    borderRadius: borderRadius.lg,
-  },
-  remarksContainer: {
-    marginTop: spacing['2'],
+    marginTop: spacing.sm,
   },
   remarksInput: {
-    backgroundColor: colors.background.secondary,
+    marginTop: spacing.sm,
   },
   saveButtonContainer: {
-    padding: spacing['4'],
+    padding: spacing.md,
     backgroundColor: colors.surface.primary,
     borderTopWidth: 1,
     borderTopColor: colors.border.light,
+    ...shadows.md,
   },
   saveButton: {
     borderRadius: borderRadius.lg,
   },
-  modal: {
-    backgroundColor: colors.surface.primary,
-    margin: spacing['4'],
-    borderRadius: borderRadius.xl,
-    padding: spacing['4'],
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
   },
-  modalTitle: {
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing['3'],
-    textAlign: 'center',
-  },
-  modalText: {
+  loadingText: {
+    marginTop: spacing.md,
     color: colors.text.secondary,
-    marginBottom: spacing['4'],
+    fontSize: typography.fontSize.base,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  emptyTitle: {
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    color: colors.text.primary,
+    fontWeight: typography.fontWeight.bold,
+  },
+  emptyText: {
+    color: colors.text.secondary,
     textAlign: 'center',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: spacing['3'],
-  },
-  cancelButton: {
-    flex: 1,
-    borderRadius: borderRadius.lg,
-  },
-  confirmButton: {
-    flex: 1,
-    borderRadius: borderRadius.lg,
   },
 });

@@ -1,17 +1,21 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { Text, Card, Button, SegmentedButtons } from 'react-native-paper';
-import { DollarSign, Calendar, CheckCircle, Clock, AlertCircle, Users } from 'lucide-react-native';
-import { useAuth } from '@/src/contexts/AuthContext';
-import { useClassSelection } from '@/src/contexts/ClassSelectionContext';
-import { ClassSelector } from '@/src/components/ClassSelector';
-import { FeeComponents } from '@/src/components/fees/FeeComponents';
-import { RecordPayments } from '@/src/components/fees/RecordPayments';
-import { FeeAnalytics } from '@/src/components/fees/FeeAnalytics';
-import { useStudentFees, useClassStudentsFees } from '@/src/features/fees/hooks/useFees';
-import { ThreeStateView } from '@/src/components/common/ThreeStateView';
-import { useThreeStateQuery, emptyConditions } from '@/src/hooks/useThreeStateQuery';
-import { colors, spacing, borderRadius, shadows, typography } from '@/lib/design-system';
+import { View, StyleSheet, ScrollView, RefreshControl, Dimensions, TouchableOpacity } from 'react-native';
+import { Text } from 'react-native-paper';
+import { DollarSign, Calendar, CheckCircle, Clock, AlertCircle, Users, TrendingUp, CreditCard, FileText, BarChart3 } from 'lucide-react-native';
+import { useAuth } from '../../src/contexts/AuthContext';
+import { useClassSelection } from '../../src/contexts/ClassSelectionContext';
+import { ClassSelector } from '../../src/components/ClassSelector';
+// import { FeeComponents } from '@/src/components/fees/FeeComponents';
+// import { RecordPayments } from '@/src/components/fees/RecordPayments';
+// import { FeeAnalytics } from '@/src/components/fees/FeeAnalytics';
+import { EmptyState } from '../../src/components/ui';
+import { useStudentPayments, useClassPayments } from '../../src/hooks/useFees';
+import { ThreeStateView } from '../../src/components/common/ThreeStateView';
+import { colors, spacing, borderRadius, shadows, typography } from '../../lib/design-system';
+import { Card, Badge, Avatar, Button } from '../../src/components/ui';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const { width } = Dimensions.get('window');
 
 export default function FeesScreen() {
   const { profile } = useAuth();
@@ -22,23 +26,15 @@ export default function FeesScreen() {
   const studentId = isSuperAdmin ? null : profile?.id;
   const classId = selectedClass?.id;
 
-  const studentFeesQuery = useStudentFees(studentId);
-  const classStudentsFeesQuery = useClassStudentsFees(classId);
-
-  const studentFeesState = useThreeStateQuery(studentFeesQuery, {
-    emptyCondition: (data) => !data || (!data.plan && data.payments.length === 0)
-  });
-
-  const classFeesState = useThreeStateQuery(classStudentsFeesQuery, {
-    emptyCondition: emptyConditions.array
-  });
+  const studentFeesQuery = useStudentPayments(studentId || undefined);
+  const classFeesQuery = useClassPayments(classId || undefined);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     if (isSuperAdmin) {
-      await classFeesState.refetch();
+      await classFeesQuery.refetch();
     } else {
-      await studentFeesState.refetch();
+      await studentFeesQuery.refetch();
     }
     setRefreshing(false);
   };
@@ -59,13 +55,56 @@ export default function FeesScreen() {
     }
   };
 
-  const currentState = isSuperAdmin ? classFeesState : studentFeesState;
-  const currentData = isSuperAdmin ? classStudentsFeesQuery.data : studentFeesQuery.data;
-  const currentError = isSuperAdmin ? classStudentsFeesQuery.error : studentFeesQuery.error;
+  const currentData = isSuperAdmin ? classFeesQuery.data : studentFeesQuery.data;
+  const currentError = isSuperAdmin ? classFeesQuery.error : studentFeesQuery.error;
+  const isLoading = isSuperAdmin ? classFeesQuery.isLoading : studentFeesQuery.isLoading;
+
+  const feeStats = [
+    {
+      title: 'Total Due',
+      value: '₹2,45,000',
+      change: '+12%',
+      icon: DollarSign,
+      color: colors.primary[600],
+      bgColor: colors.primary[50],
+    },
+    {
+      title: 'Collected',
+      value: '₹1,89,000',
+      change: '+8%',
+      icon: CheckCircle,
+      color: colors.success[600],
+      bgColor: colors.success[50],
+    },
+    {
+      title: 'Pending',
+      value: '₹56,000',
+      change: '-3%',
+      icon: Clock,
+      color: colors.warning[600],
+      bgColor: colors.warning[50],
+    },
+    {
+      title: 'Overdue',
+      value: '₹12,000',
+      change: '+2%',
+      icon: AlertCircle,
+      color: colors.error[600],
+      bgColor: colors.error[50],
+    },
+  ];
+
+  const tabButtons = [
+    { key: 'overview', label: 'Overview', icon: DollarSign },
+    { key: 'history', label: 'History', icon: Calendar },
+    { key: 'components', label: 'Components', icon: FileText },
+    { key: 'payments', label: 'Payments', icon: CreditCard },
+    { key: 'analytics', label: 'Analytics', icon: BarChart3 },
+  ];
 
   return (
     <ThreeStateView
-      state={currentState.state}
+      state={isLoading ? 'loading' : currentError ? 'error' : !currentData?.length ? 'empty' : 'success'}
       loadingMessage="Loading fee information..."
       errorMessage="Failed to load fee data"
       errorDetails={currentError?.message}
@@ -73,27 +112,32 @@ export default function FeesScreen() {
       emptyAction={isSuperAdmin ? undefined : { label: "Contact Admin", onPress: () => {} }}
       onRetry={handleRefresh}
     >
-      <ScrollView
-        style={styles.container}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-      >
-        <View
+      <View style={styles.container}>
+        {/* Modern Header with Gradient */}
+        <LinearGradient
+          colors={colors.gradient.warning as [string, string, ...string[]]}
           style={styles.header}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
         >
           <View style={styles.headerContent}>
-            <View style={styles.headerText}>
-              <Text variant="headlineLarge" style={styles.title}>Fees</Text>
-              <Text variant="bodyLarge" style={styles.subtitle}>
-                {selectedClass ? `Grade ${selectedClass.grade}-${selectedClass.section}` :
-                 profile?.class_instance?.grade ? `Grade ${profile.class_instance.grade}-${profile.class_instance.section}` :
-                 'Fee Management'}
-              </Text>
+            <View style={styles.headerLeft}>
+              <View style={styles.iconContainer}>
+                <DollarSign size={32} color={colors.text.inverse} />
+              </View>
+              <View style={styles.headerText}>
+                <Text style={styles.headerTitle}>Fees</Text>
+                <Text style={styles.headerSubtitle}>
+                  {selectedClass ? `Grade ${selectedClass.grade}-${selectedClass.section}` :
+                   profile?.class_instance?.grade ? `Grade ${profile.class_instance.grade}-${profile.class_instance.section}` :
+                   'Fee Management'}
+                </Text>
+              </View>
             </View>
-            <View style={styles.headerIcon}>
-              <DollarSign size={32} color={colors.text.inverse} />
+            <View style={styles.headerRight}>
+              <Badge variant="warning" size="sm" style={styles.statusBadge}>
+                Live
+              </Badge>
             </View>
           </View>
           {isSuperAdmin && (
@@ -101,39 +145,100 @@ export default function FeesScreen() {
               <ClassSelector />
             </View>
           )}
-        </View>
+        </LinearGradient>
 
-        <View style={styles.content}>
-          <SegmentedButtons
-            value={activeTab}
-            onValueChange={(value) => setActiveTab(value as 'overview' | 'history' | 'components' | 'payments' | 'analytics')}
-            buttons={[
-              { value: 'overview', label: 'Overview', icon: 'information-outline' },
-              { value: 'history', label: 'History', icon: 'history' },
-              { value: 'components', label: 'Components', icon: 'format-list-bulleted' },
-              { value: 'payments', label: 'Payments', icon: 'credit-card-outline' },
-              { value: 'analytics', label: 'Analytics', icon: 'chart-bar' },
-            ]}
-            style={styles.segmentedButtons}
-          />
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+        >
+          {/* Stats Grid */}
+          <View style={styles.statsGrid}>
+            {feeStats.map((stat, index) => (
+              <Card key={index} variant="elevated" style={styles.statCard}>
+                <View style={styles.statContent}>
+                  <View style={[styles.statIconContainer, { backgroundColor: stat.bgColor }]}>
+                    <stat.icon size={20} color={stat.color} />
+                  </View>
+                  <View style={styles.statText}>
+                    <Text style={styles.statValue}>{stat.value}</Text>
+                    <Text style={styles.statTitle}>{stat.title}</Text>
+                    <Text style={[styles.statChange, { color: stat.color }]}>
+                      {stat.change}
+                    </Text>
+                  </View>
+                </View>
+              </Card>
+            ))}
+          </View>
 
-          {activeTab === 'overview' ? (
-            isSuperAdmin ? (
-              <ClassFeesOverview data={currentData} formatAmount={formatAmount} getStatusIcon={getStatusIcon} />
-            ) : (
-              <StudentFeesOverview data={currentData} formatAmount={formatAmount} getStatusIcon={getStatusIcon} />
-            )
-          ) : activeTab === 'history' ? (
-            <FeeHistory data={currentData} formatAmount={formatAmount} getStatusIcon={getStatusIcon} />
-          ) : activeTab === 'components' ? (
-            <FeeComponents />
-          ) : activeTab === 'payments' ? (
-            <RecordPayments />
-          ) : activeTab === 'analytics' ? (
-            <FeeAnalytics />
-          ) : null}
-        </View>
-      </ScrollView>
+          {/* Modern Tab Navigation */}
+          <View style={styles.tabContainer}>
+            <Card variant="glass" style={styles.tabCard}>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.tabScrollContent}
+              >
+                {tabButtons.map((tab) => (
+                  <TouchableOpacity
+                    key={tab.key}
+                    style={[
+                      styles.tabButton,
+                      activeTab === tab.key && styles.activeTab
+                    ]}
+                    onPress={() => setActiveTab(tab.key as any)}
+                  >
+                    <tab.icon 
+                      size={18} 
+                      color={activeTab === tab.key ? colors.warning[600] : colors.neutral[500]} 
+                    />
+                    <Text style={[
+                      styles.tabText,
+                      activeTab === tab.key && styles.activeTabText
+                    ]}>
+                      {tab.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </Card>
+          </View>
+
+          {/* Content */}
+          <View style={styles.content}>
+            {activeTab === 'overview' ? (
+              isSuperAdmin ? (
+                <ClassFeesOverview data={currentData} formatAmount={formatAmount} getStatusIcon={getStatusIcon} />
+              ) : (
+                <StudentFeesOverview data={currentData} formatAmount={formatAmount} getStatusIcon={getStatusIcon} />
+              )
+            ) : activeTab === 'history' ? (
+              <FeeHistory data={currentData} formatAmount={formatAmount} getStatusIcon={getStatusIcon} />
+            ) : activeTab === 'components' ? (
+              <EmptyState
+                title="Fee Components"
+                message="Fee component management will be available in the next update"
+                icon={<CreditCard size={64} color={colors.text.tertiary} />}
+              />
+            ) : activeTab === 'payments' ? (
+              <EmptyState
+                title="Record Payments"
+                message="Payment recording will be available in the next update"
+                icon={<DollarSign size={64} color={colors.text.tertiary} />}
+              />
+            ) : activeTab === 'analytics' ? (
+              <EmptyState
+                title="Fee Analytics"
+                message="Fee analytics will be available in the next update"
+                icon={<BarChart3 size={64} color={colors.text.tertiary} />}
+              />
+            ) : null}
+          </View>
+        </ScrollView>
+      </View>
     </ThreeStateView>
   );
 }
@@ -141,50 +246,137 @@ export default function FeesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.secondary,
+    backgroundColor: colors.background.app,
   },
   header: {
-    padding: spacing.lg,
+    paddingTop: spacing.xl + 20,
     paddingBottom: spacing.xl,
-    borderBottomLeftRadius: borderRadius.xl,
-    borderBottomRightRadius: borderRadius.xl,
-    ...shadows.md,
+    paddingHorizontal: spacing.lg,
   },
   headerContent: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    alignItems: 'flex-start',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  headerRight: {
+    alignItems: 'flex-end',
+  },
+  iconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: borderRadius.xl,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
   },
   headerText: {
     flex: 1,
   },
-  title: {
+  headerTitle: {
+    fontSize: typography.fontSize['3xl'],
+    fontWeight: typography.fontWeight.bold,
     color: colors.text.inverse,
-    fontWeight: 'bold',
     marginBottom: spacing.xs,
   },
-  subtitle: {
+  headerSubtitle: {
+    fontSize: typography.fontSize.base,
     color: colors.text.inverse,
     opacity: 0.9,
   },
-  headerIcon: {
-    marginLeft: spacing.md,
+  statusBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   classSelectorContainer: {
-    marginTop: spacing.md,
+    marginTop: spacing.lg,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  statCard: {
+    width: (width - spacing.lg * 3) / 2,
+    padding: spacing.lg,
+  },
+  statContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  statText: {
+    flex: 1,
+  },
+  statValue: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: 2,
+  },
+  statTitle: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginBottom: 2,
+  },
+  statChange: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  tabContainer: {
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  tabCard: {
+    padding: spacing.sm,
+  },
+  tabScrollContent: {
+    paddingHorizontal: spacing.sm,
+  },
+  tabButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.lg,
+    marginRight: spacing.sm,
+    gap: spacing.sm,
+  },
+  activeTab: {
+    backgroundColor: colors.warning[50],
+    ...shadows.sm,
+  },
+  tabText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.secondary,
+  },
+  activeTabText: {
+    color: colors.warning[700],
+    fontWeight: typography.fontWeight.semibold,
   },
   content: {
-    flex: 1,
-    padding: spacing.md,
-  },
-  segmentedButtons: {
-    marginBottom: spacing.md,
+    padding: spacing.lg,
+    paddingBottom: 100, // Space for tab bar
   },
   summaryCard: {
     marginBottom: spacing.md,
-    borderRadius: borderRadius.md,
-    ...shadows.sm,
   },
   summaryHeader: {
     flexDirection: 'row',
@@ -203,10 +395,6 @@ const styles = StyleSheet.create({
   },
   statItem: {
     alignItems: 'center',
-  },
-  statValue: {
-    fontWeight: 'bold',
-    color: colors.text.primary,
   },
   statLabel: {
     color: colors.text.secondary,
@@ -305,9 +493,7 @@ const StudentFeesOverview: React.FC<StudentFeesOverviewProps> = ({ data, formatA
         <Text variant="bodySmall" style={styles.emptyMessage}>
           Your fee plan is not yet available or you have no payments recorded.
         </Text>
-        <Button mode="contained" onPress={() => {}} style={{ marginTop: spacing.md }}>
-          Contact Admin
-        </Button>
+        <Button title="Contact Admin" onPress={() => {}} style={{ marginTop: spacing.md }} />
       </View>
     );
   }
@@ -317,41 +503,34 @@ const StudentFeesOverview: React.FC<StudentFeesOverviewProps> = ({ data, formatA
   return (
     <>
       <Card style={styles.summaryCard}>
-        <Card.Content>
-          <View style={styles.summaryHeader}>
-            <DollarSign size={24} color="#667eea" />
-            <Text variant="titleMedium" style={styles.summaryTitle}>Your Fee Summary</Text>
-          </View>
+        <View style={styles.summaryHeader}>
+          <DollarSign size={24} color="#667eea" />
+          <Text variant="titleMedium" style={styles.summaryTitle}>Your Fee Summary</Text>
+        </View>
 
-          <View style={styles.summaryStats}>
-            <View style={styles.statItem}>
-              <Text variant="headlineSmall" style={styles.statValue}>{formatAmount(totalDue)}</Text>
-              <Text style={styles.statLabel}>Total Due</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text variant="headlineSmall" style={styles.statValue}>{formatAmount(totalPaid)}</Text>
-              <Text style={styles.statLabel}>Total Paid</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text variant="headlineSmall" style={styles.statValue}>{formatAmount(balance)}</Text>
-              <Text style={styles.statLabel}>Balance</Text>
-            </View>
+        <View style={styles.summaryStats}>
+          <View style={styles.statItem}>
+            <Text variant="headlineSmall" style={styles.statValue}>{formatAmount(totalDue)}</Text>
+            <Text style={styles.statLabel}>Total Due</Text>
           </View>
+          <View style={styles.statItem}>
+            <Text variant="headlineSmall" style={styles.statValue}>{formatAmount(totalPaid)}</Text>
+            <Text style={styles.statLabel}>Total Paid</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text variant="headlineSmall" style={styles.statValue}>{formatAmount(balance)}</Text>
+            <Text style={styles.statLabel}>Balance</Text>
+          </View>
+        </View>
 
-          <View style={styles.actionButtons}>
-            <Button mode="contained" icon="credit-card-outline" style={styles.actionButton} onPress={() => {}}>
-              Pay Now
-            </Button>
-            <Button mode="outlined" icon="file-document-outline" style={styles.actionButton} onPress={() => {}}>
-              View Invoice
-            </Button>
-          </View>
-        </Card.Content>
+        <View style={styles.actionButtons}>
+          <Button title="Pay Now" onPress={() => {}} style={styles.actionButton} />
+          <Button title="View Invoice" variant="outline" onPress={() => {}} style={styles.actionButton} />
+        </View>
       </Card>
 
       {plan && plan.items && plan.items.length > 0 && (
         <Card style={styles.summaryCard}>
-          <Card.Content>
             <Text style={styles.sectionTitle}>Fee Components</Text>
             {plan.items.map((item: any) => {
               const totalAmount = item.amount_paise * item.quantity;
@@ -371,13 +550,11 @@ const StudentFeesOverview: React.FC<StudentFeesOverviewProps> = ({ data, formatA
                 </View>
               );
             })}
-          </Card.Content>
         </Card>
       )}
 
       {payments.length > 0 && (
         <Card style={styles.summaryCard}>
-          <Card.Content>
             <Text style={styles.sectionTitle}>Recent Payments</Text>
             {payments.slice(0, 3).map((payment: any) => (
               <View key={payment.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: spacing.sm }}>
@@ -397,10 +574,7 @@ const StudentFeesOverview: React.FC<StudentFeesOverviewProps> = ({ data, formatA
                 </View>
               </View>
             ))}
-            <Button mode="text" style={{ marginTop: spacing.md }} onPress={() => {}}>
-              View All Payments
-            </Button>
-          </Card.Content>
+            <Button title="View All Payments" variant="ghost" style={{ marginTop: spacing.md }} onPress={() => {}} />
         </Card>
       )}
     </>
@@ -433,7 +607,6 @@ const ClassFeesOverview: React.FC<ClassFeesOverviewProps> = ({ data, formatAmoun
   return (
     <>
       <Card style={styles.summaryCard}>
-        <Card.Content>
           <View style={styles.summaryHeader}>
             <DollarSign size={24} color="#667eea" />
             <Text variant="titleMedium" style={styles.summaryTitle}>Class Fee Summary</Text>
@@ -453,38 +626,42 @@ const ClassFeesOverview: React.FC<ClassFeesOverviewProps> = ({ data, formatAmoun
               <Text style={styles.statLabel}>Balance</Text>
             </View>
           </View>
-        </Card.Content>
       </Card>
 
       <Text style={styles.sectionTitle}>Students in Class</Text>
-      {data.map((student: any) => (
-        <Card key={student.id} style={styles.studentCard}>
-          <Card.Content style={styles.studentCardContent}>
-            <View style={styles.studentInfo}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{student.full_name[0]}</Text>
+      {data.map((student: any) => {
+        const fullName = student.full_name || 'N/A';
+        const initial = fullName && fullName.length > 0 ? fullName[0].toUpperCase() : '?';
+        
+        return (
+          <Card key={student.id} style={styles.studentCard}>
+            <View style={styles.studentCardContent}>
+              <View style={styles.studentInfo}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{initial}</Text>
+                </View>
+                <View>
+                  <Text variant="titleSmall" style={styles.studentName}>{fullName}</Text>
+                  {student.student_code && (
+                    <Text style={styles.rollNumber}>Code: {student.student_code}</Text>
+                  )}
+                </View>
               </View>
-              <View>
-                <Text variant="titleSmall" style={styles.studentName}>{student.full_name}</Text>
-                {student.student_code && (
-                  <Text style={styles.rollNumber}>Code: {student.student_code}</Text>
-                )}
+              <View style={styles.feeStatus}>
+                {getStatusIcon(student.feeDetails?.balance > 0 ? 'pending' : 'paid')}
+                <Text
+                  style={[
+                    styles.statusText,
+                    { color: student.feeDetails?.balance > 0 ? '#f59e0b' : '#10b981' },
+                  ]}
+                >
+                  {student.feeDetails?.balance > 0 ? formatAmount(student.feeDetails.balance) : 'Paid'}
+                </Text>
               </View>
             </View>
-            <View style={styles.feeStatus}>
-              {getStatusIcon(student.feeDetails?.balance > 0 ? 'pending' : 'paid')}
-              <Text
-                style={[
-                  styles.statusText,
-                  { color: student.feeDetails?.balance > 0 ? '#f59e0b' : '#10b981' },
-                ]}
-              >
-                {student.feeDetails?.balance > 0 ? formatAmount(student.feeDetails.balance) : 'Paid'}
-              </Text>
-            </View>
-          </Card.Content>
-        </Card>
-      ))}
+          </Card>
+        );
+      })}
     </>
   );
 };

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/src/services/api';
+import { api } from '../services/api';
 
 export function useClassCalendar(classId?: string) {
   return useQuery({

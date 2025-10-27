@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { Database } from '@/src/types/database.types';
+import { Database } from '../types/database.types';
 
 // Get Supabase configuration from environment or app.json
 const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -25,7 +25,6 @@ const AsyncStorageAdapter = {
       }
       return await AsyncStorage.getItem(key);
     } catch (error) {
-      console.error('Error getting item from storage:', error);
       return null;
     }
   },
@@ -39,7 +38,7 @@ const AsyncStorageAdapter = {
       }
       await AsyncStorage.setItem(key, value);
     } catch (error) {
-      console.error('Error setting item in storage:', error);
+      // Error setting item in storage
     }
   },
   removeItem: async (key: string): Promise<void> => {
@@ -52,7 +51,7 @@ const AsyncStorageAdapter = {
       }
       await AsyncStorage.removeItem(key);
     } catch (error) {
-      console.error('Error removing item from storage:', error);
+      // Error removing item from storage
     }
   },
 };
@@ -124,4 +123,4 @@ export const hasPermission = (userRole: string, resource: string, action: string
 };
 
 // Export types for convenience
-export type { Database } from '@/src/types/database.types';
+export type { Database } from '../types/database.types';

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { CardSkeleton, ListCardSkeleton } from './CardSkeleton';
-import { colors, spacing } from '@/lib/design-system';
+import { colors, spacing } from '../../../lib/design-system';
 
 export function FeesSkeleton() {
   return (

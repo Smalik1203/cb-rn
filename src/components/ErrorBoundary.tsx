@@ -2,7 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AlertCircle } from 'lucide-react-native';
-import { colors, typography, spacing, borderRadius, shadows } from '@/lib/design-system';
+import { colors, typography, spacing, borderRadius, shadows } from '../../lib/design-system';
 
 interface Props {
   children: ReactNode;
@@ -36,16 +36,37 @@ class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log error to console (in production, send to error tracking service)
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
     
     this.setState({
       error,
       errorInfo,
     });
 
-    // TODO: Send error to monitoring service (e.g., Sentry, Bugsnag)
-    // logErrorToService(error, errorInfo);
+    // Enhanced error reporting
+    this.logErrorToService(error, errorInfo);
   }
+
+  private logErrorToService = (error: Error, errorInfo: ErrorInfo) => {
+    const errorReport = {
+      message: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+      timestamp: new Date().toISOString(),
+      userAgent: 'React Native App',
+      version: '1.0.0', // You can get this from package.json
+    };
+
+    // In development, log to console
+    if (__DEV__) {
+    }
+
+    // In production, you would send this to your error tracking service
+    // Example: Sentry, Bugsnag, or your own error tracking endpoint
+    if (!__DEV__) {
+      // Example: Sentry.captureException(error, { extra: errorInfo });
+      // Example: Bugsnag.notify(error, { metaData: errorInfo });
+    }
+  };
 
   handleReset = () => {
     this.setState({

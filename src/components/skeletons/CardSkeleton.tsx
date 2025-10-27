@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Animated, Easing } from 'react-native';
-import { colors, spacing, borderRadius } from '@/lib/design-system';
+import { colors, spacing, borderRadius } from '../../../lib/design-system';
 
 interface CardSkeletonProps {
   height?: number;

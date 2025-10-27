@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { mapError } from './errorMapper';
+import { DB } from '../types/db.constants';
 
 export interface RLSCheckResult {
   table: string;
@@ -24,73 +25,73 @@ export async function checkRLSAccess(
   // Test each table with a minimal count query
   const checks = [
     {
-      table: 'users',
-      query: () => supabase.from('users').select('id', { count: 'exact', head: true }).eq('school_code', schoolCode),
+      table: DB.tables.users,
+      query: () => supabase.from(DB.tables.users).select('id', { count: 'exact', head: true }).eq(DB.columns.schoolCode, schoolCode),
       queryName: 'checkUsersAccess'
     },
     {
-      table: 'student',
-      query: () => supabase.from('student').select('id', { count: 'exact', head: true }).eq('school_code', schoolCode),
+      table: DB.tables.student,
+      query: () => supabase.from(DB.tables.student).select('id', { count: 'exact', head: true }).eq(DB.columns.schoolCode, schoolCode),
       queryName: 'checkStudentsAccess'
     },
     {
-      table: 'class_instances',
-      query: () => supabase.from('class_instances').select('id', { count: 'exact', head: true }).eq('school_code', schoolCode),
+      table: DB.tables.classInstances,
+      query: () => supabase.from(DB.tables.classInstances).select('id', { count: 'exact', head: true }).eq(DB.columns.schoolCode, schoolCode),
       queryName: 'checkClassesAccess'
     },
     {
-      table: 'attendance',
-      query: () => supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('school_code', schoolCode),
+      table: DB.tables.attendance,
+      query: () => supabase.from(DB.tables.attendance).select('id', { count: 'exact', head: true }).eq(DB.columns.schoolCode, schoolCode),
       queryName: 'checkAttendanceAccess'
     },
     {
-      table: 'fee_student_plans',
-      query: () => supabase.from('fee_student_plans').select('id', { count: 'exact', head: true }).eq('school_code', schoolCode),
+      table: DB.tables.feeStudentPlans,
+      query: () => supabase.from(DB.tables.feeStudentPlans).select('id', { count: 'exact', head: true }).eq(DB.columns.schoolCode, schoolCode),
       queryName: 'checkFeePlansAccess'
     },
     {
-      table: 'fee_payments',
-      query: () => supabase.from('fee_payments').select('id', { count: 'exact', head: true }).eq('school_code', schoolCode),
+      table: DB.tables.feePayments,
+      query: () => supabase.from(DB.tables.feePayments).select('id', { count: 'exact', head: true }).eq(DB.columns.schoolCode, schoolCode),
       queryName: 'checkFeePaymentsAccess'
     },
     {
-      table: 'timetable_slots',
-      query: () => supabase.from('timetable_slots').select('id', { count: 'exact', head: true }).eq('school_code', schoolCode),
+      table: DB.tables.timetableSlots,
+      query: () => supabase.from(DB.tables.timetableSlots).select('id', { count: 'exact', head: true }).eq(DB.columns.schoolCode, schoolCode),
       queryName: 'checkTimetableAccess'
     },
     {
-      table: 'school_calendar_events',
-      query: () => supabase.from('school_calendar_events').select('id', { count: 'exact', head: true }).eq('school_code', schoolCode),
+      table: DB.tables.schoolCalendarEvents,
+      query: () => supabase.from(DB.tables.schoolCalendarEvents).select('id', { count: 'exact', head: true }).eq(DB.columns.schoolCode, schoolCode),
       queryName: 'checkCalendarAccess'
     },
     {
-      table: 'learning_resources',
-      query: () => supabase.from('learning_resources').select('id', { count: 'exact', head: true }).eq('school_code', schoolCode),
+      table: DB.tables.learningResources,
+      query: () => supabase.from(DB.tables.learningResources).select('id', { count: 'exact', head: true }).eq(DB.columns.schoolCode, schoolCode),
       queryName: 'checkResourcesAccess'
     },
     {
-      table: 'tests',
-      query: () => supabase.from('tests').select('id', { count: 'exact', head: true }).eq('school_code', schoolCode),
+      table: DB.tables.tests,
+      query: () => supabase.from(DB.tables.tests).select('id', { count: 'exact', head: true }).eq(DB.columns.schoolCode, schoolCode),
       queryName: 'checkTestsAccess'
     },
     {
-      table: 'tasks',
-      query: () => supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('school_code', schoolCode),
+      table: DB.tables.tasks,
+      query: () => supabase.from(DB.tables.tasks).select('id', { count: 'exact', head: true }).eq(DB.columns.schoolCode, schoolCode),
       queryName: 'checkTasksAccess'
     },
     {
-      table: 'academic_years',
-      query: () => supabase.from('academic_years').select('id', { count: 'exact', head: true }).eq('school_code', schoolCode),
+      table: DB.tables.academicYears,
+      query: () => supabase.from(DB.tables.academicYears).select('id', { count: 'exact', head: true }).eq(DB.columns.schoolCode, schoolCode),
       queryName: 'checkAcademicYearsAccess'
     },
     {
-      table: 'subjects',
-      query: () => supabase.from('subjects').select('id', { count: 'exact', head: true }).eq('school_code', schoolCode),
+      table: DB.tables.subjects,
+      query: () => supabase.from(DB.tables.subjects).select('id', { count: 'exact', head: true }).eq(DB.columns.schoolCode, schoolCode),
       queryName: 'checkSubjectsAccess'
     },
     {
-      table: 'fee_component_types',
-      query: () => supabase.from('fee_component_types').select('id', { count: 'exact', head: true }).eq('school_code', schoolCode),
+      table: DB.tables.feeComponentTypes,
+      query: () => supabase.from(DB.tables.feeComponentTypes).select('id', { count: 'exact', head: true }).eq(DB.columns.schoolCode, schoolCode),
       queryName: 'checkFeeComponentsAccess'
     }
   ];
@@ -98,14 +99,14 @@ export async function checkRLSAccess(
   // Add class-specific checks if classInstanceId provided
   if (classInstanceId) {
     checks.push(
-      {
-        table: 'student (class-filtered)',
-        query: () => supabase.from('student').select('id', { count: 'exact', head: true }).eq('class_instance_id', classInstanceId).eq('school_code', schoolCode),
+    {
+      table: DB.tables.student,
+        query: () => supabase.from(DB.tables.student).select('id', { count: 'exact', head: true }).eq(DB.columns.classInstanceId, classInstanceId).eq(DB.columns.schoolCode, schoolCode),
         queryName: 'checkClassStudentsAccess'
       },
       {
-        table: 'attendance (class-filtered)',
-        query: () => supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('class_instance_id', classInstanceId).eq('school_code', schoolCode),
+      table: DB.tables.attendance,
+        query: () => supabase.from(DB.tables.attendance).select('id', { count: 'exact', head: true }).eq(DB.columns.classInstanceId, classInstanceId).eq(DB.columns.schoolCode, schoolCode),
         queryName: 'checkClassAttendanceAccess'
       }
     );
@@ -115,13 +116,13 @@ export async function checkRLSAccess(
   if (academicYearId) {
     checks.push(
       {
-        table: 'fee_student_plans (year-filtered)',
-        query: () => supabase.from('fee_student_plans').select('id', { count: 'exact', head: true }).eq('academic_year_id', academicYearId).eq('school_code', schoolCode),
+        table: DB.tables.feeStudentPlans,
+        query: () => supabase.from(DB.tables.feeStudentPlans).select('id', { count: 'exact', head: true }).eq(DB.columns.academicYearId, academicYearId).eq(DB.columns.schoolCode, schoolCode),
         queryName: 'checkYearFeePlansAccess'
       },
       {
-        table: 'tasks (year-filtered)',
-        query: () => supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('academic_year_id', academicYearId).eq('school_code', schoolCode),
+        table: DB.tables.tasks,
+        query: () => supabase.from(DB.tables.tasks).select('id', { count: 'exact', head: true }).eq(DB.columns.academicYearId, academicYearId).eq(DB.columns.schoolCode, schoolCode),
         queryName: 'checkYearTasksAccess'
       }
     );
@@ -174,12 +175,13 @@ export async function checkRLSAccess(
  * Check specific table access with detailed error info
  */
 export async function checkTableAccess(
-  table: string,
+  table: keyof typeof DB.tables | keyof typeof DB.columns | string,
   schoolCode: string,
   additionalFilters?: Record<string, any>
 ): Promise<RLSCheckResult> {
   try {
-    let query = supabase.from(table).select('id', { count: 'exact', head: true });
+    const tableName = (DB.tables as any)[table as any] || table;
+    let query = (supabase as any).from(tableName).select('id', { count: 'exact', head: true });
     
     // Apply school filter
     query = query.eq('school_code', schoolCode);

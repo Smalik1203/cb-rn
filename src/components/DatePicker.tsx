@@ -3,7 +3,7 @@ import { View, StyleSheet, Platform } from 'react-native';
 import { Text, Button, Portal, Modal } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Calendar } from 'lucide-react-native';
-import { colors, typography, spacing, borderRadius } from '@/lib/design-system';
+import { colors, typography, spacing, borderRadius } from '../../lib/design-system';
 
 interface DatePickerProps {
   selectedDate: Date;
