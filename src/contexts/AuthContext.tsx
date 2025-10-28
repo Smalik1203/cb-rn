@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
-import { supabase } from '../lib/supabase';
+import { supabase, testSupabaseConnection } from '../lib/supabase';
 import { log } from '../lib/logger';
 
 /** Auth state machine */
@@ -11,6 +11,7 @@ type Profile = {
   auth_id: string;
   role: string;
   school_code: string | null;
+  school_name: string | null;
   class_instance_id: string | null;
   full_name: string | null;
   email: string | null;
@@ -124,6 +125,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .abortSignal(controller.signal)
         .maybeSingle();
 
+      // Fetch school name if school_code exists
+      let schoolName = null;
+      if (userProfile?.school_code && !profileError) {
+        const { data: schoolData } = await supabase
+          .from('schools')
+          .select('school_name')
+          .eq('school_code', userProfile.school_code)
+          .abortSignal(controller.signal)
+          .maybeSingle();
+        
+        schoolName = schoolData?.school_name || null;
+      }
+
       clearTimeout(timeout);
 
       // Discard stale results from a previous session
@@ -182,6 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         auth_id: user.id,
         role: userProfile.role,
         school_code: userProfile.school_code,
+        school_name: schoolName,
         class_instance_id: userProfile.class_instance_id,
         full_name: userProfile.full_name,
         email: userProfile.email,
@@ -235,6 +250,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const prime = async () => {
       try {
+        // Test Supabase connection first
+        const connectionOk = await testSupabaseConnection();
+        if (!connectionOk) {
+          log.error('Supabase connection failed - check your configuration');
+          if (alive) setState((prev) => ({ ...prev, status: 'signedOut' }));
+          return;
+        }
+
         const { data: { session } } = await supabase.auth.getSession();
         if (!alive) return;
 

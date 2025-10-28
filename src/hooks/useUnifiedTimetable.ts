@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useRef, useEffect } from 'react';
 import { TimetableSlot } from '../services/api';
+import { useSyllabusLoader } from './useSyllabusLoader';
 
 export interface UnifiedTimetableResult {
   slots: TimetableSlot[];
@@ -61,9 +62,12 @@ export interface QuickGeneratePayload {
   }>;
 }
 
-export function useUnifiedTimetable(classId?: string, dateStr?: string): UnifiedTimetableResult {
+export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCode?: string): UnifiedTimetableResult {
   const queryClient = useQueryClient();
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Load syllabus data for chapter and topic names
+  const { syllabusContentMap } = useSyllabusLoader(classId, schoolCode);
 
   useEffect(() => {
     return () => {
@@ -73,10 +77,10 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string): Unified
     };
   }, []);
 
-  const { data: slots, isLoading, error, refetch } = useQuery({
+  const { data: slots, isLoading, error, refetch } = useQuery<{ slots: TimetableSlot[]; taughtSlotIds: Set<string> }>({
     queryKey: ['unifiedTimetable', classId, dateStr],
     queryFn: async () => {
-      if (!classId || !dateStr) return [];
+      if (!classId || !dateStr) return { slots: [], taughtSlotIds: new Set<string>() };
       
       abortControllerRef.current = new AbortController();
       
@@ -112,7 +116,7 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string): Unified
       }
 
       if (!slotsData || slotsData.length === 0) {
-        return [];
+        return { slots: [], taughtSlotIds: new Set<string>() };
       }
 
       // Get unique subject and teacher IDs
@@ -144,23 +148,47 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string): Unified
       const subjectsMap = new Map((subjectsResult.data || []).map(s => [s.id, s]));
       const teachersMap = new Map((teachersResult.data || []).map(t => [t.id, t]));
 
-      // Combine slots with subject and teacher data
-      const enrichedSlots = slotsData.map(slot => ({
-        ...slot,
-        subject_name: slot.subject_id ? subjectsMap.get(slot.subject_id)?.subject_name : null,
-        teacher_name: slot.teacher_id ? teachersMap.get(slot.teacher_id)?.full_name : null,
-        day_of_week: new Date(slot.class_date).getDay(), // Add day_of_week for compatibility
-      }));
+      // Get taught slot IDs from syllabus_progress table
+      const { data: progressData, error: progressError } = await supabase
+        .from('syllabus_progress')
+        .select('timetable_slot_id')
+        .eq('class_instance_id', classId)
+        .eq('date', dateStr)
+        .abortSignal(abortControllerRef.current.signal);
 
-      return enrichedSlots as TimetableSlot[];
+      if (progressError) {
+        throw progressError;
+      }
+
+      const taughtSlotIds = new Set((progressData || []).map(p => p.timetable_slot_id));
+
+      // Combine slots with subject and teacher data
+      const enrichedSlots = slotsData.map(slot => {
+        // Get chapter and topic names from syllabus content map
+        const chapterContent = slot.syllabus_chapter_id ? syllabusContentMap?.get(`chapter_${slot.syllabus_chapter_id}`) : null;
+        const topicContent = slot.syllabus_topic_id ? syllabusContentMap?.get(`topic_${slot.syllabus_topic_id}`) : null;
+        
+        return {
+          ...slot,
+          subject_name: slot.subject_id ? subjectsMap.get(slot.subject_id)?.subject_name : null,
+          teacher_name: slot.teacher_id ? teachersMap.get(slot.teacher_id)?.full_name : null,
+          chapter_name: chapterContent?.title || null,
+          topic_name: topicContent?.title || null,
+          day_of_week: new Date(slot.class_date).getDay(), // Add day_of_week for compatibility
+        };
+      });
+
+      return { slots: enrichedSlots as TimetableSlot[], taughtSlotIds };
     },
     enabled: !!classId && !!dateStr,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 15 * 60 * 1000, // 15 minutes
+    staleTime: 30 * 1000, // 30 seconds - shorter for better sync
+    gcTime: 5 * 60 * 1000, // 5 minutes
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true, // Refetch when app comes to focus
     refetchOnMount: true,
+    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
+    refetchIntervalInBackground: false, // Don't refetch in background to save battery
   });
 
   // Helper function to renumber slots sequentially
@@ -277,7 +305,10 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string): Unified
       await renumberSlotsSequentially(payload.class_instance_id, payload.class_date, payload.school_code);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['unifiedTimetable', classId, dateStr] });
+      // Invalidate all timetable queries for better cross-device sync
+      queryClient.invalidateQueries({ queryKey: ['unifiedTimetable'] });
+      // Also invalidate syllabus progress queries
+      queryClient.invalidateQueries({ queryKey: ['syllabus_progress'] });
     },
   });
 
@@ -312,7 +343,10 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string): Unified
       );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['unifiedTimetable', classId, dateStr] });
+      // Invalidate all timetable queries for better cross-device sync
+      queryClient.invalidateQueries({ queryKey: ['unifiedTimetable'] });
+      // Also invalidate syllabus progress queries
+      queryClient.invalidateQueries({ queryKey: ['syllabus_progress'] });
     },
   });
 
@@ -334,7 +368,10 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string): Unified
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['unifiedTimetable', classId, dateStr] });
+      // Invalidate all timetable queries for better cross-device sync
+      queryClient.invalidateQueries({ queryKey: ['unifiedTimetable'] });
+      // Also invalidate syllabus progress queries
+      queryClient.invalidateQueries({ queryKey: ['syllabus_progress'] });
     },
   });
 
@@ -374,7 +411,10 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string): Unified
       await renumberSlotsSequentially(payload.class_instance_id, payload.class_date, payload.school_code);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['unifiedTimetable', classId, dateStr] });
+      // Invalidate all timetable queries for better cross-device sync
+      queryClient.invalidateQueries({ queryKey: ['unifiedTimetable'] });
+      // Also invalidate syllabus progress queries
+      queryClient.invalidateQueries({ queryKey: ['syllabus_progress'] });
     },
   });
 
@@ -416,7 +456,10 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string): Unified
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['unifiedTimetable', classId, dateStr] });
+      // Invalidate all timetable queries for better cross-device sync
+      queryClient.invalidateQueries({ queryKey: ['unifiedTimetable'] });
+      // Also invalidate syllabus progress queries
+      queryClient.invalidateQueries({ queryKey: ['syllabus_progress'] });
     },
   });
 
@@ -447,7 +490,10 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string): Unified
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['unifiedTimetable', classId, dateStr] });
+      // Invalidate all timetable queries for better cross-device sync
+      queryClient.invalidateQueries({ queryKey: ['unifiedTimetable'] });
+      // Also invalidate syllabus progress queries
+      queryClient.invalidateQueries({ queryKey: ['syllabus_progress'] });
     },
   });
 
@@ -464,15 +510,25 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string): Unified
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['unifiedTimetable', classId, dateStr] });
+      // Invalidate all timetable queries for better cross-device sync
+      queryClient.invalidateQueries({ queryKey: ['unifiedTimetable'] });
+      // Also invalidate syllabus progress queries
+      queryClient.invalidateQueries({ queryKey: ['syllabus_progress'] });
     },
   });
 
+  // Manual refresh function for better sync
+  const refreshData = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['unifiedTimetable'] });
+    await queryClient.invalidateQueries({ queryKey: ['syllabus_progress'] });
+    await refetch();
+  };
+
   return {
-    slots: slots || [],
+    slots: slots?.slots || [],
     loading: isLoading,
     error: error as Error | null,
-    refetch,
+    refetch: refreshData, // Use enhanced refresh function
     createSlot: (payload: CreateSlotPayload) => createSlotMutation.mutateAsync(payload),
     updateSlot: (id: string, updates: UpdateSlotPayload) => updateSlotMutation.mutateAsync({ id, updates }),
     deleteSlot: (slotId: string) => deleteSlotMutation.mutateAsync(slotId),
@@ -480,8 +536,8 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string): Unified
     markSlotTaught: (slotId: string) => markSlotTaughtMutation.mutateAsync(slotId),
     unmarkSlotTaught: (slotId: string) => unmarkSlotTaughtMutation.mutateAsync(slotId),
     updateSlotStatus: (slotId: string, status: 'planned' | 'done' | 'cancelled') => updateSlotStatusMutation.mutateAsync({ slotId, status }),
-    displayPeriodNumber: (slots || []).filter(slot => slot.slot_type === 'period').length,
-    taughtSlotIds: new Set<string>(), // TODO: Implement taught slot tracking
+    displayPeriodNumber: (slots?.slots || []).filter(slot => slot.slot_type === 'period').length,
+    taughtSlotIds: slots?.taughtSlotIds || new Set<string>(),
   };
 }
 

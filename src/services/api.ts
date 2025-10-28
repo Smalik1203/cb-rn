@@ -77,6 +77,8 @@ export interface TimetableSlot {
   // Enriched properties added by useUnifiedTimetable hook
   subject_name?: string | null;
   teacher_name?: string | null;
+  chapter_name?: string | null;
+  topic_name?: string | null;
   // Legacy nested objects (for backward compatibility)
   subject?: {
     id: string;
@@ -488,6 +490,32 @@ export const api = {
         .select('*')
         .eq('school_code', schoolCode)
         .order('due_date', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    },
+  },
+
+  subjects: {
+    async getBySchool(schoolCode: string) {
+      const { data, error } = await supabase
+        .from('subjects')
+        .select('id, subject_name, school_code')
+        .eq('school_code', schoolCode)
+        .order('subject_name', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    },
+  },
+
+  admin: {
+    async getBySchool(schoolCode: string) {
+      const { data, error } = await supabase
+        .from('admin')
+        .select('id, full_name, email, phone, role, school_code')
+        .eq('school_code', schoolCode)
+        .order('full_name', { ascending: true });
 
       if (error) throw error;
       return data || [];

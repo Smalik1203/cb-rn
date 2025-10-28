@@ -8,12 +8,7 @@ export default function IndexScreen() {
   const auth = useAuth();
 
   useEffect(() => {
-    console.log('🔎 Index auth:', {
-      status: auth.status,
-      bootstrapping: auth.bootstrapping,
-      loading: auth.loading,
-      hasProfile: !!auth.profile,
-    });
+    // Handle auth state changes
   }, [auth.status, auth.bootstrapping, auth.loading, auth.profile]);
 
   // 1) While checking session or bootstrapping profile, show splash (no redirects).

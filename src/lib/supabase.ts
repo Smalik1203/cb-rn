@@ -67,3 +67,24 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, 
 });
 
 log.info('Supabase client created successfully with AsyncStorage');
+
+// Test Supabase connection
+export const testSupabaseConnection = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('schools')
+      .select('count')
+      .limit(1);
+    
+    if (error) {
+      log.error('Supabase connection test failed:', error);
+      return false;
+    }
+    
+    log.info('Supabase connection test successful');
+    return true;
+  } catch (error) {
+    log.error('Supabase connection test error:', error);
+    return false;
+  }
+};

@@ -22,9 +22,9 @@ export default function RootLayout() {
         <ErrorBoundary>
           <QueryClientProvider client={queryClient}>
             <PaperProvider>
-              <AuthProvider>
-                <ClassSelectionProvider>
-                  <Drawer
+            <AuthProvider>
+              <ClassSelectionProvider>
+                <Drawer
                     drawerContent={(props) => <DrawerContent {...props} />}
                     screenOptions={{
                       headerShown: false,
@@ -32,6 +32,9 @@ export default function RootLayout() {
                         backgroundColor: '#ffffff',
                         width: 280,
                       },
+                      overlayColor: 'rgba(0, 0, 0, 0.5)',
+                      drawerType: 'front',
+                      swipeEnabled: true,
                     }}
                   >
                     <Drawer.Screen
@@ -51,8 +54,8 @@ export default function RootLayout() {
                   </Drawer>
                   <StatusBar style="auto" />
                   <NetworkStatus />
-                </ClassSelectionProvider>
-              </AuthProvider>
+              </ClassSelectionProvider>
+            </AuthProvider>
             </PaperProvider>
           </QueryClientProvider>
         </ErrorBoundary>

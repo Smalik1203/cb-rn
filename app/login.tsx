@@ -19,9 +19,7 @@ export default function LoginScreen() {
 
   // Redirect if already signed in
   React.useEffect(() => {
-    console.log('LoginScreen auth status:', auth.status);
     if (auth.status === 'signedIn') {
-      console.log('Redirecting to main app from login screen');
       router.replace('/(tabs)');
     }
   }, [auth.status]);
@@ -84,7 +82,6 @@ export default function LoginScreen() {
       if (data.user) {
         // Don't set loading to false here - let the auth context handle the flow
         // The auth context will either redirect to main app or show access denied
-        console.log('Login successful, auth context will handle the flow...');
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'An unexpected error occurred');

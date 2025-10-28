@@ -5,9 +5,8 @@ export function useSubjects(schoolCode?: string) {
   return useQuery({
     queryKey: ['subjects', schoolCode],
     queryFn: async ({ signal }) => {
-      // TODO: Implement subjects API with signal support
-      // For now, return empty array since api.subjects doesn't exist
-      return [];
+      if (!schoolCode) return [];
+      return api.subjects.getBySchool(schoolCode);
     },
     enabled: !!schoolCode,
     staleTime: 10 * 60 * 1000, // 10 minutes
@@ -23,9 +22,8 @@ export function useAdmin(schoolCode?: string) {
   return useQuery({
     queryKey: ['admin', schoolCode],
     queryFn: async ({ signal }) => {
-      // TODO: Implement admin API with signal support
-      // For now, return empty array since api.admin doesn't exist
-      return [];
+      if (!schoolCode) return [];
+      return api.admin.getBySchool(schoolCode);
     },
     enabled: !!schoolCode,
     staleTime: 10 * 60 * 1000, // 10 minutes
