@@ -32,7 +32,7 @@ export default function AnalyticsScreen() {
   const { selectedClass } = useClassSelection();
   const [activeTab, setActiveTab] = useState<'overview' | 'detailed'>('overview');
 
-  const role = profile?.role || 'student';
+  const role = profile?.role;
   const canViewAnalytics = role === 'admin' || role === 'superadmin' || role === 'cb_admin';
 
   // Fetch analytics data

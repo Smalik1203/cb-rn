@@ -144,6 +144,27 @@ export async function withRetry<T>(
 }
 
 /**
+ * Creates a timeout signal that respects a parent signal and cleans up properly
+ * Use this when you need custom timeouts in React Query queryFn
+ */
+export function withTimeoutSignal(parent: AbortSignal | undefined, ms: number) {
+  const ctrl = new AbortController();
+
+  const onAbort = () => ctrl.abort();
+  parent?.addEventListener('abort', onAbort, { once: true });
+
+  const timer = setTimeout(() => ctrl.abort(), ms);
+
+  const clear = () => {
+    clearTimeout(timer);
+    parent?.removeEventListener('abort', onAbort);
+  };
+
+  // Tie the child signal to both parent and timeout
+  return { signal: ctrl.signal, clear };
+}
+
+/**
  * Single-flight promise cache to prevent duplicate requests
  */
 export class SingleFlightCache<T> {

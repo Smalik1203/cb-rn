@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   periodChip: {
-    backgroundColor: colors.primary.light,
+    backgroundColor: colors.primary[100],
     borderColor: colors.primary.main,
   },
   periodChipText: {
@@ -316,6 +316,11 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     fontWeight: '600',
     marginLeft: spacing.sm,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xs,
   },
   teacherRow: {
     flexDirection: 'row',

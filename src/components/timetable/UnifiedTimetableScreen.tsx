@@ -70,7 +70,7 @@ export function UnifiedTimetableScreen() {
         school_code: profile.school_code,
         class_date: dateStr,
         period_number: slotForm.slot_type === 'break' ? 0 : slots.filter(s => s.slot_type === 'period').length + 1,
-        slot_type: slotForm.slot_type,
+        slot_type: slotForm.slot_type as 'period' | 'break',
         name: slotForm.slot_type === 'break' ? slotForm.name : null,
         start_time: slotForm.start_time,
         end_time: slotForm.end_time,
@@ -94,7 +94,7 @@ export function UnifiedTimetableScreen() {
 
     try {
       await updateSlot(editingSlot.id, {
-        slot_type: slotForm.slot_type,
+        slot_type: slotForm.slot_type as 'period' | 'break',
         name: slotForm.slot_type === 'break' ? slotForm.name : null,
         start_time: slotForm.start_time,
         end_time: slotForm.end_time,
@@ -165,10 +165,13 @@ export function UnifiedTimetableScreen() {
                 school_code: profile.school_code,
                 class_date: dateStr,
                 startTime: '08:00:00',
-                periodDuration: 45,
-                breakDuration: 15,
+                periodDurationMin: 45,
                 numPeriods: 8,
-                breakAfterPeriods: [2, 4, 6],
+                breaks: [
+                  { afterPeriod: 2, durationMin: 15, name: 'Break' },
+                  { afterPeriod: 4, durationMin: 15, name: 'Break' },
+                  { afterPeriod: 6, durationMin: 15, name: 'Break' }
+                ],
               });
             } catch (error) {
               Alert.alert('Error', 'Failed to generate timetable');
@@ -222,8 +225,8 @@ export function UnifiedTimetableScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Manage Timetable</Text>
+        <View style={styles.primaryHeader}>
+          <Text style={styles.contextTitle}>Manage Timetable</Text>
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary.main} />
@@ -237,8 +240,8 @@ export function UnifiedTimetableScreen() {
   if (error) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Manage Timetable</Text>
+        <View style={styles.primaryHeader}>
+          <Text style={styles.contextTitle}>Manage Timetable</Text>
         </View>
         <View style={styles.errorContainer}>
           <Text style={styles.errorTitle}>Failed to load timetable</Text>
@@ -422,7 +425,7 @@ export function UnifiedTimetableScreen() {
                     {slot.slot_type === 'period' && (
                       <View style={styles.periodBadge}>
                         <Text style={styles.periodBadgeText}>
-                          Period {slot.displayPeriodNumber}
+                          Period {slot.period_number}
                         </Text>
                       </View>
                     )}
@@ -681,7 +684,7 @@ export function UnifiedTimetableScreen() {
             <Button
               mode="outlined"
               onPress={() => setShowQuickGenerateModal(false)}
-              style={styles.cancelButton}
+              style={styles.confirmCancelButton}
             >
               Cancel
             </Button>
@@ -1127,7 +1130,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     textAlign: 'center',
   },
-  cancelButton: {
+  confirmCancelButton: {
     flex: 1,
     borderColor: colors.border.light,
   },

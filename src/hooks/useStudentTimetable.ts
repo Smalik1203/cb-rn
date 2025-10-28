@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
-import { useRef, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { TimetableSlot } from '../services/api';
 
 export interface StudentTimetableResult {
@@ -12,22 +12,10 @@ export interface StudentTimetableResult {
 }
 
 export function useStudentTimetable(classInstanceId?: string, dateStr?: string): StudentTimetableResult {
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
-
   const { data: slots, isLoading, error, refetch } = useQuery({
     queryKey: ['studentTimetable', classInstanceId, dateStr],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!classInstanceId || !dateStr) return [];
-      
-      abortControllerRef.current = new AbortController();
       
       // Fetch timetable slots for the selected date
       const { data: slotsData, error: slotsError } = await supabase
@@ -47,7 +35,7 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
         .eq('class_instance_id', classInstanceId)
         .eq('class_date', dateStr)
         .order('start_time', { ascending: true })
-        .abortSignal(abortControllerRef.current.signal);
+        .abortSignal(signal);
 
       if (slotsError) throw slotsError;
       if (!slotsData || slotsData.length === 0) return [];
@@ -62,12 +50,12 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
           .from('subjects')
           .select('id, subject_name')
           .in('id', subjectIds)
-          .abortSignal(abortControllerRef.current.signal) : Promise.resolve({ data: [] }),
+          .abortSignal(signal) : Promise.resolve({ data: [] }),
         teacherIds.length > 0 ? supabase
           .from('admin')
           .select('id, full_name')
           .in('id', teacherIds)
-          .abortSignal(abortControllerRef.current.signal) : Promise.resolve({ data: [] })
+          .abortSignal(signal) : Promise.resolve({ data: [] })
       ]);
 
       const subjectsMap = new Map((subjectsResult.data || []).map(s => [s.id, s]));

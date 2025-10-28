@@ -1,22 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../services/api';
-import { useRef, useEffect } from 'react';
 
 export function useTimetable(classId?: string) {
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
-
   return useQuery({
     queryKey: ['timetable', classId],
-    queryFn: async () => {
-      abortControllerRef.current = new AbortController();
+    queryFn: async ({ signal }) => {
       return api.timetable.getByClass(classId!);
     },
     enabled: !!classId,
@@ -32,7 +20,7 @@ export function useTimetable(classId?: string) {
 export function useSchoolTimetable(schoolCode?: string) {
   return useQuery({
     queryKey: ['timetable', 'school', schoolCode],
-    queryFn: async () => api.timetable.getBySchool(schoolCode!),
+    queryFn: async ({ signal }) => api.timetable.getBySchool(schoolCode!),
     enabled: !!schoolCode,
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes
@@ -44,23 +32,11 @@ export function useSchoolTimetable(schoolCode?: string) {
 }
 
 export function useTimetableRange(classId?: string, startDate?: string, endDate?: string) {
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
-
   return useQuery({
     queryKey: ['timetable', classId, startDate, endDate],
-    queryFn: async () => {
-      
+    queryFn: async ({ signal }) => {
       // TODO: Implement range-based timetable fetching
-      // abortControllerRef.current = new AbortController();
-      // return api.timetable.getByClassInRange(classId!, startDate!, endDate!, { signal: abortControllerRef.current.signal });
+      // return api.timetable.getByClassInRange(classId!, startDate!, endDate!, { signal });
       return [];
     },
     enabled: !!classId && !!startDate && !!endDate,

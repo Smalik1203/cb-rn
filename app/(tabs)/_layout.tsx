@@ -7,7 +7,7 @@ import { AppNavbar } from '../../src/components/layout/AppNavbarExpo';
 
 export default function TabLayout() {
   const { profile } = useAuth();
-  const role = profile?.role || 'student';
+  const role = profile?.role;
 
   const showAdminTabs = role === 'admin' || role === 'superadmin' || role === 'cb_admin';
   const showSuperAdminTabs = role === 'superadmin' || role === 'cb_admin';

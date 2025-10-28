@@ -35,7 +35,7 @@ const MENU: MenuItem[] = [
 export function DrawerContent(props: DrawerContentComponentProps) {
   const router = useRouter();
   const { profile, signOut } = useAuth();
-  const role = (profile?.role || 'student') as MenuItem['roles'][number];
+  const role = profile?.role as MenuItem['roles'][number];
 
   const grouped = useMemo(() => {
     const allowed = MENU.filter(item => !item.roles || item.roles.includes(role));
@@ -66,13 +66,13 @@ export function DrawerContent(props: DrawerContentComponentProps) {
           <View>
             <Text style={styles.appName}>ClassBridge</Text>
             <Text style={styles.schoolName} numberOfLines={1}>
-              {profile?.school_name || profile?.school_code || '—'}
+              {profile?.school_code || '—'}
             </Text>
           </View>
         </View>
         <View style={styles.userRow}>
           <Text style={styles.userName} numberOfLines={1}>{profile?.full_name || 'User'}</Text>
-          <Text style={styles.userRole}>{(profile?.role || 'student').toUpperCase()}</Text>
+          <Text style={styles.userRole}>{(profile?.role || 'UNKNOWN').toUpperCase()}</Text>
         </View>
       </View>
 

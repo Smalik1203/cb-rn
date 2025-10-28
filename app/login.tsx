@@ -11,18 +11,56 @@ const { width, height } = Dimensions.get('window');
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const auth = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Redirect to tabs if already logged in
+  // Redirect if already signed in
   React.useEffect(() => {
-    if (user) {
+    console.log('LoginScreen auth status:', auth.status);
+    if (auth.status === 'signedIn') {
+      console.log('Redirecting to main app from login screen');
       router.replace('/(tabs)');
     }
-  }, [user]);
+  }, [auth.status]);
+
+  // Handle access denied
+  React.useEffect(() => {
+    if (auth.status === 'accessDenied') {
+      Alert.alert(
+        'Access Denied',
+        auth.accessDeniedReason || 'Access denied',
+        [{ 
+          text: 'OK', 
+          onPress: () => {
+            // Clear the form after showing the error
+            setEmail('');
+            setPassword('');
+          }
+        }],
+        { cancelable: false }
+      );
+    }
+  }, [auth.status]);
+
+  // Reset loading state when auth state changes
+  React.useEffect(() => {
+    if (auth.status === 'signedIn' || auth.status === 'accessDenied' || auth.status === 'signedOut') {
+      setLoading(false);
+    }
+  }, [auth.status]);
+
+  // Show loading screen while auth is loading
+  if (auth.loading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={colors.primary[500]} />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -39,13 +77,17 @@ export default function LoginScreen() {
 
       if (error) {
         Alert.alert('Login Failed', error.message);
-      } else if (data.user) {
-        // Auth context will handle the redirect
-        router.replace('/(tabs)');
+        setLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        // Don't set loading to false here - let the auth context handle the flow
+        // The auth context will either redirect to main app or show access denied
+        console.log('Login successful, auth context will handle the flow...');
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'An unexpected error occurred');
-    } finally {
       setLoading(false);
     }
   };
@@ -270,5 +312,14 @@ const styles = StyleSheet.create({
     color: colors.primary[600],
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.medium,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: spacing['4'],
+    color: colors.text.secondary,
+    fontSize: typography.fontSize.base,
   },
 });

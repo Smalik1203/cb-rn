@@ -40,7 +40,7 @@ export default function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const queryClient = useQueryClient();
 
-  const role = profile?.role || 'student';
+  const role = profile?.role;
   const canManageEvents = role === 'admin' || role === 'superadmin' || role === 'cb_admin';
 
   // Fetch calendar events

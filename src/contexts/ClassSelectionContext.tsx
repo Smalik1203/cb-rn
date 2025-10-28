@@ -62,7 +62,7 @@ export const useClassSelection = () => {
 };
 
 export const ClassSelectionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { profile, user } = useAuth();
+  const { profile } = useAuth();
   const [selectedClass, setSelectedClass] = useState<ClassListItem | null>(null);
   const [academicYearId, setAcademicYearIdState] = useState<string | null>(null);
   const [scopeLoading, setScopeLoading] = useState(true);
@@ -91,7 +91,7 @@ export const ClassSelectionProvider: React.FC<{ children: React.ReactNode }> = (
   // Initialize academic year from user profile when auth is ready
   useEffect(() => {
     const initializeAcademicYear = async () => {
-      if (!user || !profile?.school_code) {
+      if (!profile?.school_code) {
         setScopeLoading(false);
         return;
       }
@@ -118,7 +118,7 @@ export const ClassSelectionProvider: React.FC<{ children: React.ReactNode }> = (
     };
 
     initializeAcademicYear();
-  }, [user, profile, academicYearId, selectedClass?.id]);
+  }, [profile, academicYearId, selectedClass?.id]);
 
   // Auto-select first class for super admin if none selected
   useEffect(() => {

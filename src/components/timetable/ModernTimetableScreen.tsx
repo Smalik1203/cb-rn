@@ -385,7 +385,7 @@ export function ModernTimetableScreen() {
     const slot = slots.find(s => s.id === slotId);
     const isTaught = taughtSlotIds.has(slotId);
     const action = isTaught ? 'unmark as taught' : 'mark as taught';
-    const slotDescription = slot ? `${slot.subject_name} (${slot.start_time} - ${slot.end_time})` : 'this slot';
+    const slotDescription = slot ? `${slot.subject_name || 'Period'} (${slot.start_time} - ${slot.end_time})` : 'this slot';
 
     Alert.alert(
       `Mark Slot ${isTaught ? 'Not Taught' : 'Taught'}`,
@@ -653,7 +653,7 @@ export function ModernTimetableScreen() {
           <View style={styles.filterText}>
             <Text style={styles.filterLabel}>Class</Text>
             <Text style={styles.filterValue}>
-              {selectedClass ? `${selectedClass.grade} ${selectedClass.section}` : 'Select'}
+              {selectedClass ? `${selectedClass.grade || ''} ${selectedClass.section || ''}`.trim() || 'Select' : 'Select'}
             </Text>
           </View>
           <ChevronRight size={14} color="#6b7280" />
@@ -778,7 +778,7 @@ export function ModernTimetableScreen() {
                               styles.periodBadgeText,
                               isSmallScreen && styles.smallScreenPeriodBadgeText
                             ]}>
-                              {isSmallScreen ? `P${slot.period_number}` : `Period ${slot.period_number}`}
+                              {isSmallScreen ? `P${slot.period_number || ''}` : `Period ${slot.period_number || ''}`}
                             </Text>
                           </View>
                         )}

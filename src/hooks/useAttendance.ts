@@ -1,23 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api';
-import { useRef, useEffect } from 'react';
 
 export function useClassAttendance(classId?: string, date?: string) {
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
-
   return useQuery({
     queryKey: ['attendance', 'class', classId, date],
-    queryFn: async () => {
-      abortControllerRef.current = new AbortController();
-      return api.attendance.getByClass(classId!, date, { signal: abortControllerRef.current.signal });
+    queryFn: async ({ signal }) => {
+      return api.attendance.getByClass(classId!, date);
     },
     enabled: !!classId,
     staleTime: 2 * 60 * 1000, // 2 minutes
@@ -30,21 +18,10 @@ export function useClassAttendance(classId?: string, date?: string) {
 }
 
 export function useSchoolAttendance(schoolCode?: string, date?: string) {
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
-
   return useQuery({
     queryKey: ['attendance', 'school', schoolCode, date],
-    queryFn: async () => {
-      abortControllerRef.current = new AbortController();
-      return api.attendance.getBySchool(schoolCode!, date, { signal: abortControllerRef.current.signal });
+    queryFn: async ({ signal }) => {
+      return api.attendance.getBySchool(schoolCode!, date);
     },
     enabled: !!schoolCode,
     staleTime: 2 * 60 * 1000, // 2 minutes
@@ -57,21 +34,10 @@ export function useSchoolAttendance(schoolCode?: string, date?: string) {
 }
 
 export function useStudentAttendance(studentId?: string) {
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
-
   return useQuery({
     queryKey: ['attendance', 'student', studentId],
-    queryFn: async () => {
-      abortControllerRef.current = new AbortController();
-      return api.attendance.getByStudent(studentId!, { signal: abortControllerRef.current.signal });
+    queryFn: async ({ signal }) => {
+      return api.attendance.getByStudent(studentId!);
     },
     enabled: !!studentId,
     staleTime: 5 * 60 * 1000, // 5 minutes

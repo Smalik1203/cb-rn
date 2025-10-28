@@ -1,4 +1,4 @@
-import { supabase } from '../src/lib/supabase';
+import { supabase } from '../../src/lib/supabase';
 
 export interface Student {
   id: string;
@@ -71,7 +71,7 @@ export const AttendanceService = {
       query = query.eq('student_code', studentCode);
     }
 
-    const { data, error } = await query.single();
+    const { data, error } = await query.maybeSingle();
     if (error) throw error;
     return data;
   },
@@ -142,7 +142,7 @@ export const AttendanceService = {
       query = query.or(`class_instance_id.eq.${classId},class_instance_id.is.null`);
     }
 
-    const { data, error } = await query.single();
+    const { data, error } = await query.maybeSingle();
 
     if (error && error.code !== 'PGRST116') {
       throw error;

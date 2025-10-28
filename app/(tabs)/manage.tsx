@@ -27,7 +27,7 @@ export default function ManageScreen() {
   const [activeTab, setActiveTab] = useState<'users' | 'classes' | 'settings'>('users');
   const [refreshing, setRefreshing] = useState(false);
 
-  const role = profile?.role || 'student';
+  const role = profile?.role;
   const canManage = role === 'admin' || role === 'superadmin' || role === 'cb_admin';
 
   if (!canManage) {

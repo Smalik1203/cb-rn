@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
-import { useRef, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 
 export interface SyllabusChapter {
   id: string;
@@ -40,22 +40,10 @@ export interface SyllabusLoaderResult {
 }
 
 export function useSyllabusLoader(classId?: string, schoolCode?: string): SyllabusLoaderResult {
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
-
   const { data: syllabi, isLoading, refetch } = useQuery({
     queryKey: ['syllabi', classId, schoolCode],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!classId || !schoolCode) return [];
-      
-      abortControllerRef.current = new AbortController();
       
       // Load syllabi for the class
       const { data: syllabiData, error: syllabiError } = await supabase
@@ -63,7 +51,7 @@ export function useSyllabusLoader(classId?: string, schoolCode?: string): Syllab
         .select('id, subject_id')
         .eq('class_instance_id', classId)
         .eq('school_code', schoolCode)
-        .abortSignal(abortControllerRef.current.signal);
+        .abortSignal(signal);
 
       if (syllabiError) throw syllabiError;
       if (!syllabiData || syllabiData.length === 0) return [];
@@ -86,7 +74,7 @@ export function useSyllabusLoader(classId?: string, schoolCode?: string): Syllab
         `)
         .in('syllabus_id', syllabusIds)
         .order('chapter_no', { ascending: true })
-        .abortSignal(abortControllerRef.current.signal);
+        .abortSignal(signal);
 
       if (chaptersError) throw chaptersError;
 
@@ -105,7 +93,7 @@ export function useSyllabusLoader(classId?: string, schoolCode?: string): Syllab
   });
 
   const chaptersById = useMemo(() => {
-    if (!syllabi?.chapters) return new Map();
+    if (!syllabi || Array.isArray(syllabi) || !syllabi.chapters) return new Map();
 
     const map = new Map<string, SyllabusUnit>();
     
@@ -138,7 +126,7 @@ export function useSyllabusLoader(classId?: string, schoolCode?: string): Syllab
   }, [syllabi]);
 
   const syllabusContentMap = useMemo(() => {
-    if (!syllabi?.chapters) return new Map();
+    if (!syllabi || Array.isArray(syllabi) || !syllabi.chapters) return new Map();
 
     const map = new Map<string, SyllabusContent>();
     

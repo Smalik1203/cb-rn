@@ -10,6 +10,7 @@ import { useDashboardStats, useRecentActivity } from '../../src/hooks/useDashboa
 import { Card, Badge, Avatar } from '../../src/components/ui';
 import { ThreeStateView } from '../../src/components/common/ThreeStateView';
 import { LinearGradient } from 'expo-linear-gradient';
+import { log } from '../../src/lib/logger';
 
 const { width } = Dimensions.get('window');
 
@@ -21,35 +22,21 @@ export default function DashboardScreen() {
   
   // Real data hooks
   const { data: stats, isLoading: statsLoading, error: statsError } = useDashboardStats(
-    profile?.id || '', 
+    profile?.auth_id || '', 
     profile?.class_instance_id || undefined
   );
   const { data: recentActivity, isLoading: activityLoading, error: activityError } = useRecentActivity(
-    profile?.id || '', 
+    profile?.auth_id || '', 
     profile?.class_instance_id || undefined
   );
   
-  console.log('📱 Dashboard Render:', {
-    hasProfile: !!profile,
-    profileName: profile?.full_name,
-    profileRole: profile?.role,
-    schoolCode: profile?.school_code,
-    authLoading,
-    statsLoading,
-    activityLoading,
-    hasStatsError: !!statsError,
-    hasActivityError: !!activityError,
-    statsData: stats,
-    activityData: recentActivity,
-  });
-
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
       // Refresh logic would go here - TanStack Query handles refetching automatically
       await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (err) {
-      console.error('Refresh error:', err);
+      log.error('Refresh error:', err);
     } finally {
       setRefreshing(false);
     }
@@ -136,22 +123,6 @@ export default function DashboardScreen() {
   // Determine if user has incomplete profile (fallback profile)
   const hasIncompleteProfile = profile && (!profile.school_code || !profile.class_instance_id);
   
-  console.log('🎨 Dashboard ViewState:', viewState, {
-    authLoading,
-    statsLoading,
-    activityLoading,
-    hasStatsError: !!statsError,
-    hasActivityError: !!activityError,
-    hasProfile: !!profile,
-    hasIncompleteProfile,
-    statsDetails: stats ? {
-      todaysClasses: stats.todaysClasses,
-      attendancePercentage: stats.attendancePercentage,
-      pendingAssignments: stats.pendingAssignments,
-      achievements: stats.achievements
-    } : null
-  });
-
   return (
     <ThreeStateView
       state={viewState}

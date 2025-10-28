@@ -23,7 +23,7 @@ export default function FeesScreen() {
   const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'components' | 'payments' | 'analytics'>('overview');
   const [refreshing, setRefreshing] = useState(false);
 
-  const studentId = isSuperAdmin ? null : profile?.id;
+  const studentId = isSuperAdmin ? null : profile?.auth_id;
   const classId = selectedClass?.id;
 
   const studentFeesQuery = useStudentPayments(studentId || undefined);
@@ -129,7 +129,6 @@ export default function FeesScreen() {
                 <Text style={styles.headerTitle}>Fees</Text>
                 <Text style={styles.headerSubtitle}>
                   {selectedClass ? `Grade ${selectedClass.grade}-${selectedClass.section}` :
-                   profile?.class_instance?.grade ? `Grade ${profile.class_instance.grade}-${profile.class_instance.section}` :
                    'Fee Management'}
                 </Text>
               </View>

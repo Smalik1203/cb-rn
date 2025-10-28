@@ -204,8 +204,8 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string): Unified
     const { data: daySlots, error } = await supabase
       .from('timetable_slots')
       .select('id, start_time, end_time')
-      .eq('class_instance_id', (await supabase.from('timetable_slots').select('class_instance_id').eq('id', slotId).single()).data?.class_instance_id)
-      .eq('class_date', (await supabase.from('timetable_slots').select('class_date').eq('id', slotId).single()).data?.class_date)
+      .eq('class_instance_id', (await supabase.from('timetable_slots').select('class_instance_id').eq('id', slotId).maybeSingle()).data?.class_instance_id)
+      .eq('class_date', (await supabase.from('timetable_slots').select('class_date').eq('id', slotId).maybeSingle()).data?.class_date)
       .order('start_time', { ascending: true });
 
     if (error) {
@@ -306,9 +306,9 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string): Unified
       }
 
       await renumberSlotsSequentially(
-        (await supabase.from('timetable_slots').select('class_instance_id').eq('id', id).single()).data?.class_instance_id,
-        (await supabase.from('timetable_slots').select('class_date').eq('id', id).single()).data?.class_date,
-        (await supabase.from('timetable_slots').select('school_code').eq('id', id).single()).data?.school_code
+        (await supabase.from('timetable_slots').select('class_instance_id').eq('id', id).maybeSingle()).data?.class_instance_id,
+        (await supabase.from('timetable_slots').select('class_date').eq('id', id).maybeSingle()).data?.class_date,
+        (await supabase.from('timetable_slots').select('school_code').eq('id', id).maybeSingle()).data?.school_code
       );
     },
     onSuccess: () => {
@@ -328,7 +328,7 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string): Unified
         throw error;
       }
 
-      const slotData = await supabase.from('timetable_slots').select('class_instance_id, class_date, school_code').eq('id', slotId).single();
+      const slotData = await supabase.from('timetable_slots').select('class_instance_id, class_date, school_code').eq('id', slotId).maybeSingle();
       if (slotData.data) {
         await renumberSlotsSequentially(slotData.data.class_instance_id, slotData.data.class_date, slotData.data.school_code);
       }
@@ -391,7 +391,7 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string): Unified
         .from('timetable_slots')
         .select('school_code, subject_id, teacher_id, syllabus_chapter_id, syllabus_topic_id, class_instance_id, class_date')
         .eq('id', slotId)
-        .single();
+        .maybeSingle();
 
       if (slotError) {
         throw slotError;
@@ -427,7 +427,7 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string): Unified
         .from('timetable_slots')
         .select('school_code, subject_id, teacher_id, syllabus_chapter_id, syllabus_topic_id')
         .eq('id', slotId)
-        .single();
+        .maybeSingle();
 
       if (slotError) {
         throw slotError;

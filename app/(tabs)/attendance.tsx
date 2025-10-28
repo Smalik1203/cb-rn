@@ -11,37 +11,21 @@ import { Card, Badge, Avatar, Button } from '../../src/components/ui';
 import { ThreeStateView } from '../../src/components/common/ThreeStateView';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useClassAttendance } from '../../src/hooks/useAttendance';
+import { log } from '../../src/lib/logger';
 
 const { width } = Dimensions.get('window');
 
 export default function AttendanceScreen() {
   const { profile } = useAuth();
   const { isSuperAdmin, selectedClass } = useClassSelection();
-  const role = profile?.role || 'student';
+  const role = profile?.role;
   const canMark = role === 'admin' || role === 'superadmin' || role === 'cb_admin';
-
-  // Debug logging
-  console.log('✅ Attendance Debug:', {
-    hasProfile: !!profile,
-    profileRole: profile?.role,
-    selectedClassId: selectedClass?.id,
-    isSuperAdmin,
-    canMark,
-  });
 
   // Fetch attendance data for stats
   const { data: attendanceData, isLoading, error, refetch } = useClassAttendance(
     selectedClass?.id,
     new Date().toISOString().split('T')[0]
   );
-
-  console.log('✅ Attendance Data:', {
-    isLoading,
-    hasError: !!error,
-    errorMessage: error?.message,
-    attendanceCount: attendanceData?.length || 0,
-    attendanceData: attendanceData?.slice(0, 3), // First 3 records for debugging
-  });
 
   // Calculate stats from real data
   const presentCount = attendanceData?.filter(record => record.status === 'present').length || 0;

@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase } from '../lib/supabase';
 import { mapError, formatErrorForLog } from './errorMapper';
 import { DB } from '../types/db.constants';
 import type {
@@ -52,6 +52,7 @@ export async function getCurrentUserContext(options?: { signal?: AbortSignal }):
       };
     }
     
+    // Query the custom users table to get profile data
     const { data, error } = await supabase
       .from(DB.tables.users)
       .select('id, role, school_code, class_instance_id')
@@ -66,12 +67,20 @@ export async function getCurrentUserContext(options?: { signal?: AbortSignal }):
       };
     }
     
+    // If no data found, this is an error - user should exist
+    if (!data) {
+      return {
+        data: null,
+        error: mapError(new Error('User profile not found'), { queryName: 'getCurrentUserContext', table: 'users' }),
+      };
+    }
+    
     return {
       data: {
         auth_id: user.id,
-        role: (data as any)?.role || 'student',
-        school_code: (data as any)?.school_code || null,
-        class_instance_id: (data as any)?.class_instance_id || null,
+        role: data.role,
+        school_code: data.school_code,
+        class_instance_id: data.class_instance_id,
       },
       error: null,
     };
@@ -454,7 +463,7 @@ export async function getStudentFees(
       .eq(DB.columns.academicYearId, academicYearId)
       .eq(DB.columns.schoolCode, schoolCode)
       .eq('status', 'active')
-      .single();
+      .maybeSingle();
     
     // Get all payments for this student
     const { data: paymentsData, error: paymentsError } = await supabase
@@ -617,7 +626,7 @@ export async function recordPayment(payment: FeePaymentInsert): Promise<QueryRes
       .from(DB.tables.feePayments)
       .insert(payment as any)
       .select()
-      .single();
+      .maybeSingle();
     
     if (error) {
       return {

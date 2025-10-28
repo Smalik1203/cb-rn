@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase } from '../lib/supabase';
 import { mapError } from './errorMapper';
 import { DB } from '../types/db.constants';
 
@@ -257,14 +257,19 @@ export async function checkUserPermissions(
       .from('users')
       .select('role, school_code')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
     if (userError) {
       result.errors.push(`User lookup failed: ${userError.message}`);
       return result;
     }
 
-    result.userRole = (user as any)?.role || 'student';
+    if (!user) {
+      result.errors.push('User profile not found');
+      return result;
+    }
+
+    result.userRole = (user as any)?.role;
     result.schoolAccess = (user as any)?.school_code === schoolCode;
 
     // Check class access for teachers/admins
@@ -289,7 +294,7 @@ export async function checkUserPermissions(
         .select('class_instance_id')
         .eq('auth_user_id', userId)
         .eq('school_code', schoolCode)
-        .single();
+        .maybeSingle();
 
       if (studentError) {
         result.errors.push(`Student access check failed: ${studentError.message}`);

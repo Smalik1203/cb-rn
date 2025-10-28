@@ -94,7 +94,7 @@ export const UnifiedAttendance: React.FC = () => {
         status: student.status!,
         remarks: student.remarks || null,
         school_code: scope.school_code!,
-        marked_by: profile?.id || '',
+        marked_by: profile?.auth_id || '',
         marked_by_role_code: profile?.role || 'admin',
       }));
 
