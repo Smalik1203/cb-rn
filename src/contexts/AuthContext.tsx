@@ -160,8 +160,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           authId: user.id,
           email: user.email,
         });
-        // Stay signedIn; let UI continue with minimal context.
-        setState((prev) => ({ ...prev, bootstrapping: false, profile: null }));
+        // Sign out user if profile fetch fails - they need to log in again
+        setState((prev) => ({
+          ...prev,
+          status: 'accessDenied',
+          accessDeniedReason: 'Profile fetch failed. Please try logging in again.',
+          accessDeniedEmail: user.email ?? undefined,
+          bootstrapping: false,
+          profile: null,
+        }));
+        // Sign out from Supabase as well
+        setTimeout(() => {
+          supabase.auth.signOut().catch((e) => {
+            log.warn('Failed to sign out after profile error', e);
+          });
+        }, 100);
         return;
       }
 
@@ -191,7 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Success
+      // Success - only set signedIn if we have a valid profile
       const profile: Profile = {
         auth_id: user.id,
         role: userProfile.role,

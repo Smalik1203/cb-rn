@@ -1,13 +1,33 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
+import React, { useEffect } from 'react';
+import { Tabs, Redirect } from 'expo-router';
 import { Home, Calendar, CheckSquare, DollarSign, BarChart3, Users, CalendarDays, BookOpen } from 'lucide-react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { colors, typography, spacing, borderRadius, shadows } from '../../lib/design-system';
 import { AppNavbar } from '../../src/components/layout/AppNavbarExpo';
+import { useRouter } from 'expo-router';
 
 export default function TabLayout() {
-  const { profile } = useAuth();
+  const { profile, status, loading, bootstrapping } = useAuth();
   const role = profile?.role;
+  const router = useRouter();
+
+  // Protect routes: redirect to login if no profile or not signed in
+  useEffect(() => {
+    // Don't redirect while checking/auth is loading
+    if (loading || bootstrapping) {
+      return;
+    }
+    
+    if (status === 'signedOut' || status === 'accessDenied' || (status === 'signedIn' && !profile)) {
+      // Only redirect if we're not already on login page
+      router.replace('/login');
+    }
+  }, [status, profile, loading, bootstrapping, router]);
+
+  // Don't render tabs if user doesn't have a profile or auth is still loading
+  if (loading || bootstrapping || status !== 'signedIn' || !profile) {
+    return null; // Will redirect via useEffect or show loading
+  }
 
   const showAdminTabs = role === 'admin' || role === 'superadmin' || role === 'cb_admin';
   const showSuperAdminTabs = role === 'superadmin' || role === 'cb_admin';
@@ -81,6 +101,7 @@ export default function TabLayout() {
         options={{
           title: 'Attendance',
           tabBarIcon: ({ size, color }) => <CheckSquare size={size} color={color} />,
+          tabBarStyle: { display: 'none' }, // Hide tab bar for attendance screen
         }}
       />
 

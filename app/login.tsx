@@ -24,12 +24,17 @@ export default function LoginScreen() {
     }
   }, [auth.status]);
 
-  // Handle access denied
+  // Handle access denied - sign out user and show message
   React.useEffect(() => {
     if (auth.status === 'accessDenied') {
+      // Sign out the user automatically
+      auth.signOut().catch((err) => {
+        console.error('Failed to sign out after access denied:', err);
+      });
+      
       Alert.alert(
         'Access Denied',
-        auth.accessDeniedReason || 'Access denied',
+        auth.accessDeniedReason || 'No profile found in system. Please contact administrator.',
         [{ 
           text: 'OK', 
           onPress: () => {
@@ -41,7 +46,7 @@ export default function LoginScreen() {
         { cancelable: false }
       );
     }
-  }, [auth.status]);
+  }, [auth.status, auth.accessDeniedReason, auth.signOut]);
 
   // Reset loading state when auth state changes
   React.useEffect(() => {

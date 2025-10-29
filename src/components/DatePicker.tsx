@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, forwardRef, useImperativeHandle } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { Text, Button, Portal, Modal } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -23,6 +23,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   style,
 }) => {
   const [showPicker, setShowPicker] = useState(false);
+  const [tempDate, setTempDate] = useState(selectedDate);
 
   const formatDisplayDate = (date: Date) => {
     return date.toLocaleDateString('en-GB', { 
@@ -33,21 +34,39 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   };
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
-    setShowPicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      onDateChange(selectedDate);
+    if (Platform.OS === 'android') {
+      setShowPicker(false);
+      if (selectedDate) {
+        onDateChange(selectedDate);
+      }
+    } else {
+      // iOS - just update temp date, don't call onDateChange yet
+      if (selectedDate) {
+        setTempDate(selectedDate);
+      }
     }
   };
 
   const handleConfirm = () => {
+    onDateChange(tempDate);
     setShowPicker(false);
+  };
+
+  const handleCancel = () => {
+    setTempDate(selectedDate); // Reset to original date
+    setShowPicker(false);
+  };
+
+  const openPicker = () => {
+    setTempDate(selectedDate); // Initialize temp date
+    setShowPicker(true);
   };
 
   return (
     <View style={[styles.container, style]}>
       <Button
         mode="outlined"
-        onPress={() => setShowPicker(true)}
+        onPress={openPicker}
         disabled={disabled}
         style={styles.button}
         contentStyle={styles.buttonContent}
@@ -60,13 +79,13 @@ export const DatePicker: React.FC<DatePickerProps> = ({
         <Portal>
           <Modal
             visible={showPicker}
-            onDismiss={() => setShowPicker(false)}
+            onDismiss={handleCancel}
             contentContainerStyle={styles.modal}
           >
             <Text variant="titleLarge" style={styles.modalTitle}>Select Date</Text>
             
             <DateTimePicker
-              value={selectedDate}
+              value={tempDate}
               mode="date"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
               onChange={handleDateChange}
@@ -77,7 +96,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
 
             {Platform.OS === 'ios' && (
               <View style={styles.modalActions}>
-                <Button mode="outlined" onPress={() => setShowPicker(false)} style={styles.modalButton}>
+                <Button mode="outlined" onPress={handleCancel} style={styles.modalButton}>
                   Cancel
                 </Button>
                 <Button mode="contained" onPress={handleConfirm} style={styles.modalButton} buttonColor={colors.primary[500]}>
@@ -97,33 +116,40 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   button: {
-    borderColor: colors.neutral[300],
-    borderRadius: borderRadius.lg,
+    borderColor: colors.border.DEFAULT,
+    borderRadius: borderRadius.sm,
+    backgroundColor: 'transparent',
   },
   buttonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing['2'],
-    paddingHorizontal: spacing['3'],
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
   buttonText: {
-    fontSize: typography.fontSize.base,
+    fontSize: typography.fontSize.sm,
     color: colors.text.primary,
     fontWeight: typography.fontWeight.medium,
-    marginLeft: spacing['2'],
+    marginLeft: spacing.md,
   },
   modal: {
     backgroundColor: colors.surface.primary,
-    padding: spacing['6'],
-    margin: spacing['4'],
-    borderRadius: borderRadius.xl,
-    maxHeight: '80%',
+    padding: spacing.lg,
+    margin: spacing.lg,
+    borderRadius: borderRadius.lg,
+    maxHeight: '70%',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
   },
   modalTitle: {
     textAlign: 'center',
-    marginBottom: spacing['4'],
+    marginBottom: spacing.lg,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
+    fontSize: typography.fontSize.lg,
   },
   picker: {
     alignSelf: 'center',

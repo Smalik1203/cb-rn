@@ -30,11 +30,22 @@ export interface AttendanceRecord {
   student_id: string;
   class_instance_id: string;
   date: string;
-  status: string; // Changed from union type to string to match database
+  status: 'present' | 'absent';
   marked_by: string;
-  marked_by_role_code: string; // Added missing field
-  school_code: string | null; // Added missing field
+  marked_by_role_code: string;
+  school_code: string;
   created_at: string;
+  updated_at?: string;
+}
+
+export interface AttendanceInput {
+  student_id: string;
+  class_instance_id: string;
+  date: string;
+  status: 'present' | 'absent';
+  marked_by: string;
+  marked_by_role_code: string;
+  school_code: string;
 }
 
 export interface FeePayment {
@@ -256,7 +267,11 @@ export const api = {
       const { data, error } = await query.order('date', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return (data || []).map(record => ({
+        ...record,
+        status: record.status as 'present' | 'absent',
+        updated_at: (record as any).updated_at || record.created_at
+      }));
     },
 
     async getBySchool(schoolCode: string, date?: string): Promise<AttendanceRecord[]> {
@@ -281,7 +296,11 @@ export const api = {
       const { data, error } = await query.order('date', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return (data || []).map(record => ({
+        ...record,
+        status: record.status as 'present' | 'absent',
+        updated_at: (record as any).updated_at || record.created_at
+      }));
     },
 
     async getByStudent(studentId: string): Promise<AttendanceRecord[]> {
@@ -293,15 +312,188 @@ export const api = {
         .limit(30);
 
       if (error) throw error;
-      return data || [];
+      return (data || []).map(record => ({
+        ...record,
+        status: record.status as 'present' | 'absent',
+        updated_at: (record as any).updated_at || record.created_at
+      }));
     },
 
-    async markAttendance(records: Omit<AttendanceRecord, 'id' | 'created_at'>[]): Promise<void> {
-      const { error } = await supabase
+    async markAttendance(records: AttendanceInput[]): Promise<void> {
+      // Batch process for better performance
+      const existingRecords: { [key: string]: string } = {};
+      
+      // First, get all existing records in one query
+      if (records.length > 0) {
+        const studentIds = records.map(r => r.student_id);
+        const classId = records[0].class_instance_id;
+        const date = records[0].date;
+        
+        const { data: existing } = await supabase
+          .from('attendance')
+          .select('id, student_id')
+          .eq('class_instance_id', classId)
+          .eq('date', date)
+          .in('student_id', studentIds);
+
+        if (existing) {
+          existing.forEach(record => {
+            existingRecords[record.student_id] = record.id;
+          });
+        }
+      }
+
+      // Separate records into updates and inserts
+      const updates: any[] = [];
+      const inserts: AttendanceInput[] = [];
+
+      records.forEach(record => {
+        if (existingRecords[record.student_id]) {
+          updates.push({
+            id: existingRecords[record.student_id],
+            status: record.status,
+            marked_by: record.marked_by,
+            marked_by_role_code: record.marked_by_role_code,
+            updated_at: new Date().toISOString()
+          });
+        } else {
+          inserts.push(record);
+        }
+      });
+
+      // Batch update existing records
+      if (updates.length > 0) {
+        const { error: updateError } = await supabase
+          .from('attendance')
+          .upsert(updates);
+        
+        if (updateError) throw updateError;
+      }
+
+      // Batch insert new records
+      if (inserts.length > 0) {
+        const { error: insertError } = await supabase
+          .from('attendance')
+          .insert(inserts);
+        
+        if (insertError) throw insertError;
+      }
+    },
+
+    async markBulkAttendance(
+      classId: string, 
+      date: string, 
+      status: 'present' | 'absent',
+      markedBy: string,
+      markedByRoleCode: string,
+      schoolCode: string
+    ): Promise<void> {
+      // Get all students in the class
+      const { data: students, error: studentsError } = await supabase
+        .from('student')
+        .select('id')
+        .eq('class_instance_id', classId);
+
+      if (studentsError) throw studentsError;
+      if (!students || students.length === 0) return;
+
+      const records: AttendanceInput[] = students.map(student => ({
+        student_id: student.id,
+        class_instance_id: classId,
+        date,
+        status,
+        marked_by: markedBy,
+        marked_by_role_code: markedByRoleCode,
+        school_code: schoolCode
+      }));
+
+      await this.markAttendance(records);
+    },
+
+    async getAttendanceStats(
+      studentId: string, 
+      startDate: string, 
+      endDate: string
+    ): Promise<{
+      totalDays: number;
+      presentDays: number;
+      absentDays: number;
+      percentage: number;
+    }> {
+      const { data, error } = await supabase
         .from('attendance')
-        .insert(records);
+        .select('status')
+        .eq('student_id', studentId)
+        .gte('date', startDate)
+        .lte('date', endDate);
 
       if (error) throw error;
+
+      const attendanceData = data || [];
+      const totalDays = attendanceData.length;
+      const presentDays = attendanceData.filter(a => a.status === 'present').length;
+      const absentDays = attendanceData.filter(a => a.status === 'absent').length;
+      const percentage = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
+
+      return {
+        totalDays,
+        presentDays,
+        absentDays,
+        percentage: Math.round(percentage * 100) / 100
+      };
+    },
+
+    async getClassAttendanceSummary(
+      classId: string,
+      startDate: string,
+      endDate: string
+    ): Promise<{
+      studentId: string;
+      studentName: string;
+      studentCode: string;
+      totalDays: number;
+      presentDays: number;
+      absentDays: number;
+      percentage: number;
+    }[]> {
+      // Get all students in the class
+      const { data: students, error: studentsError } = await supabase
+        .from('student')
+        .select('id, full_name, student_code')
+        .eq('class_instance_id', classId);
+
+      if (studentsError) throw studentsError;
+      if (!students || students.length === 0) return [];
+
+      // Get attendance data for all students
+      const studentIds = students.map(s => s.id);
+      const { data: attendanceData, error: attendanceError } = await supabase
+        .from('attendance')
+        .select('student_id, status')
+        .in('student_id', studentIds)
+        .gte('date', startDate)
+        .lte('date', endDate);
+
+      if (attendanceError) throw attendanceError;
+
+      // Calculate stats for each student
+      return students.map(student => {
+        const studentAttendance = attendanceData?.filter(a => a.student_id === student.id) || [];
+        const totalDays = studentAttendance.length;
+        const presentDays = studentAttendance.filter(a => a.status === 'present').length;
+        const absentDays = studentAttendance.filter(a => a.status === 'absent').length;
+        const percentage = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
+
+        return {
+          studentId: student.id,
+          studentName: student.full_name,
+          studentCode: student.student_code,
+          totalDays,
+          presentDays,
+          absentDays,
+          percentage: Math.round(percentage * 100) / 100
+        };
+      });
     },
   },
 

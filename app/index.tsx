@@ -20,17 +20,24 @@ export default function IndexScreen() {
     );
   }
 
-  // 2) Fully signed in with a resolved profile -> go to app
+  // 2) Signed in but no profile -> sign out and redirect to login
+  // This handles edge cases where user might have session but no profile
+  if (auth.status === 'signedIn' && !auth.profile) {
+    // Auth context should handle this, but as fallback redirect to login
+    return <Redirect href="/login" />;
+  }
+
+  // 3) Fully signed in with a resolved profile -> go to app
   if (auth.status === 'signedIn' && auth.profile) {
     return <Redirect href="/(tabs)" />;
   }
 
-  // 3) Access denied routes to login (LoginScreen will show the reason via context)
+  // 4) Access denied routes to login (LoginScreen will show the reason via context)
   if (auth.status === 'accessDenied') {
     return <Redirect href="/login" />;
   }
 
-  // 4) Default: signedOut or fallback -> login
+  // 5) Default: signedOut or fallback -> login
   return <Redirect href="/login" />;
 }
 
