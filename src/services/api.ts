@@ -638,6 +638,38 @@ export const api = {
       if (error) throw error;
       return data || [];
     },
+
+    async create(resourceData: Omit<LearningResource, 'id' | 'created_at' | 'updated_at'>): Promise<LearningResource> {
+      const { data, error } = await supabase
+        .from('learning_resources')
+        .insert([resourceData])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+
+    async update(id: string, updates: Partial<LearningResource>): Promise<LearningResource> {
+      const { data, error } = await supabase
+        .from('learning_resources')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+
+    async delete(id: string): Promise<void> {
+      const { error } = await supabase
+        .from('learning_resources')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
   },
 
   calendar: {

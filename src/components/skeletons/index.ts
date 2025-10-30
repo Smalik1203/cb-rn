@@ -3,5 +3,5 @@ export { CardSkeleton, ListCardSkeleton, StatCardSkeleton } from './CardSkeleton
 export { DashboardSkeleton } from './DashboardSkeleton';
 export { TimetableSkeleton } from './TimetableSkeleton';
 export { FeesSkeleton } from './FeesSkeleton';
-export { AttendanceSkeleton } from './AttendanceSkeleton';
+// AttendanceSkeleton removed - not yet implemented
 

@@ -125,6 +125,7 @@ export const colors = {
     default: '#f8fafc', // Default background
     light: '#f1f5f9', // Light background
     paper: '#ffffff', // Paper background
+    card: '#ffffff', // Card background
   },
 
   // Surface System

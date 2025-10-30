@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Dimensions, Platform, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { X } from 'lucide-react-native';
 import { colors, spacing } from '../../../lib/design-system';
@@ -13,12 +14,13 @@ interface PDFViewerProps {
 
 export function PDFViewer({ uri, title, onClose }: PDFViewerProps) {
   const [loading, setLoading] = useState(true);
+  const insets = useSafeAreaInsets();
 
   const googleDocsUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(uri)}&embedded=true`;
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <Text style={styles.title} numberOfLines={1}>{title}</Text>
         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
           <X size={24} color={colors.text.primary} />
@@ -40,6 +42,7 @@ export function PDFViewer({ uri, title, onClose }: PDFViewerProps) {
           startInLoadingState
         />
       </View>
+      <View style={{ height: insets.bottom, backgroundColor: colors.surface.primary }} />
     </View>
   );
 }
@@ -53,7 +56,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+    backgroundColor: colors.surface.primary,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.light,
   },

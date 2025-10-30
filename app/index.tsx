@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect } from 'expo-router';
 import { useAuth } from '../src/contexts/AuthContext';
 import { colors } from '../lib/design-system';
@@ -14,9 +15,9 @@ export default function IndexScreen() {
   // 1) While checking session or bootstrapping profile, show splash (no redirects).
   if (auth.status === 'checking' || auth.loading || auth.bootstrapping) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <ActivityIndicator size="large" color={colors.primary[600]} />
-      </View>
+      </SafeAreaView>
     );
   }
 

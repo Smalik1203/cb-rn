@@ -78,6 +78,24 @@ const MENU: MenuItem[] = [
     description: 'Study materials'
   },
   { 
+    key: 'syllabus_staff', 
+    label: 'Syllabus', 
+    icon: BookOpen, 
+    route: '/(tabs)/syllabus', 
+    roles: ['admin', 'superadmin', 'cb_admin', 'teacher'],
+    section: 'Learning',
+    description: 'Chapters and topics'
+  },
+  { 
+    key: 'syllabus_student', 
+    label: 'Syllabus', 
+    icon: BookOpen, 
+    route: '/(tabs)/syllabus-student', 
+    roles: ['student'],
+    section: 'Learning',
+    description: 'Your syllabus'
+  },
+  { 
     key: 'attendance', 
     label: 'Attendance', 
     icon: CheckSquare, 

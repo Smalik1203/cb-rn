@@ -1,7 +1,13 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { api, AttendanceInput } from '../services/api';
 
-export function useClassAttendance(classId?: string, date?: string) {
+type AttendanceRecord = Awaited<ReturnType<typeof api.attendance.getByClass>>[number];
+
+export function useClassAttendance(
+  classId?: string, 
+  date?: string,
+  options?: Omit<UseQueryOptions<AttendanceRecord[]>, 'queryKey' | 'queryFn'>
+) {
   return useQuery({
     queryKey: ['attendance', 'class', classId, date],
     queryFn: async ({ signal }) => {
@@ -14,6 +20,7 @@ export function useClassAttendance(classId?: string, date?: string) {
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     refetchOnWindowFocus: false,
     refetchOnMount: true,
+    ...options,
   });
 }
 

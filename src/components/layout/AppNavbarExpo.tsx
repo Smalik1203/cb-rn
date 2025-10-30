@@ -4,7 +4,7 @@ import { Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { DrawerActions } from '@react-navigation/native';
 import { useNavigation } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Menu, Plus, RefreshCw, User } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
 
@@ -25,6 +25,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
 }) => {
   const router = useRouter();
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
 
   const handleBack = () => {
     if (router.canGoBack()) {
@@ -43,7 +44,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <View style={styles.container}>
         <View style={styles.left}>
           {showBackButton ? (
@@ -88,7 +89,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
           ) : null}
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

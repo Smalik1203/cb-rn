@@ -1,59 +1,60 @@
-// Simple YouTube branding reduction script
+// Conservative YouTube branding reduction script
 export const removeYouTubeBranding = `
-  // Simple CSS to reduce YouTube branding without affecting controls
-  const style = document.createElement('style');
-  style.innerHTML = \`
-    /* Reduce YouTube branding visibility - only target specific branding elements */
-    .ytp-watermark {
-      opacity: 0.3 !important;
-      z-index: 1 !important;
+  // Wait for the page to load before applying styles
+  function applyYouTubeStyles() {
+    try {
+      const style = document.createElement('style');
+      style.innerHTML = \`
+        /* Minimal branding reduction - only hide non-essential elements */
+        .ytp-watermark {
+          opacity: 0.2 !important;
+        }
+        
+        .ytp-branding {
+          opacity: 0.2 !important;
+        }
+        
+        /* Hide promotional overlays that might interfere */
+        .ytp-show-cards-title {
+          display: none !important;
+        }
+        
+        .ytp-impression-link {
+          display: none !important;
+        }
+        
+        /* Ensure video player is responsive */
+        .html5-video-player {
+          width: 100% !important;
+          height: 100% !important;
+        }
+        
+        .html5-video-container {
+          width: 100% !important;
+          height: 100% !important;
+        }
+        
+        /* Ensure controls are accessible */
+        .ytp-chrome-controls {
+          z-index: 1000 !important;
+        }
+      \`;
+      
+      if (document.head) {
+        document.head.appendChild(style);
+      } else {
+        // If head doesn't exist yet, wait and try again
+        setTimeout(applyYouTubeStyles, 100);
+      }
+    } catch (error) {
+      console.log('YouTube styling error:', error);
     }
-    
-    .ytp-branding {
-      opacity: 0.3 !important;
-      z-index: 1 !important;
-    }
-    
-    .ytp-branding-logo {
-      opacity: 0.3 !important;
-      z-index: 1 !important;
-    }
-    
-    /* Hide some promotional elements */
-    .ytp-show-cards-title {
-      display: none !important;
-    }
-    
-    .ytp-impression-link {
-      display: none !important;
-    }
-    
-    /* Make end screen less prominent */
-    .ytp-endscreen-content {
-      opacity: 0.5 !important;
-      z-index: 1 !important;
-    }
-    
-    .ytp-suggested-action {
-      opacity: 0.5 !important;
-      z-index: 1 !important;
-    }
-    
-    /* Ensure video controls stay on top */
-    .ytp-chrome-controls,
-    .ytp-chrome-bottom,
-    .ytp-progress-bar,
-    .ytp-play-button,
-    .ytp-pause-button,
-    .ytp-volume-button,
-    .ytp-mute-button,
-    .ytp-fullscreen-button,
-    .ytp-settings-button,
-    .ytp-time-display {
-      z-index: 10 !important;
-      position: relative !important;
-    }
-  \`;
-  document.head.appendChild(style);
+  }
   
+  // Apply styles when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyYouTubeStyles);
+  } else {
+    applyYouTubeStyles();
+  }
 `;

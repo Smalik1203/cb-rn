@@ -41,25 +41,7 @@ export default function TabLayout() {
             showBackButton={false}
           />
         ),
-        tabBarActiveTintColor: colors.primary[600],
-        tabBarInactiveTintColor: colors.neutral[400],
-        tabBarStyle: {
-          backgroundColor: colors.surface.primary,
-          borderTopWidth: 1,
-          borderTopColor: colors.border.light,
-          borderTopLeftRadius: borderRadius.md,
-          borderTopRightRadius: borderRadius.md,
-          paddingTop: spacing.xs,
-          paddingBottom: spacing.sm,
-          height: 60,
-          ...shadows.sm,
-          elevation: 2,
-        },
-        tabBarLabelStyle: {
-          fontSize: typography.fontSize.xs - 1,
-          fontWeight: typography.fontWeight.medium,
-          marginTop: 2,
-        },
+        tabBarStyle: { display: 'none' }, // Hide tab bar globally
       }}
     >
       <Tabs.Screen
@@ -76,7 +58,6 @@ export default function TabLayout() {
         options={{
           title: 'Timetable',
           tabBarIcon: ({ size, color }) => <Calendar size={size} color={color} />,
-          tabBarStyle: { display: 'none' }, // Hide tab bar for timetable screen
         }}
       />
 
@@ -97,11 +78,26 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
+        name="syllabus"
+        options={{
+          title: 'Syllabus',
+          tabBarIcon: ({ size, color }) => <BookOpen size={size} color={color} />,
+        }}
+      />
+
+      <Tabs.Screen
+        name="syllabus-student"
+        options={{
+          title: 'Syllabus (Student)',
+          tabBarIcon: ({ size, color }) => <BookOpen size={size} color={color} />,
+        }}
+      />
+
+      <Tabs.Screen
         name="attendance"
         options={{
           title: 'Attendance',
           tabBarIcon: ({ size, color }) => <CheckSquare size={size} color={color} />,
-          tabBarStyle: { display: 'none' }, // Hide tab bar for attendance screen
         }}
       />
 

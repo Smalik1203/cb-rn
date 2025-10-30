@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Dimensions } from 'react-native';
 import { Text, Card, Button, SegmentedButtons, ActivityIndicator, FAB, Menu, Portal, Modal } from 'react-native-paper';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { 
   CheckSquare, 
   Users, 
@@ -20,6 +19,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useClassSelection } from '../../contexts/ClassSelectionContext';
 import { ClassSelector } from '../ClassSelector';
+import { DatePickerModal } from '../common/DatePickerModal';
 import { useStudents } from '../../hooks/useStudents';
 import { useClasses } from '../../hooks/useClasses';
 import { useClassAttendance, useMarkAttendance, useMarkBulkAttendance, useClassAttendanceSummary } from '../../hooks/useAttendance';
@@ -46,7 +46,6 @@ export const AttendanceScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'mark' | 'history'>('mark');
   const [showClassDropdown, setShowClassDropdown] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [tempDate, setTempDate] = useState<Date>(new Date());
 
   const dateString = selectedDate.toISOString().split('T')[0];
   const canMark = profile?.role === 'admin' || profile?.role === 'superadmin';
@@ -67,21 +66,13 @@ export const AttendanceScreen: React.FC = () => {
   const markAttendanceMutation = useMarkAttendance();
   const markBulkAttendanceMutation = useMarkBulkAttendance();
 
-  // Initialize tempDate when showDatePicker opens
-  useEffect(() => {
-    if (showDatePicker) {
-      setTempDate(selectedDate);
-    }
-  }, [showDatePicker, selectedDate]);
-
-  const handleDateConfirm = () => {
-    setSelectedDate(tempDate);
+  const handleDateConfirm = (date: Date) => {
+    setSelectedDate(date);
     setHasChanges(true);
     setShowDatePicker(false);
   };
 
   const handleDateCancel = () => {
-    setTempDate(selectedDate); // Reset to original date
     setShowDatePicker(false);
   };
 
@@ -425,65 +416,15 @@ export const AttendanceScreen: React.FC = () => {
         </Modal>
       </Portal>
 
-      {/* Date Picker - Platform specific rendering */}
-      {showDatePicker && Platform.OS === 'android' && (
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display="default"
-          onChange={(event, selectedDate) => {
-            setShowDatePicker(false);
-            if (selectedDate) {
-              setSelectedDate(selectedDate);
-              setHasChanges(true);
-            }
-          }}
-          minimumDate={new Date(2020, 0, 1)}
-          maximumDate={new Date(2030, 11, 31)}
-        />
-      )}
-      
-      {showDatePicker && Platform.OS === 'ios' && (
-        <Portal>
-          <Modal
-            visible={showDatePicker}
-            onDismiss={handleDateCancel}
-            contentContainerStyle={styles.datePickerModal}
-          >
-            <View style={styles.datePickerContainer}>
-              <Text style={styles.datePickerTitle}>Select Date</Text>
-              <DateTimePicker
-                value={tempDate}
-                mode="date"
-                display="spinner"
-                onChange={(event, selectedDate) => {
-                  if (selectedDate) {
-                    setTempDate(selectedDate);
-                  }
-                }}
-                minimumDate={new Date(2020, 0, 1)}
-                maximumDate={new Date(2030, 11, 31)}
-              />
-              <View style={styles.datePickerActions}>
-                <Button
-                  mode="outlined"
-                  onPress={handleDateCancel}
-                  style={styles.datePickerButton}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  mode="contained"
-                  onPress={handleDateConfirm}
-                  style={styles.datePickerButton}
-                >
-                  Done
-                </Button>
-              </View>
-            </View>
-          </Modal>
-        </Portal>
-      )}
+      {/* Date Picker Modal */}
+      <DatePickerModal
+        visible={showDatePicker}
+        onDismiss={handleDateCancel}
+        onConfirm={handleDateConfirm}
+        initialDate={selectedDate}
+        minimumDate={new Date(2020, 0, 1)}
+        maximumDate={new Date(2030, 11, 31)}
+      />
 
       {/* Save Button */}
       {hasChanges && canMark && (
@@ -560,121 +501,11 @@ const styles = StyleSheet.create({
     height: 40,
     width: 120,
   },
-  datePickerModal: {
-    backgroundColor: colors.surface.primary,
-    margin: spacing.lg,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-  },
-  datePickerContainer: {
-    alignItems: 'center',
-  },
-  datePickerTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.lg,
-  },
-  datePickerActions: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.lg,
-  },
-  datePickerButton: {
-    flex: 1,
-  },
   filterDivider: {
     width: 1,
     height: 40,
     backgroundColor: colors.border.DEFAULT,
     marginHorizontal: spacing.md,
-  },
-  datePickerModal: {
-    backgroundColor: colors.surface.primary,
-    padding: spacing.lg,
-    margin: spacing.xl,
-    borderRadius: borderRadius.lg,
-    maxHeight: '60%',
-    minHeight: 300,
-  },
-  customDatePickerModal: {
-    justifyContent: 'flex-end',
-    margin: 0,
-  },
-  customDatePickerContainer: {
-    backgroundColor: colors.surface.primary,
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xl,
-    paddingHorizontal: spacing.lg,
-    maxHeight: Dimensions.get('window').height * 0.6,
-  },
-  handleBar: {
-    width: 40,
-    height: 4,
-    backgroundColor: colors.border.DEFAULT,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: spacing.lg,
-  },
-  customDatePicker: {
-    height: 200,
-    marginVertical: spacing.lg,
-  },
-  datePickerActions: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.lg,
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: colors.surface.primary,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: colors.text.secondary,
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
-  },
-  continueButton: {
-    flex: 1,
-    backgroundColor: colors.primary[600],
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-  },
-  continueButtonText: {
-    color: colors.text.inverse,
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  datePickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  datePickerTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-  },
-  datePicker: {
-    alignSelf: 'center',
-    marginVertical: spacing.lg,
-  },
-  datePickerActions: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.lg,
-  },
-  datePickerButton: {
-    flex: 1,
   },
   studentsSection: {
     paddingHorizontal: spacing.lg,

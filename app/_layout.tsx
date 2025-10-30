@@ -52,7 +52,7 @@ export default function RootLayout() {
                       }}
                     />
                   </Drawer>
-                  <StatusBar style="auto" />
+                  <StatusBar style="dark" translucent={false} />
                   <NetworkStatus />
               </ClassSelectionProvider>
             </AuthProvider>

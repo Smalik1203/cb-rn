@@ -1,90 +1,141 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { Text, Card, Button, Chip } from 'react-native-paper';
-import { CalendarDays, Plus, Edit, Trash2, Clock, MapPin } from 'lucide-react-native';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
+import { Text, Card, Button, Chip, SegmentedButtons } from 'react-native-paper';
+import { 
+  Plus, 
+  Filter as FilterIcon,
+  ListTodo,
+  Calendar as CalendarIcon,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Users,
+} from 'lucide-react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { useClassSelection } from '../../src/contexts/ClassSelectionContext';
-import { ClassSelector } from '../../src/components/ClassSelector';
 import { colors, typography, spacing, borderRadius } from '../../lib/design-system';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  useCalendarEvents,
+  useCreateCalendarEvent,
+  useUpdateCalendarEvent,
+  useDeleteCalendarEvent,
+  CalendarEvent,
+} from '../../src/hooks/useCalendarEvents';
+import {
+  CalendarEventFormModal,
+  CalendarMonthView,
+} from '../../src/components/calendar';
+// Date picker not used in calendar filter anymore
+import { MonthPickerModal } from '../../src/components/common';
 import { supabase } from '../../src/lib/supabase';
 import { DB } from '../../src/types/db.constants';
 
-interface CalendarEvent {
-  id: string;
-  title: string;
-  description: string | null;
-  start_date: string;
-  end_date: string;
-  start_time: string;
-  end_time: string;
-  event_type: 'class' | 'exam' | 'holiday' | 'meeting' | 'other';
-  color: string;
-  is_all_day: boolean;
-  is_recurring: boolean;
-  recurrence_pattern?: string;
-  recurrence_interval?: number;
-  recurrence_end_date?: string;
-  is_active: boolean;
-  academic_year_id: string;
-  class_instance_id: string;
-  school_code: string;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-}
-
 export default function CalendarScreen() {
   const { profile } = useAuth();
-  const { selectedClass } = useClassSelection();
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const queryClient = useQueryClient();
+  
+  // State
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<'month' | 'list'>('month');
+  const [isEventModalVisible, setIsEventModalVisible] = useState(false);
+  const [isHolidayModalVisible, setIsHolidayModalVisible] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [showClassDropdown, setShowClassDropdown] = useState(false);
+  const [classes, setClasses] = useState<Array<{ id: string; grade: number; section?: string }>>([]);
+  const [loadingClasses, setLoadingClasses] = useState(false);
+  // Month picker state
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [monthPickerYear, setMonthPickerYear] = useState<number>(new Date().getFullYear());
 
   const role = profile?.role;
   const canManageEvents = role === 'admin' || role === 'superadmin' || role === 'cb_admin';
+  const schoolCode = profile?.school_code || '';
+
+  // Fetch classes for the school
+  const fetchClasses = useCallback(async () => {
+    if (!schoolCode) return;
+    
+    setLoadingClasses(true);
+    try {
+      const { data, error } = await supabase
+        .from(DB.tables.classInstances)
+        .select('id, grade, section')
+        .eq('school_code', schoolCode)
+        .order('grade', { ascending: true })
+        .order('section', { ascending: true });
+
+      if (error) throw error;
+      setClasses(data || []);
+    } catch (error) {
+      console.error('Error fetching classes:', error);
+    } finally {
+      setLoadingClasses(false);
+    }
+  }, [schoolCode]);
+
+  useEffect(() => {
+    fetchClasses();
+  }, [fetchClasses]);
+
+  // Calculate date range for current month
+  const { startDate, endDate } = useMemo(() => {
+    const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    return {
+      startDate: start.toISOString().split('T')[0],
+      endDate: end.toISOString().split('T')[0],
+    };
+  }, [currentDate]);
 
   // Fetch calendar events
-  const { data: events, isLoading, error, refetch } = useQuery({
-    queryKey: ['calendar-events', selectedClass?.id, selectedDate],
-    queryFn: async (): Promise<CalendarEvent[]> => {
-      if (!selectedClass?.id) return [];
-      
-      const { data, error } = await supabase
-        .from(DB.tables.schoolCalendarEvents)
-        .select('*')
-        .eq('class_instance_id', selectedClass.id)
-        .gte('date', selectedDate)
-        .lt('date', new Date(new Date(selectedDate).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-        .order('date')
-        .order('start_time');
-      
-      if (error) throw error;
-      return (data || []) as CalendarEvent[];
-    },
-    enabled: !!selectedClass?.id,
-  });
+  const { data: events = [], isLoading, error, refetch } = useCalendarEvents(
+    schoolCode,
+    startDate,
+    endDate,
+    selectedClassId || undefined
+  );
 
-  // Delete event mutation
-  const deleteEventMutation = useMutation({
-    mutationFn: async (eventId: string) => {
-      const { error } = await supabase
-        .from(DB.tables.schoolCalendarEvents)
-        .delete()
-        .eq('id', eventId);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['calendar-events'] });
-    },
-  });
+  // Mutations
+  const createEventMutation = useCreateCalendarEvent();
+  const updateEventMutation = useUpdateCalendarEvent();
+  const deleteEventMutation = useDeleteCalendarEvent();
+
+  // Handlers
+  const handlePreviousMonth = () => {
+    setCurrentDate((prev) => {
+      const newDate = new Date(prev);
+      newDate.setMonth(prev.getMonth() - 1);
+      return newDate;
+    });
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate((prev) => {
+      const newDate = new Date(prev);
+      newDate.setMonth(prev.getMonth() + 1);
+      return newDate;
+    });
+  };
+
+  const handleToday = () => {
+    setCurrentDate(new Date());
+  };
 
   const handleAddEvent = () => {
     if (!canManageEvents) {
       Alert.alert('Access Denied', 'Only administrators can add events.');
       return;
     }
-    Alert.alert('Add Event', 'Event creation will be implemented in the next update.');
+    setSelectedEvent(null);
+    setIsEventModalVisible(true);
+  };
+
+  const handleAddHoliday = () => {
+    if (!canManageEvents) {
+      Alert.alert('Access Denied', 'Only administrators can add holidays.');
+      return;
+    }
+    setSelectedEvent(null);
+    setIsHolidayModalVisible(true);
   };
 
   const handleEditEvent = (event: CalendarEvent) => {
@@ -92,7 +143,12 @@ export default function CalendarScreen() {
       Alert.alert('Access Denied', 'Only administrators can edit events.');
       return;
     }
-    Alert.alert('Edit Event', `Edit "${event.title}" - Feature coming soon.`);
+    setSelectedEvent(event);
+    if (event.event_type === 'holiday') {
+      setIsHolidayModalVisible(true);
+    } else {
+      setIsEventModalVisible(true);
+    }
   };
 
   const handleDeleteEvent = (event: CalendarEvent) => {
@@ -100,7 +156,7 @@ export default function CalendarScreen() {
       Alert.alert('Access Denied', 'Only administrators can delete events.');
       return;
     }
-    
+
     Alert.alert(
       'Delete Event',
       `Are you sure you want to delete "${event.title}"?`,
@@ -115,37 +171,46 @@ export default function CalendarScreen() {
     );
   };
 
-  const getEventTypeColor = (type: string) => {
-    switch (type) {
-      case 'class': return colors.primary[600];
-      case 'exam': return colors.error[600];
-      case 'holiday': return colors.success[600];
-      case 'meeting': return colors.warning[600];
-      default: return colors.neutral[600];
+  const handleSaveEvent = async (eventData: any) => {
+    try {
+      if (selectedEvent) {
+        await updateEventMutation.mutateAsync({ id: selectedEvent.id, ...eventData });
+        Alert.alert('Success', 'Event updated successfully');
+      } else {
+        await createEventMutation.mutateAsync(eventData);
+        Alert.alert('Success', 'Event created successfully');
+      }
+      setIsEventModalVisible(false);
+      setIsHolidayModalVisible(false);
+      setSelectedEvent(null);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save event');
+      console.error('Error saving event:', error);
     }
   };
 
-  const getEventTypeLabel = (type: string) => {
-    switch (type) {
-      case 'class': return 'Class';
-      case 'exam': return 'Exam';
-      case 'holiday': return 'Holiday';
-      case 'meeting': return 'Meeting';
-      default: return 'Event';
-    }
+  const handleDateClick = (_date: Date) => {
+    // No view switching; month view remains active
   };
+
+  const handleEventClick = (event: CalendarEvent) => {
+    handleEditEvent(event);
+  };
+
+  // Month/list views do not expose date selector
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
-      weekday: 'long',
+      weekday: 'short',
       year: 'numeric',
-      month: 'long',
+      month: 'short',
       day: 'numeric',
     });
   };
 
   const formatTime = (timeString: string) => {
+    if (!timeString) return '';
     const [hours, minutes] = timeString.split(':');
     const hour = parseInt(hours);
     const ampm = hour >= 12 ? 'PM' : 'AM';
@@ -153,124 +218,119 @@ export default function CalendarScreen() {
     return `${displayHour}:${minutes} ${ampm}`;
   };
 
-  if (!selectedClass) {
+  const getEventTypeColor = (type: string) => {
+    const colors_map: { [key: string]: string } = {
+      holiday: '#0369a1',
+      assembly: '#1890ff',
+      exam: '#faad14',
+      ptm: '#52c41a',
+      'sports day': '#722ed1',
+      'cultural event': '#eb2f96',
+    };
+    return colors_map[type.toLowerCase()] || '#8c8c8c';
+  };
+
+  const renderListView = () => {
+    // Group events by date
+    const groupedEvents: { [key: string]: CalendarEvent[] } = {};
+    events.forEach((event) => {
+      const dateKey = event.start_date;
+      if (!groupedEvents[dateKey]) {
+        groupedEvents[dateKey] = [];
+      }
+      groupedEvents[dateKey].push(event);
+    });
+
+    const sortedDates = Object.keys(groupedEvents).sort();
+
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <View style={styles.headerLeft}>
-              <View style={styles.iconContainer}>
-                <CalendarDays size={32} color={colors.text.inverse} />
-              </View>
-              <View>
-                <Text variant="headlineSmall" style={styles.headerTitle}>
-                  Calendar
-                </Text>
-                <Text variant="bodyLarge" style={styles.headerSubtitle}>
-                  Select a class to view events
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-        <ClassSelector />
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View style={styles.headerLeft}>
-            <View style={styles.iconContainer}>
-              <CalendarDays size={32} color={colors.text.inverse} />
-            </View>
-            <View>
-              <Text variant="headlineSmall" style={styles.headerTitle}>
-                Calendar
-              </Text>
-              <Text variant="bodyLarge" style={styles.headerSubtitle}>
-                {canManageEvents ? 'Manage events and view calendar' : 'View school calendar and events'}
-              </Text>
-            </View>
-          </View>
-          {canManageEvents && (
-            <TouchableOpacity style={styles.addButton} onPress={handleAddEvent}>
-              <Plus size={20} color={colors.text.inverse} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      <ClassSelector />
-
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {isLoading ? (
-          <View style={styles.loadingContainer}>
+          <View style={styles.centerContainer}>
             <Text>Loading events...</Text>
           </View>
         ) : error ? (
-          <View style={styles.errorContainer}>
+          <View style={styles.centerContainer}>
             <Text style={styles.errorText}>Failed to load events</Text>
             <Button onPress={() => refetch()}>Retry</Button>
           </View>
-        ) : events && events.length > 0 ? (
+        ) : events.length > 0 ? (
           <View style={styles.eventsList}>
-            {events.map((event) => (
-              <Card key={event.id} style={styles.eventCard}>
-                <View style={styles.eventHeader}>
-                  <View style={styles.eventTitleRow}>
-                    <Text variant="titleMedium" style={styles.eventTitle}>
-                      {event.title}
-                    </Text>
-                    <Chip 
-                      style={[styles.eventTypeChip, { backgroundColor: getEventTypeColor(event.event_type) + '20' }]}
-                      textStyle={{ color: getEventTypeColor(event.event_type) }}
-                    >
-                      {getEventTypeLabel(event.event_type)}
-                    </Chip>
-                  </View>
-                  {canManageEvents && (
-                    <View style={styles.eventActions}>
-                      <TouchableOpacity onPress={() => handleEditEvent(event)}>
-                        <Edit size={16} color={colors.neutral[600]} />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => handleDeleteEvent(event)}>
-                        <Trash2 size={16} color={colors.error[600]} />
-                      </TouchableOpacity>
+            {sortedDates.map((dateKey) => {
+              const dateEvents = groupedEvents[dateKey];
+              const date = new Date(dateKey);
+              
+              return (
+                <View key={dateKey} style={styles.dateGroup}>
+                  {/* Date Header */}
+                  <View style={styles.dateGroupHeader}>
+                    <View style={styles.dateGroupDateBox}>
+                      <Text style={styles.dateGroupDay}>{date.getDate()}</Text>
+                      <Text style={styles.dateGroupMonth}>
+                        {date.toLocaleDateString('en-US', { month: 'short' })}
+                      </Text>
                     </View>
-                  )}
-                </View>
-                
-                <View style={styles.eventDetails}>
-                  <View style={styles.eventDetailRow}>
-                    <CalendarDays size={16} color={colors.neutral[600]} />
-                    <Text style={styles.eventDetailText}>{formatDate(event.start_date)}</Text>
+                    <View style={styles.dateGroupInfo}>
+                      <Text style={styles.dateGroupWeekday}>
+                        {date.toLocaleDateString('en-US', { weekday: 'long' })}
+                      </Text>
+                      <Text style={styles.dateGroupCount}>
+                        {dateEvents.length} {dateEvents.length === 1 ? 'event' : 'events'}
+                      </Text>
+                    </View>
                   </View>
-                  
-                  <View style={styles.eventDetailRow}>
-                    <Clock size={16} color={colors.neutral[600]} />
-                    <Text style={styles.eventDetailText}>
-                      {formatTime(event.start_time)} - {formatTime(event.end_time)}
-                    </Text>
-                  </View>
-                  
-                  {/* Location field not available in database schema */}
-                  
-                  {event.description && (
-                    <Text style={styles.eventDescription}>{event.description}</Text>
-                  )}
+
+                  {/* Events for this date */}
+                  {dateEvents.map((event) => (
+                    <TouchableOpacity key={event.id} onPress={() => handleEventClick(event)}>
+                      <View style={styles.eventCardList}>
+                        <View
+                          style={[
+                            styles.eventColorStrip,
+                            { backgroundColor: event.color || getEventTypeColor(event.event_type) },
+                          ]}
+                        />
+                        <View style={styles.eventCardContent}>
+                          <View style={styles.eventCardHeader}>
+                            <Text style={styles.eventCardTitle}>{event.title}</Text>
+                            <View
+                              style={[
+                                styles.eventTypeBadge,
+                                { backgroundColor: event.color || getEventTypeColor(event.event_type) },
+                              ]}
+                            >
+                              <Text style={styles.eventTypeBadgeText}>{event.event_type}</Text>
+                            </View>
+                          </View>
+
+                          {!event.is_all_day && event.start_time && (
+                            <Text style={styles.eventCardTime}>
+                              🕐 {formatTime(event.start_time)}
+                              {event.end_time && ` - ${formatTime(event.end_time)}`}
+                            </Text>
+                          )}
+
+                          {event.description && (
+                            <Text style={styles.eventCardDescription} numberOfLines={2}>
+                              {event.description}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-              </Card>
-            ))}
+              );
+            })}
           </View>
         ) : (
-          <View style={styles.emptyContainer}>
+          <View style={styles.centerContainer}>
             <CalendarDays size={64} color={colors.text.tertiary} />
-            <Text variant="titleLarge" style={styles.emptyTitle}>No Events</Text>
+            <Text variant="titleLarge" style={styles.emptyTitle}>
+              No Events
+            </Text>
             <Text variant="bodyMedium" style={styles.emptyMessage}>
-              No events scheduled for this week.
+              No events scheduled for this month.
             </Text>
             {canManageEvents && (
               <Button mode="contained" onPress={handleAddEvent} style={styles.addEventButton}>
@@ -280,6 +340,185 @@ export default function CalendarScreen() {
           </View>
         )}
       </ScrollView>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+
+      {/* Filter Bar */}
+      <View style={styles.filterBar}>
+        <TouchableOpacity style={styles.filterItem} onPress={() => setShowClassDropdown(true)}>
+          <View style={styles.filterIcon}>
+            <Users size={16} color={colors.text.inverse} />
+          </View>
+          <View style={styles.filterContent}>
+            <Text style={styles.filterLabel}>Class</Text>
+            <Text style={styles.filterValue}>
+              {selectedClassId
+                ? `${classes.find((c) => c.id === selectedClassId)?.grade}-${
+                    classes.find((c) => c.id === selectedClassId)?.section || ''
+                  }`
+                : 'All Classes'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Date Pill - opens month picker */}
+        <TouchableOpacity
+          style={styles.filterItem}
+          onPress={() => {
+            setMonthPickerYear(new Date(currentDate).getFullYear());
+            setShowMonthPicker(true);
+          }}
+          activeOpacity={0.8}
+        >
+          <View style={styles.filterIcon}>
+            <ListTodo size={16} color={colors.text.inverse} />
+          </View>
+          <View style={styles.filterContent}>
+            <Text style={styles.filterLabel}>Date</Text>
+            <Text style={styles.filterValue}>
+              {new Date(currentDate).toLocaleDateString('en-GB', {
+                month: 'short', year: 'numeric'
+              })}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
+
+      {/* View Mode Tabs */}
+      <View style={styles.tabsContainer}>
+        <SegmentedButtons
+          value={viewMode}
+          onValueChange={(value) => setViewMode(value as any)}
+          buttons={[
+            {
+              value: 'month',
+              label: 'Month',
+              icon: () => <CalendarIcon size={16} color={viewMode === 'month' ? colors.primary[600] : colors.text.secondary} />,
+            },
+            {
+              value: 'list',
+              label: 'List',
+              icon: () => <ListTodo size={16} color={viewMode === 'list' ? colors.primary[600] : colors.text.secondary} />,
+            },
+          ]}
+          style={styles.segmentedButtons}
+        />
+      </View>
+
+      {/* Content */}
+      {viewMode === 'month' && (
+        <CalendarMonthView
+          currentDate={currentDate}
+          events={events}
+          onDateClick={handleDateClick}
+          onEventClick={handleEventClick}
+        />
+      )}
+
+      {viewMode === 'list' && renderListView()}
+
+      {/* Class Selector Modal */}
+      <Modal
+        visible={showClassDropdown}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowClassDropdown(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.sheet}>
+            <Text style={styles.sheetTitle}>Select Class</Text>
+            <ScrollView style={styles.sheetList}>
+              <TouchableOpacity
+                style={styles.sheetItem}
+                onPress={() => {
+                  setSelectedClassId('');
+                  setShowClassDropdown(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.sheetItemText,
+                    !selectedClassId && styles.sheetItemTextSelected,
+                  ]}
+                >
+                  All Classes (School-wide)
+                </Text>
+              </TouchableOpacity>
+              {classes.map((c) => (
+                <TouchableOpacity
+                  key={c.id}
+                  style={styles.sheetItem}
+                  onPress={() => {
+                    setSelectedClassId(c.id);
+                    setShowClassDropdown(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.sheetItemText,
+                      selectedClassId === c.id && styles.sheetItemTextSelected,
+                    ]}
+                  >
+                    Grade {c.grade}
+                    {c.section ? `-${c.section}` : ''}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <Button onPress={() => setShowClassDropdown(false)}>Close</Button>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Event Form Modal */}
+      <CalendarEventFormModal
+        visible={isEventModalVisible}
+        event={selectedEvent || undefined}
+        academicYearId={undefined}
+        schoolCode={schoolCode}
+        classes={[]}
+        userId={profile?.auth_id || ''}
+        onCancel={() => {
+          setIsEventModalVisible(false);
+          setSelectedEvent(null);
+        }}
+        onSuccess={handleSaveEvent}
+      />
+
+      {/* Holiday Form Modal */}
+      <CalendarEventFormModal
+        visible={isHolidayModalVisible}
+        event={selectedEvent || undefined}
+        academicYearId={undefined}
+        schoolCode={schoolCode}
+        classes={[]}
+        isHoliday
+        userId={profile?.auth_id || ''}
+        onCancel={() => {
+          setIsHolidayModalVisible(false);
+          setSelectedEvent(null);
+        }}
+        onSuccess={handleSaveEvent}
+      />
+
+      {/* Floating Add Button */}
+      {canManageEvents && (
+        <TouchableOpacity onPress={handleAddEvent} style={styles.floatingButton}>
+          <Plus size={24} color={colors.text.inverse} />
+        </TouchableOpacity>
+      )}
+
+      {/* Month Picker */}
+      <MonthPickerModal
+        visible={showMonthPicker}
+        initialDate={new Date(currentDate)}
+        onDismiss={() => setShowMonthPicker(false)}
+        onConfirm={(date) => setCurrentDate(date)}
+      />
     </View>
   );
 }
@@ -287,61 +526,28 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.app,
+    backgroundColor: '#FAFBFC',
   },
-  header: {
-    backgroundColor: colors.primary[600],
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.lg,
+  tabsContainer: {
     paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.background.default,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.DEFAULT,
   },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  headerTitle: {
-    color: colors.text.inverse,
-    fontWeight: typography.fontWeight.bold,
-  },
-  headerSubtitle: {
-    color: colors.text.inverse,
-    opacity: 0.9,
-  },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  segmentedButtons: {
+    backgroundColor: colors.background.default,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
   },
   content: {
     flex: 1,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+    backgroundColor: '#FAFBFC',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: spacing.xl,
-  },
-  errorContainer: {
+  centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -352,63 +558,116 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   eventsList: {
-    gap: spacing.md,
+    gap: spacing.lg,
   },
-  eventCard: {
-    padding: spacing.lg,
-    marginBottom: spacing.md,
+  dateGroup: {
+    marginBottom: spacing.lg,
   },
-  eventHeader: {
+  dateGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    paddingLeft: spacing.xs,
+  },
+  dateGroupDateBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: '#4F46E5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  dateGroupDay: {
+    fontSize: 22,
+    fontWeight: typography.fontWeight.bold,
+    color: '#FFFFFF',
+  },
+  dateGroupMonth: {
+    fontSize: 11,
+    fontWeight: typography.fontWeight.semibold,
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  dateGroupInfo: {
+    flex: 1,
+  },
+  dateGroupWeekday: {
+    fontSize: 16,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: 2,
+  },
+  dateGroupCount: {
+    fontSize: 13,
+    color: colors.text.secondary,
+  },
+  eventCardList: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    marginBottom: spacing.sm,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E1E4E8',
+  },
+  eventColorStrip: {
+    width: 4,
+  },
+  eventCardContent: {
+    flex: 1,
+    padding: spacing.md,
+  },
+  eventCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: spacing.md,
+    marginBottom: spacing.xs,
   },
-  eventTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: spacing.md,
-  },
-  eventTitle: {
+  eventCardTitle: {
+    fontSize: 15,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
     flex: 1,
     marginRight: spacing.sm,
   },
-  eventTypeChip: {
-    alignSelf: 'flex-start',
+  eventTypeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-  eventActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
+  eventTypeBadgeText: {
+    fontSize: 11,
+    fontWeight: typography.fontWeight.semibold,
+    color: '#FFFFFF',
+    textTransform: 'capitalize',
   },
-  eventDetails: {
-    gap: spacing.sm,
-  },
-  eventDetailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  eventDetailText: {
+  eventCardTime: {
+    fontSize: 13,
     color: colors.text.secondary,
-    fontSize: typography.fontSize.sm,
+    marginBottom: spacing.xs,
   },
-  eventDescription: {
+  eventCardDescription: {
+    fontSize: 13,
     color: colors.text.secondary,
-    fontSize: typography.fontSize.sm,
-    marginTop: spacing.sm,
-    lineHeight: 20,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: spacing.xl,
+    lineHeight: 18,
   },
   emptyTitle: {
     color: colors.text.primary,
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
+    fontWeight: typography.fontWeight.bold,
   },
   emptyMessage: {
     color: colors.text.secondary,
@@ -417,5 +676,103 @@ const styles = StyleSheet.create({
   },
   addEventButton: {
     marginTop: spacing.md,
+  },
+  filterBar: {
+    flexDirection: 'row',
+    backgroundColor: colors.background.default,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.DEFAULT,
+  },
+  filterItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#E6E8EF',
+  },
+  filterItemDisabled: {
+    opacity: 0.6,
+  },
+  filterDivider: {
+    display: 'none',
+  },
+  filterIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary[600],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterContent: {
+    flex: 1,
+  },
+  filterLabel: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.secondary,
+    marginBottom: 2,
+  },
+  filterValue: {
+    color: colors.text.primary,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  sheet: {
+    backgroundColor: colors.background.default,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    maxHeight: '70%',
+  },
+  sheetTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.md,
+  },
+  sheetList: {
+    maxHeight: 400,
+    marginBottom: spacing.md,
+  },
+  sheetItem: {
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  sheetItemText: {
+    fontSize: typography.fontSize.base,
+    color: colors.text.primary,
+  },
+  sheetItemTextSelected: {
+    color: colors.primary[600],
+    fontWeight: typography.fontWeight.bold,
+  },
+  floatingButton: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#4F46E5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
   },
 });

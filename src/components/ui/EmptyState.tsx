@@ -11,6 +11,7 @@ interface EmptyStateProps {
   icon?: React.ReactNode;
   actionLabel?: string;
   onAction?: () => void;
+  variant?: 'screen' | 'card';
 }
 
 export function EmptyState({
@@ -19,9 +20,10 @@ export function EmptyState({
   icon,
   actionLabel,
   onAction,
+  variant = 'screen',
 }: EmptyStateProps) {
   return (
-    <View style={styles.container}>
+    <View style={variant === 'card' ? styles.cardContainer : styles.container}>
       {icon || <Inbox size={64} color={colors.neutral[300]} />}
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message}</Text>
@@ -43,6 +45,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xl,
+  },
+  cardContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.xl,
   },
   title: {
     fontSize: typography.fontSize.xl,
