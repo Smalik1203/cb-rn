@@ -248,9 +248,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
          if (session) {
            maybeBootstrap(session, version);
          }
-      } catch (e) {
-        log.error('Initial session check failed', e);
-        if (alive) setState((prev) => ({ ...prev, status: 'signedOut' }));
+      } catch (e: any) {
+        // Handle invalid refresh token error - clear session and sign out
+        if (e?.message?.includes('Invalid Refresh Token') || e?.message?.includes('Refresh Token Not Found')) {
+          log.warn('Invalid refresh token detected - clearing session and signing out');
+          // Force sign out to clear the invalid session
+          supabase.auth.signOut().catch(() => {});
+        } else {
+          log.error('Initial session check failed', e);
+        }
+        if (alive) setState((prev) => ({ ...prev, status: 'signedOut', session: null, user: null, profile: null }));
       }
     };
 
