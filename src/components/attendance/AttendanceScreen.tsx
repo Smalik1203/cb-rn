@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Dimensions } from 'react-native';
 import { Text, Card, Button, SegmentedButtons, ActivityIndicator, FAB, Menu, Portal, Modal } from 'react-native-paper';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { 
   CheckSquare, 
   Users, 
@@ -46,8 +47,18 @@ export const AttendanceScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'mark' | 'history'>('mark');
   const [showClassDropdown, setShowClassDropdown] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [tempDate, setTempDate] = useState<Date>(new Date());
+  const [historyStartDate, setHistoryStartDate] = useState<Date>(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 30); // Default to last 30 days
+    return date;
+  });
+  const [historyEndDate, setHistoryEndDate] = useState<Date>(new Date());
+  const [showHistoryDatePicker, setShowHistoryDatePicker] = useState<'start' | 'end' | null>(null);
 
   const dateString = selectedDate.toISOString().split('T')[0];
+  const historyStartDateString = historyStartDate.toISOString().split('T')[0];
+  const historyEndDateString = historyEndDate.toISOString().split('T')[0];
   const canMark = profile?.role === 'admin' || profile?.role === 'superadmin';
 
   // Fetch data
@@ -59,8 +70,13 @@ export const AttendanceScreen: React.FC = () => {
 
   const { data: existingAttendance = [], isLoading: attendanceLoading } = useClassAttendance(
     selectedClass?.id,
-    dateString,
-    { enabled: !!selectedClass?.id && !!dateString }
+    dateString
+  );
+
+  const { data: attendanceSummary = [], isLoading: summaryLoading } = useClassAttendanceSummary(
+    activeTab === 'history' && selectedClass?.id ? selectedClass.id : undefined,
+    activeTab === 'history' ? historyStartDateString : undefined,
+    activeTab === 'history' ? historyEndDateString : undefined
   );
 
   const markAttendanceMutation = useMarkAttendance();
@@ -220,9 +236,37 @@ export const AttendanceScreen: React.FC = () => {
     );
   }
 
+  // Calculate history stats
+  const historyStats = {
+    total: attendanceSummary.length,
+    present: attendanceSummary.reduce((sum, s) => sum + s.presentDays, 0),
+    absent: attendanceSummary.reduce((sum, s) => sum + s.absentDays, 0),
+  };
+
   return (
     <View style={styles.container}>
+      {/* Tab Switcher */}
+      <View style={styles.tabContainer}>
+        <SegmentedButtons
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value as 'mark' | 'history')}
+          buttons={[
+            {
+              value: 'mark',
+              label: 'Mark Attendance',
+            },
+            {
+              value: 'history',
+              label: 'View History',
+            },
+          ]}
+          style={styles.tabSwitcher}
+        />
+      </View>
+
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {activeTab === 'mark' ? (
+          <>
         {/* Quick Filters Section */}
         <View style={styles.filterSection}>
           <View style={styles.filterRow}>
@@ -236,11 +280,11 @@ export const AttendanceScreen: React.FC = () => {
               </View>
               <View style={styles.filterContent}>
                 <Text style={styles.filterLabel}>Class</Text>
-                <Text style={styles.filterValue}>
+                <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
                   {selectedClass ? `${selectedClass.grade} ${selectedClass.section}` : 'Select'}
                 </Text>
               </View>
-              <ChevronDown size={14} color={colors.text.secondary} />
+              <ChevronDown size={14} color={colors.text.secondary} style={{ marginLeft: spacing.xs, flexShrink: 0 }} />
             </TouchableOpacity>
 
             {/* Divider */}
@@ -258,7 +302,7 @@ export const AttendanceScreen: React.FC = () => {
               </View>
               <View style={styles.filterContent}>
                 <Text style={styles.filterLabel}>Date</Text>
-                <Text style={styles.filterValue}>
+                <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
                   {selectedDate.toLocaleDateString('en-US', { 
                     month: 'short', 
                     day: 'numeric'
@@ -359,6 +403,140 @@ export const AttendanceScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         )}
+          </>
+        ) : (
+          /* History Tab */
+          <View style={styles.historyContainer}>
+            {/* Quick Filters Section - Same design as mark tab */}
+            <View style={styles.filterSection}>
+              <View style={styles.filterRow}>
+                {/* Class Filter */}
+                <TouchableOpacity
+                  style={styles.filterItem}
+                  onPress={() => setShowClassDropdown(true)}
+                >
+                  <View style={styles.filterContent}>
+                    <Text style={styles.filterLabel}>Class</Text>
+                    <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
+                      {selectedClass ? `${selectedClass.grade} ${selectedClass.section}` : 'Select'}
+                    </Text>
+                  </View>
+                  <ChevronDown size={14} color={colors.text.secondary} style={{ marginLeft: spacing.xs, flexShrink: 0 }} />
+                </TouchableOpacity>
+
+                {/* Divider */}
+                <View style={styles.filterDivider} />
+
+                {/* Start Date Filter */}
+                <TouchableOpacity 
+                  style={styles.filterItem}
+                  onPress={() => setShowHistoryDatePicker('start')}
+                >
+                  <View style={styles.filterContent}>
+                    <Text style={styles.filterLabel}>Start</Text>
+                    <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
+                      {historyStartDate.toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric'
+                      })}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Divider */}
+                <View style={styles.filterDivider} />
+
+                {/* End Date Filter */}
+                <TouchableOpacity 
+                  style={styles.filterItem}
+                  onPress={() => setShowHistoryDatePicker('end')}
+                >
+                  <View style={styles.filterContent}>
+                    <Text style={styles.filterLabel}>End</Text>
+                    <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
+                      {historyEndDate.toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric'
+                      })}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {!selectedClass ? (
+              <View style={styles.emptyContainer}>
+                <Users size={48} color={colors.text.tertiary} />
+                <Text style={styles.emptyText}>Please select a class to view attendance history</Text>
+              </View>
+            ) : (
+              <>
+
+                {/* Summary Stats */}
+                <View style={styles.historyStats}>
+                  <View style={styles.statCard}>
+                    <Text style={styles.statNumber}>{historyStats.total}</Text>
+                    <Text style={styles.statLabel}>Total Students</Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text style={[styles.statNumber, { color: colors.success[600] }]}>{historyStats.present}</Text>
+                    <Text style={styles.statLabel}>Total Present</Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text style={[styles.statNumber, { color: colors.error[600] }]}>{historyStats.absent}</Text>
+                    <Text style={styles.statLabel}>Total Absent</Text>
+                  </View>
+                </View>
+
+                {/* Attendance Summary List */}
+                <View style={styles.summaryContainer}>
+                  <Text style={styles.summaryTitle}>Student Summary</Text>
+                  {summaryLoading ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="large" color={colors.primary[600]} />
+                      <Text style={styles.loadingText}>Loading history...</Text>
+                    </View>
+                  ) : attendanceSummary.length === 0 ? (
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyStateText}>No attendance records found for this period</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.summaryList}>
+                      {attendanceSummary.map((student) => (
+                        <View key={student.studentId} style={styles.summaryItem}>
+                          <View style={styles.summaryStudentInfo}>
+                            <Text style={styles.summaryStudentName}>{student.studentName}</Text>
+                            <Text style={styles.studentCode}>{student.studentCode}</Text>
+                          </View>
+                          <View style={styles.summaryStats}>
+                            <Text style={styles.summaryStatText}>
+                              {student.presentDays} / {student.totalDays} ({student.percentage.toFixed(0)}%)
+                            </Text>
+                            <View style={[
+                              styles.summaryStatus,
+                              student.percentage >= 75 ? styles.summaryStatusPresent :
+                              student.percentage >= 50 ? styles.summaryStatusUnmarked :
+                              styles.summaryStatusAbsent
+                            ]}>
+                              <Text style={[
+                                styles.summaryStatusText,
+                                student.percentage >= 75 ? styles.summaryStatusTextPresent :
+                                student.percentage >= 50 ? styles.summaryStatusTextUnmarked :
+                                styles.summaryStatusTextAbsent
+                              ]}>
+                                {student.percentage >= 75 ? 'Good' : student.percentage >= 50 ? 'Fair' : 'Low'}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              </>
+            )}
+          </View>
+        )}
       </ScrollView>
 
       {/* Class Dropdown Modal */}
@@ -426,6 +604,75 @@ export const AttendanceScreen: React.FC = () => {
         maximumDate={new Date(2030, 11, 31)}
       />
 
+      {/* History Date Picker */}
+      {showHistoryDatePicker && Platform.OS === 'android' && (
+        <DateTimePicker
+          value={showHistoryDatePicker === 'start' ? historyStartDate : historyEndDate}
+          mode="date"
+          display="default"
+          onChange={(event, selectedDate) => {
+            setShowHistoryDatePicker(null);
+            if (selectedDate) {
+              if (showHistoryDatePicker === 'start') {
+                setHistoryStartDate(selectedDate);
+              } else {
+                setHistoryEndDate(selectedDate);
+              }
+            }
+          }}
+          minimumDate={new Date(2020, 0, 1)}
+          maximumDate={new Date(2030, 11, 31)}
+        />
+      )}
+
+      {showHistoryDatePicker && Platform.OS === 'ios' && (
+        <Portal>
+          <Modal
+            visible={!!showHistoryDatePicker}
+            onDismiss={() => setShowHistoryDatePicker(null)}
+            contentContainerStyle={styles.datePickerModal}
+          >
+            <View style={styles.datePickerContainer}>
+              <Text style={styles.datePickerTitle}>
+                Select {showHistoryDatePicker === 'start' ? 'Start' : 'End'} Date
+              </Text>
+              <DateTimePicker
+                value={showHistoryDatePicker === 'start' ? historyStartDate : historyEndDate}
+                mode="date"
+                display="spinner"
+                onChange={(event, selectedDate) => {
+                  if (selectedDate) {
+                    if (showHistoryDatePicker === 'start') {
+                      setHistoryStartDate(selectedDate);
+                    } else {
+                      setHistoryEndDate(selectedDate);
+                    }
+                  }
+                }}
+                minimumDate={new Date(2020, 0, 1)}
+                maximumDate={new Date(2030, 11, 31)}
+              />
+              <View style={styles.datePickerActions}>
+                <Button
+                  mode="outlined"
+                  onPress={() => setShowHistoryDatePicker(null)}
+                  style={styles.datePickerButton}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  mode="contained"
+                  onPress={() => setShowHistoryDatePicker(null)}
+                  style={styles.datePickerButton}
+                >
+                  Done
+                </Button>
+              </View>
+            </View>
+          </Modal>
+        </Portal>
+      )}
+
       {/* Save Button */}
       {hasChanges && canMark && (
         <FAB
@@ -442,6 +689,15 @@ export const AttendanceScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background.secondary,
+  },
+  tabContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.surface.primary,
+  },
+  tabSwitcher: {
     backgroundColor: colors.background.secondary,
   },
   scrollView: {
@@ -461,6 +717,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
+    paddingHorizontal: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     elevation: 2,
@@ -473,6 +730,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    minWidth: 0, // Allow flex items to shrink below content size
   },
   filterIcon: {
     width: 32,
@@ -482,9 +740,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.sm,
+    flexShrink: 0,
   },
   filterContent: {
     flex: 1,
+    minWidth: 0, // Allow text to truncate properly
+    alignItems: 'flex-start',
   },
   filterLabel: {
     fontSize: typography.fontSize.xs,
@@ -501,11 +762,98 @@ const styles = StyleSheet.create({
     height: 40,
     width: 120,
   },
+  datePickerModal: {
+    backgroundColor: colors.surface.primary,
+    padding: spacing.lg,
+    margin: spacing.xl,
+    borderRadius: borderRadius.lg,
+    maxHeight: '60%',
+    minHeight: 300,
+  },
+  datePickerContainer: {
+    alignItems: 'center',
+  },
+  datePickerTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.lg,
+  },
+  datePickerActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.lg,
+  },
+  datePickerButton: {
+    flex: 1,
+  },
   filterDivider: {
     width: 1,
     height: 40,
     backgroundColor: colors.border.DEFAULT,
-    marginHorizontal: spacing.md,
+    marginHorizontal: spacing.sm,
+    flexShrink: 0,
+  },
+  customDatePickerModal: {
+    justifyContent: 'flex-end',
+    margin: 0,
+  },
+  customDatePickerContainer: {
+    backgroundColor: colors.surface.primary,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    maxHeight: Dimensions.get('window').height * 0.6,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: colors.border.DEFAULT,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: spacing.lg,
+  },
+  customDatePicker: {
+    height: 200,
+    marginVertical: spacing.lg,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: colors.surface.primary,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: colors.text.secondary,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+  },
+  continueButton: {
+    flex: 1,
+    backgroundColor: colors.primary[600],
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  continueButtonText: {
+    color: colors.text.inverse,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  datePicker: {
+    alignSelf: 'center',
+    marginVertical: spacing.lg,
   },
   studentsSection: {
     paddingHorizontal: spacing.lg,
@@ -726,7 +1074,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   historyContainer: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
   },
   historyTitle: {
@@ -739,6 +1087,29 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
     marginBottom: spacing.lg,
+  },
+  dateRangeSelector: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  dateRangeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.surface.primary,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+  },
+  dateRangeButtonText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.primary,
+    fontWeight: typography.fontWeight.medium,
   },
   historyStats: {
     flexDirection: 'row',
@@ -785,11 +1156,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border.DEFAULT,
   },
+  summaryStudentInfo: {
+    flex: 1,
+  },
   summaryStudentName: {
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.medium,
     color: colors.text.primary,
-    flex: 1,
+    marginBottom: spacing.xs,
+  },
+  summaryStats: {
+    alignItems: 'flex-end',
+    gap: spacing.xs,
+  },
+  summaryStatText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    fontWeight: typography.fontWeight.medium,
   },
   summaryStatus: {
     paddingHorizontal: spacing.sm,

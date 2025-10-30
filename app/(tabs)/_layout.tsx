@@ -41,7 +41,7 @@ export default function TabLayout() {
             showBackButton={false}
           />
         ),
-        tabBarStyle: { display: 'none' }, // Hide tab bar globally
+        tabBarStyle: { display: 'none' }, // Hide bottom navigation bar - sidebar is enough
       }}
     >
       <Tabs.Screen
@@ -105,6 +105,14 @@ export default function TabLayout() {
         name="fees"
         options={{
           title: 'Fees',
+          tabBarIcon: ({ size, color }) => <DollarSign size={size} color={color} />,
+        }}
+      />
+
+      <Tabs.Screen
+        name="payments"
+        options={{
+          title: 'Payments',
           tabBarIcon: ({ size, color }) => <DollarSign size={size} color={color} />,
         }}
       />

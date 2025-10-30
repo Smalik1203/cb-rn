@@ -75,17 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     bootstrapUser(session, version);
   };
 
-  /** Debug — safe, concise */
-  useEffect(() => {
-    log.auth('Auth state changed:', {
-      status: state.status,
-      bootstrapping: state.bootstrapping,
-      hasProfile: !!state.profile,
-      platform: Platform.OS,
-      sessionId: state.session?.user?.id?.slice(0, 8),
-      sessionVersion: state.sessionVersion,
-    });
-  }, [state.status, state.bootstrapping, !!state.profile, state.session?.user?.id, state.sessionVersion]);
+  // Removed verbose debug logging - only log errors and warnings
 
   /** Bootstrap user profile; never flips auth to signedOut on errors. */
   const bootstrapUser = async (session: Session, version: string) => {
@@ -102,20 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, 15_000);
 
     try {
-      const sessionStringLen = JSON.stringify(session).length;
-      const accessLen = session.access_token?.length ?? 0;
-      const refreshLen = session.refresh_token?.length ?? 0;
-
-      log.auth('Starting user bootstrap', {
-        authId: user.id,
-        email: user.email,
-        platform: Platform.OS,
-        sessionSize: sessionStringLen,
-        accessTokenLength: accessLen,
-        refreshTokenLength: refreshLen,
-        expiresAt: session.expires_at,
-        sessionVersion: version,
-      });
+      // Removed verbose bootstrap logging
 
       // Fetch profile
       const { data: userProfile, error: profileError } = await supabase
@@ -224,24 +201,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         bootstrapping: false,
       }));
 
-      // Verify persistence once (non-blocking)
-      setTimeout(async () => {
-        try {
-          const { data } = await supabase.auth.getSession();
-          if (data.session) {
-            log.auth('Session persistence verified', {
-              size: JSON.stringify(data.session).length,
-              hasAccess: !!data.session.access_token,
-              hasRefresh: !!data.session.refresh_token,
-              expiresAt: data.session.expires_at,
-            });
-          } else {
-            log.warn('Session persistence check failed – no session present');
-          }
-        } catch (e) {
-          log.warn('Session persistence check failed', e);
-        }
-      }, 1000);
+      // Removed verbose session persistence logging
     } catch (e: any) {
       clearTimeout(timeout);
       if (e?.name === 'AbortError') {
@@ -300,12 +260,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!alive) return;
 
       const version = session ? `${session.user.id}:${session.expires_at || Date.now()}` : 'none';
-      log.auth('Auth state change event:', {
-        event,
-        hasSession: !!session,
-        platform: Platform.OS,
-        prevStatus: state.status,
-      });
+      // Removed verbose auth state change logging
 
        if (event === 'SIGNED_OUT' || !session) {
          setState((prev) => ({

@@ -21,10 +21,10 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ErrorBoundary>
           <QueryClientProvider client={queryClient}>
-            <PaperProvider>
-            <AuthProvider>
-              <ClassSelectionProvider>
-                <Drawer
+              <PaperProvider>
+                <AuthProvider>
+                  <ClassSelectionProvider>
+                    <Drawer
                     drawerContent={(props) => <DrawerContent {...props} />}
                     screenOptions={{
                       headerShown: false,

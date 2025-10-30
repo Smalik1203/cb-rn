@@ -41,6 +41,8 @@ type MenuItem = {
   badge?: number;
   isNew?: boolean;
   description?: string;
+  hasSubMenu?: boolean;
+  parent?: string;
 };
 
 const MENU: MenuItem[] = [
@@ -112,7 +114,38 @@ const MENU: MenuItem[] = [
     route: '/(tabs)/fees', 
     roles: ['admin', 'superadmin', 'cb_admin'], 
     section: 'Academic',
-    description: 'Fee management'
+    description: 'Fee management',
+    hasSubMenu: true
+  },
+  { 
+    key: 'fees_payments', 
+    label: 'Payments', 
+    icon: Activity, 
+    route: '/(tabs)/payments', 
+    roles: ['admin', 'superadmin', 'cb_admin'], 
+    section: 'Academic',
+    description: 'Payment history',
+    parent: 'fees'
+  },
+  { 
+    key: 'fees_components', 
+    label: 'Components', 
+    icon: Settings, 
+    route: '/(tabs)/fees?tab=components', 
+    roles: ['admin', 'superadmin', 'cb_admin'], 
+    section: 'Academic',
+    description: 'Manage fee components',
+    parent: 'fees'
+  },
+  { 
+    key: 'fees_manage', 
+    label: 'Manage Fee', 
+    icon: Wrench, 
+    route: '/(tabs)/fees?tab=plans', 
+    roles: ['admin', 'superadmin', 'cb_admin'], 
+    section: 'Academic',
+    description: 'Assign plans and record payments',
+    parent: 'fees'
   },
   { 
     key: 'analytics', 
@@ -139,6 +172,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
   const { profile, signOut } = useAuth();
   const role = profile?.role as MenuItem['roles'][number];
   const [activeItem, setActiveItem] = React.useState<string>('home');
+  const [expandedMenus, setExpandedMenus] = React.useState<Set<string>>(new Set(['fees']));
   const insets = useSafeAreaInsets();
   
   // Animation values
@@ -188,10 +222,33 @@ export function DrawerContent(props: DrawerContentComponentProps) {
     }
   };
 
+  const toggleSubMenu = (key: string) => {
+    setExpandedMenus(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
+      }
+      return newSet;
+    });
+  };
+
   const handleItemPress = (item: MenuItem) => {
     try {
+      if (item.hasSubMenu) {
+        toggleSubMenu(item.key);
+        return;
+      }
+      
       setActiveItem(item.key);
       props.navigation.closeDrawer();
+      
+      // Handle sub-menu items by setting parent as active too
+      if (item.parent) {
+        setActiveItem(item.parent);
+      }
+      
       router.push(item.route as any);
     } catch (error) {
       try {
@@ -260,9 +317,13 @@ export function DrawerContent(props: DrawerContentComponentProps) {
             {Object.entries(grouped).map(([section, items]) => (
               <View key={section} style={styles.section}>
                 <Text style={styles.sectionLabel}>{section}</Text>
-                {items.map((item) => (
+                {items.filter(item => !item.parent).map((item) => {
+                  const isExpanded = expandedMenus.has(item.key);
+                  const subItems = items.filter(i => i.parent === item.key);
+                  
+                  return (
+                    <View key={item.key}>
                   <TouchableOpacity
-                    key={item.key}
                     style={[
                       styles.menuItem,
                       activeItem === item.key && styles.menuItemActive
@@ -279,13 +340,53 @@ export function DrawerContent(props: DrawerContentComponentProps) {
                     ]}>
                       {item.label}
                     </Text>
+                        {item.hasSubMenu && (
+                          <ChevronRight 
+                            size={16} 
+                            color={colors.text.secondary}
+                            style={[
+                              styles.chevron,
+                              isExpanded && styles.chevronExpanded
+                            ]}
+                          />
+                        )}
                     {item.badge && (
                       <View style={styles.badge}>
                         <Text style={styles.badgeText}>{item.badge}</Text>
                       </View>
                     )}
                   </TouchableOpacity>
-                ))}
+                      
+                      {/* Sub-items */}
+                      {item.hasSubMenu && isExpanded && subItems.map((subItem) => {
+                        const isSubItemActive = activeItem === subItem.key || activeItem === subItem.parent;
+                        return (
+                          <TouchableOpacity
+                            key={subItem.key}
+                            style={[
+                              styles.menuItem,
+                              styles.subMenuItem,
+                              isSubItemActive && styles.menuItemActive
+                            ]}
+                            onPress={() => handleItemPress(subItem)}
+                          >
+                            <subItem.icon 
+                              size={18} 
+                              color={isSubItemActive ? colors.primary[600] : colors.text.secondary} 
+                            />
+                            <Text style={[
+                              styles.menuItemLabel,
+                              styles.subMenuItemLabel,
+                              isSubItemActive && styles.menuItemLabelActive
+                            ]}>
+                              {subItem.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  );
+                })}
               </View>
             ))}
           </View>
@@ -392,6 +493,25 @@ const styles = StyleSheet.create({
   menuItemLabelActive: {
     color: colors.primary[700],
     fontWeight: typography.fontWeight.semibold as any,
+  },
+  subMenuItem: {
+    marginLeft: spacing.lg,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.background.secondary,
+    borderRadius: borderRadius.sm,
+    marginVertical: 1,
+  },
+  subMenuItemLabel: {
+    fontSize: typography.fontSize.sm,
+    marginLeft: spacing.sm,
+    color: colors.text.secondary,
+  },
+  chevron: {
+    marginLeft: 'auto',
+    transform: [{ rotate: '0deg' }],
+  },
+  chevronExpanded: {
+    transform: [{ rotate: '90deg' }],
   },
   badge: {
     backgroundColor: colors.error[500],
