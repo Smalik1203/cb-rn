@@ -34,7 +34,7 @@ import { useClassSelection } from '../../contexts/ClassSelectionContext';
 import { useClasses } from '../../hooks/useClasses';
 import { useStudents } from '../../hooks/useStudents';
 import { ClassSelector } from '../ClassSelector';
-import { DatePicker } from '../DatePicker';
+import { DatePickerModal } from '../common/DatePickerModal';
 import { supabase } from '../../data/supabaseClient';
 import { getClassStudentsFees, getFeeComponentTypes } from '../../data/queries';
 import { colors, spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
@@ -83,6 +83,7 @@ export default function FeePlans() {
   const [receiptNumber, setReceiptNumber] = useState<string>('');
   const [remarks, setRemarks] = useState<string>('');
   const [paymentDate, setPaymentDate] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showClassPlanModal, setShowClassPlanModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -1057,11 +1058,15 @@ export default function FeePlans() {
                 
                 <View style={styles.paymentDetailsRow}>
                   <Text style={styles.paymentLabel}>Payment Date *</Text>
-                  <DatePicker
-                    selectedDate={paymentDate}
-                    onDateChange={setPaymentDate}
-                    style={styles.datePicker}
-                  />
+                  <TouchableOpacity
+                    style={styles.datePickerButton}
+                    onPress={() => setShowDatePicker(true)}
+                  >
+                    <Calendar size={16} color={colors.text.secondary} />
+                    <Text style={styles.datePickerText}>
+                      {format(paymentDate, 'MMM dd, yyyy')}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
                 
                 <View style={styles.paymentDetailsRow}>
@@ -1501,6 +1506,20 @@ export default function FeePlans() {
             </ScrollView>
         </PaperModal>
       </Portal>
+
+      {/* Date Picker Modal */}
+      <DatePickerModal
+        visible={showDatePicker}
+        onDismiss={() => setShowDatePicker(false)}
+        onConfirm={(date) => {
+          setPaymentDate(date);
+          setShowDatePicker(false);
+        }}
+        initialDate={paymentDate}
+        minimumDate={new Date(2020, 0, 1)}
+        maximumDate={new Date(2030, 11, 31)}
+        title="Select Payment Date"
+      />
     </View>
   );
 }
@@ -2211,8 +2230,22 @@ const styles = {
     color: colors.text.primary,
     marginBottom: spacing.xs,
   },
-  datePicker: {
+  datePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface.primary,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     marginTop: spacing.xs,
+  },
+  datePickerText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.primary,
+    fontWeight: typography.fontWeight.medium,
   },
   noComponentsContainer: {
     alignItems: 'center' as const,
