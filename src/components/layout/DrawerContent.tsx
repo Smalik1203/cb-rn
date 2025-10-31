@@ -9,23 +9,30 @@ import {
   DrawerItem,
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
-import {
-  Home,
-  CalendarDays,
-  Clock,
-  BookOpen,
-  CheckSquare,
-  Users,
-  Wrench,
-  BarChart3,
-  DollarSign,
-  LogOut,
-  Bell,
-  Settings,
-  User,
+import { 
+  LayoutDashboard,
+  CalendarDays, 
+  CalendarRange, 
+  NotebookText, 
+  UserCheck, 
+  UsersRound, 
+  Wrench, 
+  LineChart, 
+  CreditCard, 
+  LogOut, 
+  Bell, 
+  Settings2, 
+  User, 
   ChevronRight,
   Star,
   Activity,
+  CheckCircle2,
+  UserPlus,
+  List,
+  Layers,
+  ReceiptText,
+  FolderOpen,
+  Zap,
   FileText
 } from 'lucide-react-native';
 import { colors, spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
@@ -37,8 +44,8 @@ type MenuItem = {
   label: string;
   icon: any;
   route: string;
-  roles?: ('superadmin' | 'cb_admin' | 'admin' | 'teacher' | 'student')[];
-  section: 'Main' | 'Academic' | 'Learning' | 'Settings' | 'CB Admin';
+  roles?: Array<'superadmin' | 'cb_admin' | 'admin' | 'teacher' | 'student'>;
+  section: 'Main' | 'Academic' | 'Learning' | 'Admin' | 'Settings' | 'CB Admin';
   badge?: number;
   isNew?: boolean;
   description?: string;
@@ -50,7 +57,7 @@ const MENU: MenuItem[] = [
   { 
     key: 'home', 
     label: 'Dashboard', 
-    icon: Home, 
+    icon: LayoutDashboard, 
     route: '/(tabs)', 
     section: 'Main',
     description: 'Overview and quick stats'
@@ -66,7 +73,7 @@ const MENU: MenuItem[] = [
   { 
     key: 'timetable', 
     label: 'Timetable', 
-    icon: Clock, 
+    icon: CalendarRange, 
     route: '/(tabs)/timetable', 
     section: 'Main',
     description: 'Class schedules',
@@ -75,7 +82,7 @@ const MENU: MenuItem[] = [
   { 
     key: 'resources', 
     label: 'Resources', 
-    icon: BookOpen, 
+    icon: FolderOpen, 
     route: '/(tabs)/resources', 
     section: 'Learning',
     description: 'Study materials'
@@ -83,7 +90,7 @@ const MENU: MenuItem[] = [
   { 
     key: 'syllabus_staff', 
     label: 'Syllabus', 
-    icon: BookOpen, 
+    icon: NotebookText, 
     route: '/(tabs)/syllabus', 
     roles: ['admin', 'superadmin', 'cb_admin', 'teacher'],
     section: 'Learning',
@@ -92,18 +99,18 @@ const MENU: MenuItem[] = [
   { 
     key: 'syllabus_student', 
     label: 'Syllabus', 
-    icon: BookOpen, 
+    icon: NotebookText, 
     route: '/(tabs)/syllabus-student', 
     roles: ['student'],
     section: 'Learning',
     description: 'Your syllabus'
   },
-  {
-    key: 'attendance',
-    label: 'Attendance',
-    icon: CheckSquare,
-    route: '/(tabs)/attendance',
-    roles: ['admin', 'superadmin', 'cb_admin'],
+  { 
+    key: 'attendance', 
+    label: 'Attendance', 
+    icon: UserCheck, 
+    route: '/(tabs)/attendance', 
+    roles: ['admin', 'superadmin', 'cb_admin'], 
     section: 'Academic',
     description: 'Track student attendance',
     badge: 5
@@ -117,12 +124,12 @@ const MENU: MenuItem[] = [
     description: 'Tests and exams',
     isNew: true
   },
-  {
-    key: 'fees',
-    label: 'Fees',
-    icon: DollarSign,
-    route: '/(tabs)/fees',
-    roles: ['admin', 'superadmin', 'cb_admin'],
+  { 
+    key: 'fees', 
+    label: 'Fees', 
+    icon: CreditCard, 
+    route: '/(tabs)/fees', 
+    roles: ['admin', 'superadmin', 'cb_admin'], 
     section: 'Academic',
     description: 'Fee management',
     hasSubMenu: true
@@ -130,7 +137,7 @@ const MENU: MenuItem[] = [
   { 
     key: 'fees_payments', 
     label: 'Payments', 
-    icon: Activity, 
+    icon: ReceiptText, 
     route: '/(tabs)/payments', 
     roles: ['admin', 'superadmin', 'cb_admin'], 
     section: 'Academic',
@@ -140,7 +147,7 @@ const MENU: MenuItem[] = [
   { 
     key: 'fees_components', 
     label: 'Components', 
-    icon: Settings, 
+    icon: Settings2, 
     route: '/(tabs)/fees?tab=components', 
     roles: ['admin', 'superadmin', 'cb_admin'], 
     section: 'Academic',
@@ -160,20 +167,76 @@ const MENU: MenuItem[] = [
   { 
     key: 'analytics', 
     label: 'Analytics', 
-    icon: BarChart3, 
+    icon: LineChart, 
     route: '/(tabs)/analytics', 
     roles: ['admin', 'superadmin', 'cb_admin'], 
     section: 'Academic',
     description: 'Performance insights'
   },
   { 
+    key: 'tasks', 
+    label: 'Tasks', 
+    icon: CheckCircle2, 
+    route: '/(tabs)/tasks', 
+    roles: ['admin', 'superadmin', 'cb_admin', 'student'], 
+    section: 'Academic',
+    description: 'Homework and assignments',
+    isNew: true
+  },
+  { 
     key: 'class_mgmt', 
     label: 'Management', 
-    icon: Wrench, 
+    icon: Settings2, 
     route: '/(tabs)/manage', 
     roles: ['admin', 'superadmin', 'cb_admin'], 
     section: 'Academic',
     description: 'Class administration'
+  },
+  {
+    key: 'setup',
+    label: 'Setup School',
+    icon: Zap,
+    route: '/(tabs)/setup',
+    roles: ['superadmin'],
+    section: 'Admin',
+    description: 'Quick school setup wizard',
+    isNew: true
+  },
+  {
+    key: 'add_admin',
+    label: 'Add Admins',
+    icon: UserPlus,
+    route: '/(tabs)/add-admin',
+    roles: ['superadmin'],
+    section: 'Admin',
+    description: 'Create and manage administrators'
+  },
+  {
+    key: 'add_classes',
+    label: 'Add Classes',
+    icon: List,
+    route: '/(tabs)/add-classes',
+    roles: ['superadmin'],
+    section: 'Admin',
+    description: 'Manage academic years and classes'
+  },
+  {
+    key: 'add_subjects',
+    label: 'Add Subjects',
+    icon: Layers,
+    route: '/(tabs)/add-subjects',
+    roles: ['superadmin'],
+    section: 'Admin',
+    description: 'Manage school subjects'
+  },
+  {
+    key: 'add_student',
+    label: 'Add Students',
+    icon: UsersRound,
+    route: '/(tabs)/add-student',
+    roles: ['admin', 'superadmin'],
+    section: 'Admin',
+    description: 'Create and manage students'
   },
 ];
 

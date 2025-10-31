@@ -1,9 +1,8 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
-import { Text, Card, Button, Chip, SegmentedButtons } from 'react-native-paper';
+import { Text, Card, Button, Chip } from 'react-native-paper';
 import { 
   Plus, 
-  Filter as FilterIcon,
   ListTodo,
   Calendar as CalendarIcon,
   CalendarDays,
@@ -390,23 +389,28 @@ export default function CalendarScreen() {
 
       {/* View Mode Tabs */}
       <View style={styles.tabsContainer}>
-        <SegmentedButtons
-          value={viewMode}
-          onValueChange={(value) => setViewMode(value as any)}
-          buttons={[
-            {
-              value: 'month',
-              label: 'Month',
-              icon: () => <CalendarIcon size={16} color={viewMode === 'month' ? colors.primary[600] : colors.text.secondary} />,
-            },
-            {
-              value: 'list',
-              label: 'List',
-              icon: () => <ListTodo size={16} color={viewMode === 'list' ? colors.primary[600] : colors.text.secondary} />,
-            },
-          ]}
-          style={styles.segmentedButtons}
-        />
+        <View style={styles.pillTabs}>
+          <TouchableOpacity
+            style={[styles.pillTab, viewMode === 'month' && styles.pillTabActive]}
+            activeOpacity={0.9}
+            onPress={() => setViewMode('month')}
+          >
+            <View style={styles.pillTabContent}>
+              <CalendarIcon size={16} color={viewMode === 'month' ? colors.primary[700] : colors.text.secondary} />
+              <Text style={[styles.pillTabText, viewMode === 'month' && styles.pillTabTextActive]}>Month</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.pillTab, viewMode === 'list' && styles.pillTabActive]}
+            activeOpacity={0.9}
+            onPress={() => setViewMode('list')}
+          >
+            <View style={styles.pillTabContent}>
+              <ListTodo size={16} color={viewMode === 'list' ? colors.primary[700] : colors.text.secondary} />
+              <Text style={[styles.pillTabText, viewMode === 'list' && styles.pillTabTextActive]}>List</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Content */}
@@ -532,14 +536,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     backgroundColor: colors.background.default,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.DEFAULT,
   },
-  segmentedButtons: {
-    backgroundColor: colors.background.default,
+  pillTabs: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.full,
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
+    overflow: 'hidden',
+  },
+  pillTab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+  },
+  pillTabActive: {
+    backgroundColor: colors.primary[50],
+  },
+  pillTabContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pillTabText: {
+    color: colors.text.secondary,
+    fontWeight: typography.fontWeight.medium,
+  },
+  pillTabTextActive: {
+    color: colors.primary[700],
+    fontWeight: typography.fontWeight.bold,
   },
   content: {
     flex: 1,
@@ -682,8 +708,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.default,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.DEFAULT,
   },
   filterItem: {
     flexDirection: 'row',

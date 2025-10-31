@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Alert, TouchableOpacity, Modal, Dimensions } from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl, Alert, TouchableOpacity, Modal, Dimensions, Animated } from 'react-native';
 import { Card, List, ActivityIndicator, Button, Text, IconButton, TextInput } from 'react-native-paper';
 import Svg, { Circle } from 'react-native-svg';
 import { BookOpen, FileText } from 'lucide-react-native';
@@ -188,6 +188,43 @@ function TeacherSyllabusScreen() {
     };
 
     // removed CSV import/export actions per request
+
+    // Animated values for bottom sheet animations (match resources implementation)
+    const classSlideAnim = React.useRef(new Animated.Value(0)).current;
+    const subjectSlideAnim = React.useRef(new Animated.Value(0)).current;
+    const overlayOpacity = React.useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        if (showClassDropdown) {
+            classSlideAnim.setValue(0);
+            overlayOpacity.setValue(0);
+            Animated.parallel([
+                Animated.timing(overlayOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+                Animated.spring(classSlideAnim, { toValue: 1, tension: 65, friction: 10, useNativeDriver: true }),
+            ]).start();
+        } else {
+            Animated.parallel([
+                Animated.timing(overlayOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+                Animated.timing(classSlideAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+            ]).start();
+        }
+    }, [showClassDropdown, classSlideAnim, overlayOpacity]);
+
+    useEffect(() => {
+        if (showSubjectDropdown) {
+            subjectSlideAnim.setValue(0);
+            overlayOpacity.setValue(0);
+            Animated.parallel([
+                Animated.timing(overlayOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+                Animated.spring(subjectSlideAnim, { toValue: 1, tension: 65, friction: 10, useNativeDriver: true }),
+            ]).start();
+        } else {
+            Animated.parallel([
+                Animated.timing(overlayOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+                Animated.timing(subjectSlideAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+            ]).start();
+        }
+    }, [showSubjectDropdown, subjectSlideAnim, overlayOpacity]);
 
     return (
         <View style={styles.container}>
@@ -476,38 +513,106 @@ function TeacherSyllabusScreen() {
                     </View>
                 </View>
             </Modal>
-            {/* Class Selector Modal */}
-            <Modal visible={showClassDropdown} transparent animationType="fade" onRequestClose={() => setShowClassDropdown(false)}>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.sheet}>
+            {/* Class Selector Modal - Animated Bottom Sheet (matching resources) */}
+            <Modal
+                visible={showClassDropdown}
+                transparent
+                animationType="none"
+                onRequestClose={() => setShowClassDropdown(false)}
+            >
+                <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
+                    <TouchableOpacity
+                        style={StyleSheet.absoluteFill}
+                        activeOpacity={1}
+                        onPress={() => setShowClassDropdown(false)}
+                    />
+                    <Animated.View
+                        style={[
+                            styles.bottomSheet,
+                            {
+                                transform: [
+                                    {
+                                        translateY: classSlideAnim.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: [500, 0],
+                                        }),
+                                    },
+                                ],
+                            },
+                        ]}
+                    >
+                        <View style={styles.sheetHandle} />
                         <Text style={styles.sheetTitle}>Select Class</Text>
-                        <ScrollView style={styles.sheetList}>
+                        <ScrollView style={styles.sheetContent}>
                             {classes.map(c => (
-                                <TouchableOpacity key={c.id} style={styles.sheetItem} onPress={() => { setSelectedClassId(c.id); setShowClassDropdown(false); }}>
-                                    <Text style={styles.sheetItemText}>{c.grade}-{c.section}</Text>
+                                <TouchableOpacity
+                                    key={c.id}
+                                    style={[styles.sheetItem, selectedClassId === c.id && styles.sheetItemActive]}
+                                    onPress={() => {
+                                        setSelectedClassId(c.id);
+                                        setShowClassDropdown(false);
+                                    }}
+                                >
+                                    <Text style={[styles.sheetItemText, selectedClassId === c.id && styles.sheetItemTextActive]}>
+                                        {c.grade}-{c.section}
+                                    </Text>
+                                    {selectedClassId === c.id && <Text style={styles.checkmark}>✓</Text>}
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
-                        <Button onPress={() => setShowClassDropdown(false)}>Close</Button>
-                    </View>
-                </View>
+                    </Animated.View>
+                </Animated.View>
             </Modal>
 
-            {/* Subject Selector Modal */}
-            <Modal visible={showSubjectDropdown} transparent animationType="fade" onRequestClose={() => setShowSubjectDropdown(false)}>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.sheet}>
+            {/* Subject Selector Modal - Animated Bottom Sheet (matching resources) */}
+            <Modal
+                visible={showSubjectDropdown}
+                transparent
+                animationType="none"
+                onRequestClose={() => setShowSubjectDropdown(false)}
+            >
+                <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
+                    <TouchableOpacity
+                        style={StyleSheet.absoluteFill}
+                        activeOpacity={1}
+                        onPress={() => setShowSubjectDropdown(false)}
+                    />
+                    <Animated.View
+                        style={[
+                            styles.bottomSheet,
+                            {
+                                transform: [
+                                    {
+                                        translateY: subjectSlideAnim.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: [500, 0],
+                                        }),
+                                    },
+                                ],
+                            },
+                        ]}
+                    >
+                        <View style={styles.sheetHandle} />
                         <Text style={styles.sheetTitle}>Select Subject</Text>
-                        <ScrollView style={styles.sheetList}>
+                        <ScrollView style={styles.sheetContent}>
                             {subjects.map(s => (
-                                <TouchableOpacity key={s.id} style={styles.sheetItem} onPress={() => { setSelectedSubjectId(s.id); setShowSubjectDropdown(false); }}>
-                                    <Text style={styles.sheetItemText}>{s.subject_name}</Text>
+                                <TouchableOpacity
+                                    key={s.id}
+                                    style={[styles.sheetItem, selectedSubjectId === s.id && styles.sheetItemActive]}
+                                    onPress={() => {
+                                        setSelectedSubjectId(s.id);
+                                        setShowSubjectDropdown(false);
+                                    }}
+                                >
+                                    <Text style={[styles.sheetItemText, selectedSubjectId === s.id && styles.sheetItemTextActive]}>
+                                        {s.subject_name}
+                                    </Text>
+                                    {selectedSubjectId === s.id && <Text style={styles.checkmark}>✓</Text>}
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
-                        <Button onPress={() => setShowSubjectDropdown(false)}>Close</Button>
-                    </View>
-                </View>
+                    </Animated.View>
+                </Animated.View>
             </Modal>
         </View>
     );
@@ -719,12 +824,59 @@ const styles = StyleSheet.create({
     addTopicFab: { borderRadius: 18, marginRight: -4 },
     topicActions: { flexDirection: 'row', alignItems: 'center' },
     segmented: { padding: 12 },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     sheet: { backgroundColor: colors.surface.primary, borderRadius: 16, padding: 16, maxHeight: '70%' },
-    sheetTitle: { fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold as any, color: colors.text.primary, marginBottom: 8 },
+    sheetTitle: { fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold as any, color: colors.text.primary, marginBottom: 8, paddingHorizontal: spacing.lg },
     sheetList: { maxHeight: 400, marginBottom: 8 },
-    sheetItem: { paddingVertical: 12 },
-    sheetItemText: { fontSize: typography.fontSize.base, color: colors.text.primary },
+    sheetItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.md,
+        borderRadius: borderRadius.md,
+        marginVertical: 2,
+        backgroundColor: '#F9FAFB',
+    },
+    sheetItemText: {
+        fontSize: typography.fontSize.base,
+        color: colors.text.primary,
+        fontWeight: typography.fontWeight.medium as any,
+        flex: 1,
+    },
+    // Bottom Sheet Styles
+    bottomSheet: {
+        backgroundColor: colors.surface.primary,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingTop: spacing.sm,
+        paddingBottom: spacing.xl,
+        maxHeight: '70%',
+    },
+    sheetHandle: {
+        width: 36,
+        height: 4,
+        backgroundColor: '#D1D5DB',
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginBottom: spacing.sm,
+    },
+    sheetContent: {
+        paddingHorizontal: spacing.lg,
+        maxHeight: 400,
+    },
+    sheetItemActive: {
+        backgroundColor: '#EEF2FF',
+    },
+    sheetItemTextActive: {
+        color: colors.primary[600],
+        fontWeight: typography.fontWeight.semibold as any,
+    },
+    checkmark: {
+        fontSize: typography.fontSize.lg,
+        color: colors.primary[600],
+        fontWeight: typography.fontWeight.bold as any,
+    },
     emptyFill: { flex: 1 },
     largeEmptyCard: {
         marginHorizontal: spacing.lg,

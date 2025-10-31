@@ -1,12 +1,13 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert, RefreshControl, Animated, Vibration } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert, RefreshControl, Animated, Vibration, Modal as RNModal } from 'react-native';
 import { Text, Card, Button, Chip, Portal, Modal, TextInput, SegmentedButtons, Snackbar } from 'react-native-paper';
-import { Calendar, Clock, ChevronLeft, ChevronRight, Plus, Edit, Trash2, CheckCircle, Circle, Settings, Users, BookOpen, MapPin, Filter, RotateCcw, User, MoreVertical, Coffee } from 'lucide-react-native';
+import { Calendar, Clock, ChevronLeft, ChevronRight, Plus, Edit, Trash2, CheckCircle, Circle, Settings, Users, BookOpen, MapPin, Filter, RotateCcw, User, MoreVertical, Coffee, ListTodo } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUnifiedTimetable } from '../../hooks/useUnifiedTimetable';
 import { useSyllabusLoader } from '../../hooks/useSyllabusLoader';
 import { useClasses } from '../../hooks/useClasses';
-import { useSubjects, useAdmin } from '../../hooks/useSubjects';
+import { useSubjects } from '../../hooks/useSubjects';
+import { useAdmins } from '../../hooks/useAdmins';
 import { colors, typography, spacing, borderRadius, shadows } from '../../../lib/design-system';
 import dayjs from 'dayjs';
 import { router } from 'expo-router';
@@ -279,7 +280,33 @@ export function ModernTimetableScreen() {
   const [showTeacherDropdown, setShowTeacherDropdown] = useState(false);
   const [editingSlot, setEditingSlot] = useState<any>(null);
   const [showQuickGenerateModal, setShowQuickGenerateModal] = useState(false);
+  const [quickForm, setQuickForm] = useState({
+    numPeriods: 6,
+    periodDurationMin: 40,
+    startTime: '09:00',
+    breaks: [] as Array<{ afterPeriod: number; durationMin: number; name: string }>,
+  });
   const [selectedSlotForMenu, setSelectedSlotForMenu] = useState<any>(null);
+
+  // Bottom sheet animation for Class selector (match Task Management)
+  const classSlideAnim = useRef(new Animated.Value(0)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (showClassSelector) {
+      classSlideAnim.setValue(0);
+      overlayOpacity.setValue(0);
+      Animated.parallel([
+        Animated.timing(overlayOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+        Animated.spring(classSlideAnim, { toValue: 1, tension: 65, friction: 10, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(overlayOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+        Animated.timing(classSlideAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [showClassSelector, classSlideAnim, overlayOpacity]);
   const [showSlotMenu, setShowSlotMenu] = useState(false);
   const [slotForm, setSlotForm] = useState({
     slot_type: 'period',
@@ -298,6 +325,7 @@ export function ModernTimetableScreen() {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [compactView, setCompactView] = useState(false);
+  const [showActionsModal, setShowActionsModal] = useState(false);
   
   // Animation values
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -306,7 +334,7 @@ export function ModernTimetableScreen() {
   const dateStr = dayjs(selectedDate).format('YYYY-MM-DD');
   const { data: classes } = useClasses(profile?.school_code);
   const { data: subjects } = useSubjects(profile?.school_code);
-  const { data: admin } = useAdmin(profile?.school_code);
+  const { data: adminsList } = useAdmins(profile?.school_code);
   const { slots, displayPeriodNumber, loading, error, refetch, createSlot, updateSlot, deleteSlot, quickGenerate, markSlotTaught, unmarkSlotTaught, updateSlotStatus, taughtSlotIds } = useUnifiedTimetable(
     selectedClassId,
     dateStr,
@@ -737,39 +765,20 @@ export function ModernTimetableScreen() {
   // Handle quick generate
   const handleQuickGenerate = async () => {
     if (!selectedClassId || !profile?.school_code) return;
-
-    const selectedClass = classes?.find(c => c.id === selectedClassId);
-    const className = selectedClass ? `${selectedClass.grade} ${selectedClass.section}` : 'this class';
-    const formattedDate = dayjs(selectedDate).format('MMMM D, YYYY');
-
-    Alert.alert(
-      'Quick Generate Timetable',
-      `This will create a standard timetable for ${className} on ${formattedDate}:\n\n• 6 periods (45 minutes each)\n• 2 breaks (15 minutes each)\n• Starting at 8:00 AM\n\n⚠️ This will REPLACE all existing slots for ${className} on this date.\n\nAre you sure you want to continue?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Generate',
-          onPress: async () => {
-            try {
-              await quickGenerate({
-                class_instance_id: selectedClassId,
-                school_code: profile.school_code,
-                class_date: dateStr,
-                startTime: '08:00',
-                numPeriods: 6,
-                periodDurationMin: 45,
-                breaks: [
-                  { afterPeriod: 2, durationMin: 15, name: 'Break' },
-                  { afterPeriod: 4, durationMin: 15, name: 'Break' },
-                ],
-              });
-            } catch (error) {
-              showError(`Failed to generate timetable: ${error.message}`);
-            }
-          },
-        },
-      ]
-    );
+    try {
+      await quickGenerate({
+        class_instance_id: selectedClassId,
+        school_code: profile.school_code,
+        class_date: dateStr,
+        startTime: quickForm.startTime,
+        numPeriods: quickForm.numPeriods,
+        periodDurationMin: quickForm.periodDurationMin,
+        breaks: quickForm.breaks,
+      });
+      setShowQuickGenerateModal(false);
+    } catch (error: any) {
+      showError(`Failed to generate timetable: ${error.message}`);
+    }
   };
 
   // Reset form
@@ -881,118 +890,56 @@ export function ModernTimetableScreen() {
         }
       >
         {/* Quick Actions Cards */}
-        <View style={styles.quickActionsContainer}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.quickActionsGrid}>
-            {/* Class Selection Card */}
-            <TouchableOpacity
-              onPress={() => setShowClassSelector(true)}
-              style={[styles.quickActionCard, styles.purpleCard]}
-              activeOpacity={0.8}
-            >
-              <View style={styles.quickActionIcon}>
-                <Users size={24} color="#ffffff" />
-              </View>
-              <Text style={styles.quickActionTitle}>Class</Text>
-              <Text style={styles.quickActionSubtitle}>
-                {selectedClass ? `${selectedClass.grade || ''} ${selectedClass.section || ''}`.trim() || 'Select' : 'Select'}
+        <View style={styles.filterBar}>
+          <TouchableOpacity style={[styles.filterItem, !selectedClassId && styles.filterItemDisabled]} onPress={() => setShowClassSelector(true)}>
+            <View style={styles.filterIcon}>
+              <Users size={16} color="#ffffff" />
+            </View>
+            <View style={styles.filterContent}>
+              <Text style={styles.filterLabel}>Class</Text>
+              <Text style={styles.filterValue}>
+                {selectedClassId ? `${selectedClass?.grade || ''} ${selectedClass?.section || ''}`.trim() : 'Select Class'}
               </Text>
-            </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
 
-            {/* Date Selection Card */}
-            <TouchableOpacity
-              onPress={() => setShowDatePicker(true)}
-              style={[styles.quickActionCard, styles.blueCard]}
-              activeOpacity={0.8}
-            >
-              <View style={styles.quickActionIcon}>
-                <Calendar size={24} color="#ffffff" />
-              </View>
-              <Text style={styles.quickActionTitle}>Date</Text>
-              <Text style={styles.quickActionSubtitle}>
-                {dayjs(selectedDate).format('MMM D')}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Add Period Card */}
-            {selectedClassId && (
-              <TouchableOpacity
-                onPress={() => {
-                  resetForm();
-                  setSlotForm(prev => ({ ...prev, slot_type: 'period' }));
-                  closeAllDropdowns();
-                  setShowAddModal(true);
-                }}
-                style={[styles.quickActionCard, styles.greenCard]}
-                activeOpacity={0.8}
-              >
-                <View style={styles.quickActionIcon}>
-                  <Plus size={24} color="#ffffff" />
-                </View>
-                <Text style={styles.quickActionTitle}>+ Period</Text>
-                <Text style={styles.quickActionSubtitle}>New class</Text>
-              </TouchableOpacity>
-            )}
-
-            {/* Quick Generate Card */}
-            {selectedClassId && (
-              <TouchableOpacity
-                onPress={() => setShowQuickGenerateModal(true)}
-                style={[styles.quickActionCard, styles.orangeCard]}
-                activeOpacity={0.8}
-              >
-                <View style={styles.quickActionIcon}>
-                  <Settings size={24} color="#ffffff" />
-                </View>
-                <Text style={styles.quickActionTitle}>Auto Generate</Text>
-                <Text style={styles.quickActionSubtitle}>Quick create</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <TouchableOpacity style={styles.filterItem} onPress={() => setShowDatePicker(true)}>
+            <View style={styles.filterIcon}>
+              <ListTodo size={16} color="#ffffff" />
+            </View>
+            <View style={styles.filterContent}>
+              <Text style={styles.filterLabel}>Date</Text>
+              <Text style={styles.filterValue}>{dayjs(selectedDate).format('MMM YYYY')}</Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
-      {/* Empty State - No Class Selected */}
-      {!selectedClassId && (
-        <View style={styles.emptyStateContainer}>
-          <View style={styles.emptyStateIcon}>
-            <Users size={48} color={colors.text.tertiary} />
+        {/* No Class Selected - Responsive Card */}
+        {!selectedClassId && (
+          <View style={styles.selectClassCard}>
+            <View style={styles.selectClassInner}>
+              <BookOpen size={isTablet ? 64 : (isSmallScreen ? 40 : 56)} color="#d4d4d4" />
+              <Text style={styles.selectClassTitle}>Select a Class</Text>
+              <Text style={styles.selectClassSubtitle}>
+                Choose a class from the list above to view and manage its timetable.
+              </Text>
+            </View>
           </View>
-          <Text style={styles.emptyStateTitle}>Select a Class</Text>
-          <Text style={styles.emptyStateMessage}>
-            Choose a class from the list above to view and manage its timetable.
-          </Text>
-        </View>
-      )}
+        )}
 
         {/* Clean Timetable Content */}
+        {selectedClassId ? (
         <View style={styles.timetableContentContainer}>
-          <View style={styles.scheduleHeader}>
-            <Text style={styles.sectionTitle}>Today&apos;s Schedule</Text>
-            {slots.length > 0 && (
-              <View style={styles.progressSummary}>
-                <Text style={styles.progressText}>
-                  {Array.from(taughtSlotIds).filter(id => 
-                    slots.some(slot => slot.id === id && slot.slot_type === 'period')
-                  ).length} of {slots.filter(slot => slot.slot_type === 'period').length} classes completed
-                </Text>
-                <View style={styles.progressBar}>
-                  <View style={[
-                    styles.progressFill,
-                    { 
-                      width: `${(Array.from(taughtSlotIds).filter(id => 
-                        slots.some(slot => slot.id === id && slot.slot_type === 'period')
-                      ).length / Math.max(slots.filter(slot => slot.slot_type === 'period').length, 1)) * 100}%`
-                    }
-                  ]} />
-                </View>
-              </View>
-            )}
-          </View>
           
-          {slots.length === 0 ? (
-            <View style={styles.cleanEmptyState}>
+          {selectedClassId && slots.length === 0 ? (
+            <View
+              style={[
+                styles.cleanEmptyState,
+                isTablet ? styles.cleanEmptyStateTablet : (isSmallScreen ? styles.cleanEmptyStateMobile : null),
+              ]}
+            >
               <View style={styles.cleanEmptyIcon}>
-                <Calendar size={56} color="#9ca3af" />
+                <Calendar size={isTablet ? 64 : (isSmallScreen ? 40 : 56)} color="#9ca3af" />
               </View>
               <Text style={styles.cleanEmptyTitle}>No classes yet</Text>
               <Text style={styles.cleanEmptyMessage}>
@@ -1030,51 +977,59 @@ export function ModernTimetableScreen() {
             </View>
           )}
         </View>
+        ) : null}
       </ScrollView>
 
-      {/* Class Selector Modal */}
-      <Portal>
-        <Modal
-          visible={showClassSelector}
-          onDismiss={() => setShowClassSelector(false)}
-          contentContainerStyle={styles.modalContainer}
-        >
-          <Text style={styles.modalTitle}>Select Class</Text>
-          <ScrollView style={styles.modalScrollView}>
-            {classes?.map((cls) => (
-              <TouchableOpacity
-                key={cls.id}
-                onPress={() => {
-                  setSelectedClassId(cls.id);
-                  setShowClassSelector(false);
-                }}
-                style={[
-                  styles.modalItem,
-                  selectedClassId === cls.id && styles.modalItemSelected
-                ]}
-                activeOpacity={0.7}
-              >
-                <Text style={[
-                  styles.modalItemText,
-                  selectedClassId === cls.id && styles.modalItemTextSelected
-                ]}>
-                  {cls.grade} {cls.section}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          <Button 
-            mode="outlined" 
-            onPress={() => setShowClassSelector(false)} 
-            style={styles.modalCloseButton}
-            buttonColor="#ffffff"
-            textColor="#374151"
-            labelStyle={styles.buttonLabel}
+      {/* Class Selector - Bottom Sheet (replaces previous modal) */}
+      <RNModal
+        visible={showClassSelector}
+        transparent
+        animationType="none"
+        onRequestClose={() => setShowClassSelector(false)}
+      >
+        <Animated.View style={[styles.bsOverlay, { opacity: overlayOpacity }]}> 
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill as any}
+            activeOpacity={1}
+            onPress={() => setShowClassSelector(false)}
+          />
+          <Animated.View
+            style={[
+              styles.bsContainer,
+              {
+                transform: [
+                  {
+                    translateY: classSlideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [500, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
           >
-            Cancel
-          </Button>
-        </Modal>
-      </Portal>
+            <View style={styles.bsHandle} />
+            <Text style={styles.bsTitle}>Select Class</Text>
+            <ScrollView style={styles.bsContent}>
+              {classes?.map((cls) => (
+                <TouchableOpacity
+                  key={cls.id}
+                  style={[styles.bsItem, selectedClassId === cls.id && styles.bsItemActive]}
+                  onPress={() => {
+                    setSelectedClassId(cls.id);
+                    setShowClassSelector(false);
+                  }}
+                >
+                  <Text style={[styles.bsItemText, selectedClassId === cls.id && styles.bsItemTextActive]}>
+                    Grade {cls.grade} - Section {cls.section}
+                  </Text>
+                  {selectedClassId === cls.id && <Text style={styles.bsCheck}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Animated.View>
+        </Animated.View>
+      </RNModal>
 
       {/* Date Picker Modal */}
       <Portal>
@@ -1214,7 +1169,7 @@ export function ModernTimetableScreen() {
                 onPress={() => setShowTeacherDropdown(true)}
               >
                 <Text style={styles.dropdownButtonText}>
-                  {admin?.find(t => t.id === slotForm.teacher_id)?.full_name || 'Select Teacher'}
+                  {adminsList?.find(t => t.id === slotForm.teacher_id)?.full_name || 'Select Teacher'}
                 </Text>
                 <ChevronRight size={20} color="#6b7280" />
               </TouchableOpacity>
@@ -1284,7 +1239,7 @@ export function ModernTimetableScreen() {
       </Portal>
 
 
-      {/* Quick Generate Confirmation Modal */}
+      {/* Quick Generate Form Modal */}
       <Portal>
         <Modal
           visible={showQuickGenerateModal}
@@ -1292,45 +1247,75 @@ export function ModernTimetableScreen() {
           contentContainerStyle={styles.modalContainer}
         >
           <Text style={styles.modalTitle}>Quick Generate Timetable</Text>
-          
-          <Text style={styles.modalDescription}>
-            This will create a standard timetable for {dayjs(selectedDate).format('MMMM D, YYYY')} with:
-          </Text>
-          
-          <View style={styles.generatePreview}>
-            <Text style={styles.generatePreviewText}>• 7 periods (45 minutes each)</Text>
-            <Text style={styles.generatePreviewText}>• 2 breaks (15 minutes each)</Text>
-            <Text style={styles.generatePreviewText}>• Starting at 8:00 AM</Text>
-          </View>
-          
-          <Text style={styles.warningText}>
-            ⚠️ This will replace any existing slots for this date.
-          </Text>
-          
+
+          <TextInput
+            label="Number of Periods"
+            value={String(quickForm.numPeriods)}
+            onChangeText={(v) => setQuickForm(f => ({ ...f, numPeriods: Math.max(1, parseInt(v || '0')) }))}
+            style={styles.textInput}
+            keyboardType="number-pad"
+            mode="outlined"
+          />
+
+          <TextInput
+            label="Period Duration (minutes)"
+            value={String(quickForm.periodDurationMin)}
+            onChangeText={(v) => setQuickForm(f => ({ ...f, periodDurationMin: Math.max(1, parseInt(v || '0')) }))}
+            style={styles.textInput}
+            keyboardType="number-pad"
+            mode="outlined"
+          />
+
+          <TextInput
+            label="Start Time"
+            value={quickForm.startTime}
+            onChangeText={(v) => setQuickForm(f => ({ ...f, startTime: v }))}
+            style={styles.textInput}
+            placeholder="HH:MM"
+            mode="outlined"
+          />
+
+          <Text style={{ marginTop: 8, marginBottom: 4, color: '#374151', fontWeight: '600' }}>Break Configuration</Text>
+          {quickForm.breaks.map((b, idx) => (
+            <View key={idx} style={styles.breakRow}>
+              <TextInput
+                label="After Period"
+                value={String(b.afterPeriod)}
+                onChangeText={(v) => setQuickForm(f => ({ ...f, breaks: f.breaks.map((bb, i) => i===idx ? { ...bb, afterPeriod: parseInt(v || '0') } : bb) }))}
+                style={[styles.textInput, { flex: 1 }]}
+                keyboardType="number-pad"
+                mode="outlined"
+              />
+              <TextInput
+                label="Duration (min)"
+                value={String(b.durationMin)}
+                onChangeText={(v) => setQuickForm(f => ({ ...f, breaks: f.breaks.map((bb, i) => i===idx ? { ...bb, durationMin: parseInt(v || '0') } : bb) }))}
+                style={[styles.textInput, { flex: 1, marginLeft: 8 }]}
+                keyboardType="number-pad"
+                mode="outlined"
+              />
+              <TouchableOpacity
+                onPress={() => setQuickForm(f => ({ ...f, breaks: f.breaks.filter((_, i) => i!==idx) }))}
+                style={styles.removeBreakBtn}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.removeBreakText}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+          <TouchableOpacity
+            onPress={() => setQuickForm(f => ({ ...f, breaks: [...f.breaks, { afterPeriod: 2, durationMin: 15, name: 'Break' }] }))}
+            style={styles.addBreakBtn}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.addBreakText}>Add Break</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.warningText}>⚠️ This will replace any existing slots for this date.</Text>
+
           <View style={styles.modalActions}>
-            <Button
-              mode="outlined"
-              onPress={() => setShowQuickGenerateModal(false)}
-              style={styles.cancelButton}
-              buttonColor="#ffffff"
-              textColor="#374151"
-              labelStyle={styles.buttonLabel}
-            >
-              Cancel
-            </Button>
-            <Button
-              mode="contained"
-              onPress={async () => {
-                setShowQuickGenerateModal(false);
-                await handleQuickGenerate();
-              }}
-              style={styles.confirmButton}
-              buttonColor="#6366f1"
-              textColor="#ffffff"
-              labelStyle={styles.buttonLabel}
-            >
-              Generate
-            </Button>
+            <Button mode="outlined" onPress={() => setShowQuickGenerateModal(false)} style={styles.cancelButton} textColor="#374151" labelStyle={styles.buttonLabel}>Cancel</Button>
+            <Button mode="contained" onPress={handleQuickGenerate} style={styles.confirmButton} buttonColor="#6366f1" textColor="#ffffff" labelStyle={styles.buttonLabel}>OK</Button>
           </View>
         </Modal>
       </Portal>
@@ -1399,7 +1384,7 @@ export function ModernTimetableScreen() {
           </View>
           
           <ScrollView style={styles.modalScrollView}>
-            {admin?.map((teacher) => (
+            {adminsList?.map((teacher) => (
               <TouchableOpacity
                 key={teacher.id}
                 onPress={() => {
@@ -1600,6 +1585,81 @@ export function ModernTimetableScreen() {
       >
         {snackbarMessage}
       </Snackbar>
+
+      {/* Floating Actions Button */}
+      {selectedClassId && (
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => {
+            setShowActionsModal(true);
+          }}
+          activeOpacity={0.85}
+        >
+          <Plus size={24} color="#ffffff" />
+        </TouchableOpacity>
+      )}
+
+      {/* Actions Modal */}
+      <Portal>
+        <Modal
+          visible={showActionsModal}
+          onDismiss={() => setShowActionsModal(false)}
+          contentContainerStyle={styles.actionsModal}
+        >
+          <Text style={styles.actionsTitle}>Quick Actions</Text>
+          <View style={styles.actionsList}>
+            <TouchableOpacity
+              style={styles.actionRow}
+              onPress={() => {
+                setShowActionsModal(false);
+                resetForm();
+                setSlotForm(prev => ({ ...prev, slot_type: 'period' }));
+                closeAllDropdowns();
+                setShowAddModal(true);
+              }}
+              activeOpacity={0.8}
+            >
+              <Plus size={18} color="#4F46E5" />
+              <Text style={styles.actionText}>Add Period</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionRow}
+              onPress={() => {
+                setShowActionsModal(false);
+                resetForm();
+                setSlotForm(prev => ({ ...prev, slot_type: 'break' }));
+                closeAllDropdowns();
+                setShowAddModal(true);
+              }}
+              activeOpacity={0.8}
+            >
+              <Coffee size={18} color="#a16207" />
+              <Text style={styles.actionText}>Add Break</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionRow}
+              onPress={() => {
+                setShowActionsModal(false);
+                setShowQuickGenerateModal(true);
+              }}
+              activeOpacity={0.8}
+            >
+              <Settings size={18} color="#f59e0b" />
+              <Text style={styles.actionText}>Quick Generate</Text>
+            </TouchableOpacity>
+          </View>
+          <Button
+            mode="outlined"
+            onPress={() => setShowActionsModal(false)}
+            style={styles.modalCloseButton}
+            textColor="#374151"
+          >
+            Close
+          </Button>
+        </Modal>
+      </Portal>
     </View>
   );
 }
@@ -1717,7 +1777,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   mainScrollContent: {
-    paddingBottom: 20,
+    paddingBottom: 16,
   },
 
   // Clean UI Styles
@@ -1740,6 +1800,162 @@ const styles = StyleSheet.create({
   quickActionsContainer: {
     paddingHorizontal: 20,
     paddingVertical: 16,
+  },
+  // Filter bar styles (match calendar)
+  filterBar: {
+    flexDirection: 'row',
+    backgroundColor: '#FAFBFC',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E6E8EF',
+    gap: spacing.md,
+  },
+  filterItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#E6E8EF',
+  },
+  filterIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#4F46E5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterItemDisabled: {
+    opacity: 0.6,
+  },
+  filterContent: { flex: 1 },
+  filterLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 2,
+  },
+  filterValue: {
+    color: '#111827',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
+  // Floating button
+  fab: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#4F46E5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+  },
+  fabSecondary: {
+    display: 'none',
+  },
+  actionsModal: {
+    backgroundColor: '#ffffff',
+    margin: 20,
+    borderRadius: 16,
+    padding: 16,
+    ...shadows.lg,
+  },
+  actionsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  actionsList: {
+    paddingVertical: 4,
+    marginBottom: 8,
+  },
+  // Bottom sheet styles (task management style)
+  bsOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  bsContainer: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
+    maxHeight: '70%',
+  },
+  bsHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: '#D1D5DB',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: spacing.sm,
+  },
+  bsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  bsContent: {
+    paddingHorizontal: spacing.lg,
+    maxHeight: 400,
+  },
+  bsItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: 12,
+    marginVertical: 2,
+    backgroundColor: '#F9FAFB',
+  },
+  bsItemActive: {
+    backgroundColor: '#EEF2FF',
+  },
+  bsItemText: {
+    fontSize: 16,
+    color: '#111827',
+    fontWeight: '600',
+    flex: 1,
+  },
+  bsItemTextActive: {
+    color: '#4F46E5',
+  },
+  bsCheck: {
+    fontSize: 18,
+    color: '#4F46E5',
+    fontWeight: '700',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  actionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
   },
   sectionTitle: {
     fontSize: 20,
@@ -1837,6 +2053,61 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9fafb',
     borderRadius: 16,
     marginTop: 20,
+    width: '100%',
+    alignSelf: 'stretch',
+    minHeight: 280,
+  },
+  cleanEmptyStateMobile: {
+    paddingVertical: 24,
+    borderRadius: 12,
+    marginTop: 12,
+    minHeight: 240,
+  },
+  cleanEmptyStateTablet: {
+    paddingVertical: 56,
+    borderRadius: 18,
+    marginTop: 24,
+    minHeight: 320,
+  },
+
+  // Select Class Card (when no class is chosen)
+  selectClassCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    marginHorizontal: 20,
+    marginTop: 12,
+    marginBottom: 12,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    minHeight: 420,
+  },
+  selectClassInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: isTablet ? 56 : 40,
+    paddingHorizontal: isTablet ? 40 : 24,
+  },
+  selectClassTitle: {
+    marginTop: 8,
+    fontSize: isTablet ? 24 : 20,
+    fontWeight: '700',
+    color: '#111827',
+    textAlign: 'center',
+  },
+  selectClassSubtitle: {
+    marginTop: 6,
+    fontSize: isTablet ? 16 : 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    maxWidth: 640,
+    alignSelf: 'center',
   },
   cleanEmptyIcon: {
     marginBottom: 16,
@@ -2669,6 +2940,35 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: spacing.lg,
     textAlign: 'center',
+  },
+  breakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  addBreakBtn: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  addBreakText: {
+    color: '#374151',
+    fontWeight: '600',
+  },
+  removeBreakBtn: {
+    marginLeft: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 8,
+  },
+  removeBreakText: {
+    color: '#DC2626',
+    fontWeight: '600',
   },
   
   // Visual Hierarchy Styles

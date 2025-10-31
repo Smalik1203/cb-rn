@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Platform, ToastAndroid } from 'react-native';
-import { Text, Button, ActivityIndicator, Portal, Modal as PaperModal } from 'react-native-paper';
+import { Text, Button, ActivityIndicator, Portal, Modal as PaperModal, IconButton } from 'react-native-paper';
 import { Plus, Edit, Trash2, X, DollarSign } from 'lucide-react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { colors, spacing, borderRadius, shadows } from '../../../lib/design-system';
+import { colors, spacing, borderRadius, shadows, typography } from '../../../lib/design-system';
 
 interface FeeComponent {
   id: string;
@@ -203,29 +203,34 @@ export function FeeComponents({ schoolCode }: FeeComponentsProps) {
               <View key={component.id} style={styles.componentCard}>
                 <View style={styles.componentContent}>
                   <View style={styles.componentInfo}>
-                    <DollarSign size={20} color={colors.primary[600]} />
+                    <View style={styles.componentIconContainer}>
+                      <DollarSign size={20} color={colors.primary[600]} />
+                    </View>
                     <View style={styles.componentText}>
                       <Text style={styles.componentName}>{component.name}</Text>
                       <Text style={styles.componentCode}>Code: {component.code}</Text>
                     </View>
                   </View>
-                  <Text style={styles.componentAmount}>
-                    {formatAmount(component.default_amount_paise)}
-                  </Text>
-                </View>
-                <View style={styles.componentActions}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => openEditModal(component)}
-                  >
-                    <Edit size={18} color={colors.primary[600]} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.deleteButton]}
-                    onPress={() => handleDelete(component)}
-                  >
-                    <Trash2 size={18} color={colors.error[600]} />
-                  </TouchableOpacity>
+                  <View style={styles.componentRight}>
+                    <Text style={styles.componentAmount}>
+                      {formatAmount(component.default_amount_paise)}
+                    </Text>
+                    <View style={styles.componentActions}>
+                      <IconButton
+                        icon={() => <Edit size={18} color={colors.text.secondary} />}
+                        size={18}
+                        onPress={() => openEditModal(component)}
+                        style={styles.actionIconButton}
+                      />
+                      <IconButton
+                        icon={() => <Trash2 size={18} color={colors.error[600]} />}
+                        size={18}
+                        onPress={() => handleDelete(component)}
+                        style={styles.actionIconButton}
+                        iconColor={colors.error[600]}
+                      />
+                    </View>
+                  </View>
                 </View>
               </View>
             ))}
@@ -233,16 +238,14 @@ export function FeeComponents({ schoolCode }: FeeComponentsProps) {
         )}
       </ScrollView>
 
-      {/* Add Button */}
+      {/* Floating Action Button */}
       <View style={styles.fabContainer}>
-        <Button
-          mode="contained"
-          icon={() => <Plus size={20} color={colors.text.inverse} />}
+        <TouchableOpacity
+          style={styles.fab}
           onPress={openAddModal}
-        style={styles.fab}
         >
-          Add Component
-        </Button>
+          <Plus size={24} color={colors.text.inverse} />
+        </TouchableOpacity>
       </View>
 
       {/* Modal */}
@@ -262,16 +265,16 @@ export function FeeComponents({ schoolCode }: FeeComponentsProps) {
               <Text style={styles.modalTitle}>
                   {editingComponent ? 'Edit Component' : 'Add Component'}
               </Text>
-              <TouchableOpacity
+              <IconButton
+                icon={() => <X size={24} color={colors.text.primary} />}
                 onPress={() => {
                   setShowModal(false);
                     setEditingComponent(null);
                     setComponentName('');
                     setComponentAmount('');
                 }}
-              >
-                <X size={24} color={colors.text.secondary} />
-              </TouchableOpacity>
+                size={24}
+              />
             </View>
 
               <View style={styles.modalBody}>
@@ -347,91 +350,102 @@ const styles = StyleSheet.create({
     padding: spacing.xl * 2,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.bold as any,
     color: colors.text.primary,
     marginTop: spacing.md,
   },
   emptyText: {
-    fontSize: 15,
+    fontSize: typography.fontSize.base,
     color: colors.text.secondary,
     marginTop: spacing.xs,
-    fontWeight: '400',
+    textAlign: 'center',
+    lineHeight: 24,
   },
   list: {
-    padding: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
     gap: spacing.sm,
   },
   componentCard: {
-    backgroundColor: colors.surface.primary,
+    backgroundColor: '#FFFFFF',
+    borderRadius: borderRadius.lg,
     padding: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    ...shadows.sm,
+    marginBottom: spacing.sm,
     elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
   },
   componentContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
   },
   componentInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
     flex: 1,
+    marginRight: spacing.md,
+  },
+  componentIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primary[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
   },
   componentText: {
     flex: 1,
   },
   componentName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold as any,
     color: colors.text.primary,
     marginBottom: spacing.xs / 2,
   },
   componentCode: {
-    fontSize: 12,
+    fontSize: typography.fontSize.xs,
     color: colors.text.secondary,
   },
+  componentRight: {
+    alignItems: 'flex-end',
+    gap: spacing.xs,
+  },
   componentAmount: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold as any,
     color: colors.primary[600],
   },
   componentActions: {
     flexDirection: 'row',
-    gap: spacing.xs,
-  },
-  actionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.background.secondary,
-    justifyContent: 'center',
     alignItems: 'center',
-    ...shadows.xs,
-    elevation: 1,
   },
-  deleteButton: {
-    backgroundColor: colors.error[50],
+  actionIconButton: {
+    margin: 0,
   },
   fabContainer: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: spacing.md,
-    backgroundColor: colors.surface.primary,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.DEFAULT,
-    ...shadows.md,
-    elevation: 4,
+    bottom: 16,
+    right: 16,
+    zIndex: 1000,
   },
   fab: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: colors.primary[600],
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
   },
   modalContent: {
     backgroundColor: colors.surface.primary,
@@ -439,8 +453,11 @@ const styles = StyleSheet.create({
     margin: spacing.lg,
     borderRadius: borderRadius.lg,
     maxHeight: '80%',
-    ...shadows.lg,
     elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -449,8 +466,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold as any,
     color: colors.text.primary,
   },
   modalBody: {
@@ -460,9 +477,10 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   inputLabel: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium as any,
     color: colors.text.secondary,
+    marginBottom: spacing.xs,
   },
   input: {
     backgroundColor: colors.background.secondary,
@@ -471,7 +489,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
     color: colors.text.primary,
   },
   modalActions: {

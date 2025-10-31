@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Tabs, useRouter } from 'expo-router';
-import { Home, Calendar, CheckSquare, DollarSign, BarChart3, Users, CalendarDays, BookOpen, FileText } from 'lucide-react-native';
+import { LayoutDashboard, CalendarRange, UserCheck, CreditCard, LineChart, Settings2, CalendarDays, NotebookText, CheckCircle2, ReceiptText, FileText } from 'lucide-react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { AppNavbar } from '../../src/components/layout/AppNavbarExpo';
 
@@ -26,6 +26,9 @@ export default function TabLayout() {
     return null; // Will redirect via useEffect or show loading
   }
 
+  const showSuperAdminTabs = profile?.role === 'superadmin';
+  const showAdminTabs = profile?.role === 'admin' || profile?.role === 'superadmin';
+
   return (
     <Tabs
       screenOptions={{
@@ -43,7 +46,7 @@ export default function TabLayout() {
         options={{
           title: 'Dashboard',
           tabBarLabel: 'Home',
-          tabBarIcon: ({ size, color }) => <Home size={size} color={color} />,
+          tabBarIcon: ({ size, color }) => <LayoutDashboard size={size} color={color} />,
         }}
       />
 
@@ -51,7 +54,7 @@ export default function TabLayout() {
         name="timetable"
         options={{
           title: 'Timetable',
-          tabBarIcon: ({ size, color }) => <Calendar size={size} color={color} />,
+          tabBarIcon: ({ size, color }) => <CalendarRange size={size} color={color} />,
         }}
       />
 
@@ -67,7 +70,7 @@ export default function TabLayout() {
         name="resources"
         options={{
           title: 'Resources',
-          tabBarIcon: ({ size, color }) => <BookOpen size={size} color={color} />,
+          tabBarIcon: ({ size, color }) => <NotebookText size={size} color={color} />,
         }}
       />
 
@@ -75,7 +78,7 @@ export default function TabLayout() {
         name="syllabus"
         options={{
           title: 'Syllabus',
-          tabBarIcon: ({ size, color }) => <BookOpen size={size} color={color} />,
+          tabBarIcon: ({ size, color }) => <NotebookText size={size} color={color} />,
         }}
       />
 
@@ -83,7 +86,7 @@ export default function TabLayout() {
         name="syllabus-student"
         options={{
           title: 'Syllabus (Student)',
-          tabBarIcon: ({ size, color }) => <BookOpen size={size} color={color} />,
+          tabBarIcon: ({ size, color }) => <NotebookText size={size} color={color} />,
         }}
       />
 
@@ -91,7 +94,15 @@ export default function TabLayout() {
         name="attendance"
         options={{
           title: 'Attendance',
-          tabBarIcon: ({ size, color }) => <CheckSquare size={size} color={color} />,
+          tabBarIcon: ({ size, color }) => <UserCheck size={size} color={color} />,
+        }}
+      />
+
+      <Tabs.Screen
+        name="tasks"
+        options={{
+          title: 'Tasks',
+          tabBarIcon: ({ size, color }) => <CheckCircle2 size={size} color={color} />,
         }}
       />
 
@@ -107,7 +118,7 @@ export default function TabLayout() {
         name="fees"
         options={{
           title: 'Fees',
-          tabBarIcon: ({ size, color }) => <DollarSign size={size} color={color} />,
+          tabBarIcon: ({ size, color }) => <CreditCard size={size} color={color} />,
         }}
       />
 
@@ -115,7 +126,7 @@ export default function TabLayout() {
         name="payments"
         options={{
           title: 'Payments',
-          tabBarIcon: ({ size, color }) => <DollarSign size={size} color={color} />,
+          tabBarIcon: ({ size, color }) => <ReceiptText size={size} color={color} />,
         }}
       />
 
@@ -123,7 +134,7 @@ export default function TabLayout() {
         name="analytics"
         options={{
           title: 'Analytics',
-          tabBarIcon: ({ size, color }) => <BarChart3 size={size} color={color} />,
+          tabBarIcon: ({ size, color }) => <LineChart size={size} color={color} />,
         }}
       />
 
@@ -131,7 +142,48 @@ export default function TabLayout() {
         name="manage"
         options={{
           title: 'Management',
-          tabBarIcon: ({ size, color }) => <Users size={size} color={color} />,
+          tabBarIcon: ({ size, color }) => <Settings2 size={size} color={color} />,
+        }}
+      />
+
+      {/* Super Admin Screens */}
+      <Tabs.Screen
+        name="setup"
+        options={{
+          title: 'Setup School',
+          href: showSuperAdminTabs ? '/(tabs)/setup' : null,
+        }}
+      />
+
+      <Tabs.Screen
+        name="add-admin"
+        options={{
+          title: 'Add Admins',
+          href: showSuperAdminTabs ? '/(tabs)/add-admin' : null,
+        }}
+      />
+
+      <Tabs.Screen
+        name="add-classes"
+        options={{
+          title: 'Add Classes',
+          href: showSuperAdminTabs ? '/(tabs)/add-classes' : null,
+        }}
+      />
+
+      <Tabs.Screen
+        name="add-subjects"
+        options={{
+          title: 'Add Subjects',
+          href: showSuperAdminTabs ? '/(tabs)/add-subjects' : null,
+        }}
+      />
+
+      <Tabs.Screen
+        name="add-student"
+        options={{
+          title: 'Add Students',
+          href: showAdminTabs ? '/(tabs)/add-student' : null,
         }}
       />
     </Tabs>

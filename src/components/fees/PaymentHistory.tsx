@@ -1,13 +1,15 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, TextInput, TouchableOpacity, Platform } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Platform, Modal, Animated, ScrollView } from 'react-native';
+import { Portal, Modal as PaperModal, Button } from 'react-native-paper';
 import { useQuery } from '@tanstack/react-query';
+import { Searchbar } from 'react-native-paper';
 import { colors, spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
 import { supabase } from '../../lib/supabase';
 import { useClassSelection } from '../../contexts/ClassSelectionContext';
 import { useAuth } from '../../contexts/AuthContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useStudents } from '../../hooks/useStudents';
-import { Wallet, CreditCard, Landmark, Smartphone, Circle, Search, Filter } from 'lucide-react-native';
+import { Wallet, CreditCard, Landmark, Smartphone, Circle, Search, Filter, Users, Calendar } from 'lucide-react-native';
 
 type PaymentRecord = {
   id: string;
@@ -62,6 +64,44 @@ export default function PaymentHistory() {
   const [showMethodModal, setShowMethodModal] = useState(false);
 
   const { data: students = [] } = useStudents(selectedClass?.id, schoolCode || undefined);
+
+  // Animated sheet (match syllabus modal)
+  const classSlideAnim = React.useRef(new Animated.Value(0)).current;
+  const overlayOpacity = React.useRef(new Animated.Value(0)).current;
+  const methodSlideAnim = React.useRef(new Animated.Value(0)).current;
+  const methodOverlayOpacity = React.useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (showClassDropdown) {
+      classSlideAnim.setValue(0);
+      overlayOpacity.setValue(0);
+      Animated.parallel([
+        Animated.timing(overlayOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+        Animated.spring(classSlideAnim, { toValue: 1, tension: 65, friction: 10, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(overlayOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+        Animated.timing(classSlideAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [showClassDropdown, classSlideAnim, overlayOpacity]);
+
+  useEffect(() => {
+    if (showMethodModal) {
+      methodSlideAnim.setValue(0);
+      methodOverlayOpacity.setValue(0);
+      Animated.parallel([
+        Animated.timing(methodOverlayOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+        Animated.spring(methodSlideAnim, { toValue: 1, tension: 65, friction: 10, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(methodOverlayOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+        Animated.timing(methodSlideAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [showMethodModal, methodSlideAnim, methodOverlayOpacity]);
 
   // Plans and dues for Pending tab
   const studentIds = useMemo(() => students.map((s: any) => s.id), [students]);
@@ -266,17 +306,7 @@ export default function PaymentHistory() {
 
   return (
     <View style={styles.container}>
-      {/* Toggle: Collected | Pending */}
-      <View style={styles.toggleRow}>
-        <TouchableOpacity onPress={() => setActiveTab('collected')} style={[styles.toggleBtn, activeTab==='collected' && styles.toggleBtnActive]}> 
-          <Text style={[styles.toggleText, activeTab==='collected' && styles.toggleTextActive]}>Collected</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setActiveTab('pending')} style={[styles.toggleBtn, activeTab==='pending' && styles.toggleBtnActive]}> 
-          <Text style={[styles.toggleText, activeTab==='pending' && styles.toggleTextActive]}>Pending</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Quick Filters - mirror Attendance history */}
+      {/* Filter Row - Header (Task Management style) */}
       <View style={styles.filterSection}>
         <View style={styles.filterRow}>
           {/* Class Filter */}
@@ -284,10 +314,12 @@ export default function PaymentHistory() {
             style={styles.filterItem}
             onPress={() => setShowClassDropdown(true)}
           >
+            <View style={styles.filterIcon}>
+              <Users size={16} color={colors.text.inverse} />
+            </View>
             <View style={styles.filterContent}>
-              <Text style={styles.filterLabel}>Class</Text>
-              <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
-                {selectedClass ? `Grade ${selectedClass.grade} ${selectedClass.section}` : 'Select'}
+              <Text style={styles.filterValue} numberOfLines={1}>
+                {selectedClass ? `Grade ${selectedClass.grade} ${selectedClass.section}` : 'Class'}
               </Text>
             </View>
           </TouchableOpacity>
@@ -300,21 +332,29 @@ export default function PaymentHistory() {
             style={styles.filterItem}
             onPress={() => { setTempPickerDate(startDate || new Date()); setShowHistoryDatePicker('start'); }}
           >
+            <View style={styles.filterIcon}>
+              <Calendar size={16} color={colors.text.inverse} />
+            </View>
             <View style={styles.filterContent}>
-              <Text style={styles.filterLabel}>Start</Text>
-              <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
+              <Text style={styles.filterValue} numberOfLines={1}>
                 {(startDate || new Date()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               </Text>
             </View>
           </TouchableOpacity>
+
+          {/* Divider */}
           <View style={styles.filterDivider} />
+
+          {/* End Date */}
           <TouchableOpacity 
             style={styles.filterItem}
             onPress={() => { setTempPickerDate(endDate || startDate || new Date()); setShowHistoryDatePicker('end'); }}
           >
+            <View style={styles.filterIcon}>
+              <Calendar size={16} color={colors.text.inverse} />
+            </View>
             <View style={styles.filterContent}>
-              <Text style={styles.filterLabel}>End</Text>
-              <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
+              <Text style={styles.filterValue} numberOfLines={1}>
                 {(endDate || startDate || new Date()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               </Text>
             </View>
@@ -322,34 +362,34 @@ export default function PaymentHistory() {
         </View>
       </View>
 
-      {/* Search input and method filter */}
-      <View style={styles.filtersRow}> 
-        <View style={[styles.filterBlock, { flex: 1 }]}> 
-          <Text style={styles.filterLabel}>Student</Text>
-          <View style={styles.searchInputWrap}>
-            <Search size={16} color={colors.text.tertiary} style={styles.searchIcon} />
-            <TouchableOpacity onPress={() => setShowMethodModal(true)}>
-              <Filter size={16} color={colors.text.tertiary} style={styles.searchFilterIcon} />
-            </TouchableOpacity>
-            <TextInput
-              placeholder="Search by student name…"
-              placeholderTextColor={colors.text.tertiary}
-              value={searchText}
-              onChangeText={setSearchText}
-              style={styles.searchInput}
-            />
-          </View>
-        </View>
-        <View style={[styles.filterBlock, { width: 140 }]}> 
-          <Text style={styles.filterLabel}>Method</Text>
-          <TouchableOpacity style={styles.methodPicker} onPress={() => setShowMethodModal(true)}>
-            <Text style={styles.methodPickerText}>{methodFilter ? methodFilter.charAt(0).toUpperCase()+methodFilter.slice(1) : 'Any'}</Text>
+      {/* Toggle: Collected | Pending */}
+      <View style={styles.toggleRow}>
+        <TouchableOpacity onPress={() => setActiveTab('collected')} style={[styles.toggleBtn, activeTab==='collected' && styles.toggleBtnActive]}> 
+          <Text style={[styles.toggleText, activeTab==='collected' && styles.toggleTextActive]}>Collected</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setActiveTab('pending')} style={[styles.toggleBtn, activeTab==='pending' && styles.toggleBtnActive]}> 
+          <Text style={[styles.toggleText, activeTab==='pending' && styles.toggleTextActive]}>Pending</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Search bar with filter icon */}
+      <View style={styles.searchSection}>
+        <View style={styles.searchBarContainer}>
+          <Searchbar
+            placeholder="Search payments..."
+            onChangeText={setSearchText}
+            value={searchText}
+            style={styles.searchBar}
+            iconColor={colors.primary[600]}
+          />
+          <TouchableOpacity 
+            style={styles.filterIconButton}
+            onPress={() => setShowMethodModal(true)}
+          >
+            <Filter size={20} color={colors.primary[600]} />
           </TouchableOpacity>
         </View>
       </View>
-
-      {/* Divider before table */}
-      <View style={styles.sectionDivider} />
 
       {/* Headline summary moved below filters */}
       <View style={[styles.headlineCard, activeTab==='pending' && styles.headlineCardPending]}>
@@ -376,16 +416,24 @@ export default function PaymentHistory() {
         renderItem={({ item, index }) => (
           <View style={[styles.row, index % 2 === 1 && styles.rowAlt]}>
             <View style={styles.colStudent}>
-              <Text style={[styles.td, styles.alignLeft]} numberOfLines={1} ellipsizeMode="tail">
+              <Text style={[styles.td, styles.alignLeft]} numberOfLines={2} ellipsizeMode="tail">
                 {item.student?.full_name || '—'}
-                {item.student?.student_code ? (
-                  <Text style={styles.tdMeta}> ({item.student.student_code})</Text>
-                ) : null}
+              </Text>
+              {item.student?.student_code ? (
+                <Text style={styles.tdMeta}>{item.student.student_code}</Text>
+              ) : null}
+            </View>
+            <View style={styles.colComponent}>
+              <Text style={[styles.td, styles.alignLeft]} numberOfLines={2} ellipsizeMode="tail">
+                {item.component?.name || '—'}
               </Text>
             </View>
-            <View style={styles.colComponent}><Text style={[styles.td, styles.alignLeft]} numberOfLines={1} ellipsizeMode="tail">{item.component?.name || '—'}</Text></View>
-            <View style={styles.colAmount}><Text style={[styles.td, styles.alignRight]}>{formatAmount(item.amount_paise)}</Text></View>
-            <View style={styles.colMethod}><Text style={[styles.td, styles.alignCenter]}>{formatMethod(item.payment_method)}</Text></View>
+            <View style={styles.colAmount}>
+              <Text style={[styles.td, styles.alignRight]}>{formatAmount(item.amount_paise)}</Text>
+            </View>
+            <View style={styles.colMethod}>
+              <Text style={[styles.td, styles.alignCenter]}>{formatMethod(item.payment_method)}</Text>
+            </View>
           </View>
         )}
         ListEmptyComponent={empty ? (
@@ -427,92 +475,175 @@ export default function PaymentHistory() {
         />
       )}
 
-      {/* Class Dropdown Modal */}
-      {showClassDropdown && (
-        <View style={styles.dropdownOverlay}>
-          <View style={styles.dropdownModalContainer}>
-            <Text style={styles.dropdownModalTitle}>Select Class ({classes?.length || 0} available)</Text>
-            <FlatList
-              data={classes}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
+      {/* Class Selector Modal - Animated Bottom Sheet (match syllabus) */}
+      <Modal
+        visible={showClassDropdown}
+        transparent
+        animationType="none"
+        onRequestClose={() => setShowClassDropdown(false)}
+      >
+        <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill as any}
+            activeOpacity={1}
+            onPress={() => setShowClassDropdown(false)}
+          />
+          <Animated.View
+            style={[
+              styles.bottomSheet,
+              {
+                transform: [
+                  {
+                    translateY: classSlideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [500, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Select Class</Text>
+            <ScrollView style={styles.sheetContent}>
+              {(classes || []).map((c: any) => (
                 <TouchableOpacity
+                  key={c.id}
+                  style={[styles.sheetItem, selectedClass?.id === c.id && styles.sheetItemActive]}
                   onPress={() => {
-                    setSelectedClass(item);
+                    setSelectedClass(c);
                     setShowClassDropdown(false);
                   }}
-                  style={[styles.dropdownItem, selectedClass?.id === item.id && styles.dropdownItemSelected]}
                 >
-                  <Text style={[styles.dropdownItemText, selectedClass?.id === item.id && styles.dropdownItemTextSelected]}>
-                    Grade {item.grade} - Section {item.section}
+                  <Text style={[styles.sheetItemText, selectedClass?.id === c.id && styles.sheetItemTextActive]}>
+                    Grade {c.grade} - Section {c.section}
                   </Text>
+                  {selectedClass?.id === c.id && <Text style={styles.checkmark}>✓</Text>}
                 </TouchableOpacity>
-              )}
-              style={styles.dropdownList}
-            />
-            <TouchableOpacity onPress={() => setShowClassDropdown(false)} style={styles.dropdownCloseButton}> 
-              <Text style={styles.clearBtnText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+              ))}
+            </ScrollView>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
+
+      {/* Method Filter - Bottom Sheet (same as class filter) */}
+      <Modal
+        visible={showMethodModal}
+        transparent
+        animationType="none"
+        onRequestClose={() => setShowMethodModal(false)}
+      >
+        <Animated.View style={[styles.modalOverlay, { opacity: methodOverlayOpacity }]}> 
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill as any}
+            activeOpacity={1}
+            onPress={() => setShowMethodModal(false)}
+          />
+          <Animated.View
+            style={[
+              styles.bottomSheet,
+              {
+                transform: [
+                  {
+                    translateY: methodSlideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [500, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Select Method</Text>
+            <ScrollView style={styles.sheetContent}>
+              {['any','cash','cheque','online','card','other'].map((m) => (
+                <TouchableOpacity
+                  key={m}
+                  style={[styles.sheetItem, (methodFilter===null && m==='any') || methodFilter===m ? styles.sheetItemActive : undefined]}
+                  onPress={() => {
+                    setMethodFilter(m==='any'? null : m);
+                    setShowMethodModal(false);
+                  }}
+                >
+                  <Text style={[styles.sheetItemText, (methodFilter===null && m==='any') || methodFilter===m ? styles.sheetItemTextActive : undefined]}>
+                    {m==='any' ? 'Any' : m.charAt(0).toUpperCase()+m.slice(1)}
+                  </Text>
+                  {((methodFilter===null && m==='any') || methodFilter===m) && <Text style={styles.checkmark}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
+
+      {/* History Date Picker (exact copy from Attendance) */}
+      {showHistoryDatePicker && Platform.OS === 'android' && (
+        <DateTimePicker
+          value={showHistoryDatePicker === 'start' ? (startDate || new Date()) : (endDate || new Date())}
+          mode="date"
+          display="default"
+          onChange={(event, selectedDate) => {
+            setShowHistoryDatePicker(null);
+            if (selectedDate) {
+              if (showHistoryDatePicker === 'start') {
+                setStartDate(selectedDate);
+              } else {
+                setEndDate(selectedDate);
+              }
+            }
+          }}
+          minimumDate={new Date(2020, 0, 1)}
+          maximumDate={new Date(2030, 11, 31)}
+        />
       )}
 
-      {/* Method Modal */}
-      {showMethodModal && (
-        <View style={styles.dropdownOverlay}>
-          <View style={styles.dropdownModalContainer}>
-            <Text style={styles.dropdownModalTitle}>Select Method</Text>
-            {['any','cash','cheque','online','card','other'].map((m) => (
-              <TouchableOpacity
-                key={m}
-                onPress={() => {
-                  setMethodFilter(m==='any'? null : m);
-                  setShowMethodModal(false);
+      {showHistoryDatePicker && Platform.OS === 'ios' && (
+        <Portal>
+          <PaperModal
+            visible={!!showHistoryDatePicker}
+            onDismiss={() => setShowHistoryDatePicker(null)}
+            contentContainerStyle={styles.datePickerModal}
+          >
+            <View style={styles.datePickerContainer}>
+              <Text style={styles.datePickerTitle}>
+                Select {showHistoryDatePicker === 'start' ? 'Start' : 'End'} Date
+              </Text>
+              <DateTimePicker
+                value={showHistoryDatePicker === 'start' ? (startDate || new Date()) : (endDate || new Date())}
+                mode="date"
+                display="spinner"
+                onChange={(event, selectedDate) => {
+                  if (selectedDate) {
+                    if (showHistoryDatePicker === 'start') {
+                      setStartDate(selectedDate);
+                    } else {
+                      setEndDate(selectedDate);
+                    }
+                  }
                 }}
-                style={[styles.dropdownItem, (methodFilter===null && m==='any') || methodFilter===m ? styles.dropdownItemSelected : undefined]}
-              >
-                <Text style={[styles.dropdownItemText, (methodFilter===null && m==='any') || methodFilter===m ? styles.dropdownItemTextSelected : undefined]}>
-                  {m==='any' ? 'Any' : m.charAt(0).toUpperCase()+m.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity onPress={() => setShowMethodModal(false)} style={styles.dropdownCloseButton}> 
-              <Text style={styles.clearBtnText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {/* History Date Picker - unified modal with explicit Done/Cancel */}
-      {showHistoryDatePicker && (
-        <View style={styles.iosPickerSheet}>
-          <View style={styles.iosPickerInner}>
-            <DateTimePicker
-              value={tempPickerDate || new Date()}
-              mode="date"
-              display="spinner"
-              onChange={(event, selected) => {
-                if (selected) setTempPickerDate(selected);
-              }}
-              minimumDate={new Date(2020, 0, 1)}
-              maximumDate={new Date(2030, 11, 31)}
-            />
-            <View style={styles.iosPickerActions}>
-              <TouchableOpacity onPress={() => { setShowHistoryDatePicker(null); setTempPickerDate(null); }} style={[styles.cancelBtn, { backgroundColor: colors.surface.primary, borderWidth: 1, borderColor: colors.border.DEFAULT }]}>
-                <Text style={[styles.cancelBtnText, { color: colors.text.primary }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => {
-                if (tempPickerDate) {
-                  if (showHistoryDatePicker === 'start') setStartDate(tempPickerDate); else setEndDate(tempPickerDate);
-                }
-                setShowHistoryDatePicker(null);
-                setTempPickerDate(null);
-              }} style={styles.cancelBtn}>
-                <Text style={styles.cancelBtnText}>Done</Text>
-              </TouchableOpacity>
+                minimumDate={new Date(2020, 0, 1)}
+                maximumDate={new Date(2030, 11, 31)}
+              />
+              <View style={styles.datePickerActions}>
+                <Button
+                  mode="outlined"
+                  onPress={() => setShowHistoryDatePicker(null)}
+                  style={styles.datePickerButton}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  mode="contained"
+                  onPress={() => setShowHistoryDatePicker(null)}
+                  style={styles.datePickerButton}
+                >
+                  Done
+                </Button>
+              </View>
             </View>
-          </View>
-        </View>
+          </PaperModal>
+        </Portal>
       )}
     </View>
   );
@@ -522,7 +653,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.secondary,
-    paddingTop: spacing.lg,
   },
   headerRow: {
     paddingHorizontal: spacing.lg,
@@ -602,43 +732,51 @@ const styles = StyleSheet.create({
   },
   filterSection: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
   },
   filterRow: {
-    backgroundColor: colors.surface.primary,
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
     borderRadius: borderRadius.lg,
     padding: spacing.md,
-    paddingHorizontal: spacing.sm,
-    flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.xs,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   filterItem: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    minWidth: 0,
+  },
+  filterIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary[600],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+    flexShrink: 0,
   },
   filterContent: {
     flex: 1,
     minWidth: 0,
-    alignItems: 'flex-start',
-  },
-  filterLabel: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.secondary,
-    marginBottom: spacing.xs,
+    overflow: 'hidden',
+    justifyContent: 'center',
   },
   filterValue: {
     fontSize: typography.fontSize.sm,
-    fontWeight: '600',
+    fontWeight: typography.fontWeight.semibold as any,
     color: colors.text.primary,
   },
   filterDivider: {
     width: 1,
     height: 40,
-    backgroundColor: colors.border.DEFAULT,
-    marginHorizontal: spacing.sm,
+    backgroundColor: colors.border.light,
   },
   title: {
     fontSize: typography.fontSize.lg,
@@ -659,42 +797,37 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
   },
-  filtersRow: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.xs,
+  searchSection: {
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  searchBarContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
   },
-  filterBlock: {
-    width: 150,
+  searchBar: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    elevation: 0,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
+  filterIconButton: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.md,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // filterLabel used above for value row
   datePickerSm: {
     height: 36,
-  },
-  searchInput: {
-    height: 36,
-    backgroundColor: colors.background.primary,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-    borderRadius: borderRadius.sm,
-    paddingLeft: spacing.lg + 8,
-    paddingRight: spacing.sm,
-    color: colors.text.primary,
-  },
-  searchInputWrap: {
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  searchIcon: {
-    position: 'absolute',
-    left: spacing.sm,
-    zIndex: 1,
-  },
-  searchFilterIcon: {
-    position: 'absolute',
-    right: spacing.sm,
-    zIndex: 1,
   },
   methodRow: {
     marginHorizontal: spacing.lg,
@@ -800,30 +933,89 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.primary,
     borderRadius: borderRadius.full,
   },
-  iosPickerSheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
+  // Bottom Sheet (Task Management style)
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  bottomSheet: {
     backgroundColor: colors.surface.primary,
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    padding: spacing.lg,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
+    maxHeight: '70%',
   },
-  iosPickerInner: {},
-  iosPickerActions: {
-    marginTop: spacing.md,
-    alignItems: 'flex-end',
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: '#D1D5DB',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: spacing.sm,
   },
-  cancelBtn: {
+  sheetTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: '700',
+    color: colors.text.primary,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.primary[600],
-    borderRadius: borderRadius.full,
+    marginBottom: spacing.sm,
   },
-  cancelBtnText: {
-    color: colors.text.inverse,
+  sheetContent: {
+    paddingHorizontal: spacing.lg,
+    maxHeight: 400,
+  },
+  sheetItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    marginVertical: 2,
+    backgroundColor: '#F9FAFB',
+  },
+  sheetItemActive: {
+    backgroundColor: '#EEF2FF',
+  },
+  sheetItemText: {
+    fontSize: typography.fontSize.base,
+    color: colors.text.primary,
     fontWeight: '600',
+    flex: 1,
+  },
+  sheetItemTextActive: {
+    color: colors.primary[600],
+  },
+  checkmark: {
+    fontSize: typography.fontSize.lg,
+    color: colors.primary[600],
+    fontWeight: '700',
+  },
+  datePickerModal: {
+    backgroundColor: colors.surface.primary,
+    padding: spacing.lg,
+    margin: spacing.xl,
+    borderRadius: borderRadius.lg,
+  },
+  datePickerContainer: {
+    alignItems: 'center',
+  },
+  datePickerTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold as any,
+    color: colors.text.primary,
+    marginBottom: spacing.md,
+  },
+  datePickerActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.xl,
+    width: '100%',
+  },
+  datePickerButton: {
+    flex: 1,
   },
   th: {
     fontSize: typography.fontSize.sm,
@@ -840,9 +1032,10 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     ...shadows.xs,
     flexDirection: 'row',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    minHeight: 52,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    minHeight: 64,
+    alignItems: 'flex-start',
   },
   rowAlt: {
     backgroundColor: colors.background.secondary,
@@ -857,10 +1050,10 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
     fontWeight: '400',
   },
-  colStudent: { flex: 2, paddingRight: spacing.sm },
-  colComponent: { flexBasis: 120, width: 120, paddingRight: spacing.sm },
-  colAmount: { flexBasis: 110, width: 110, paddingRight: spacing.sm },
-  colMethod: { flexBasis: 90, width: 90 },
+  colStudent: { flex: 2.5, minWidth: 100, paddingRight: spacing.xs },
+  colComponent: { flex: 1.8, minWidth: 90, paddingRight: spacing.xs },
+  colAmount: { flex: 1, minWidth: 90, paddingRight: spacing.xs, justifyContent: 'center', alignItems: 'center' },
+  colMethod: { flex: 0.8, minWidth: 60, justifyContent: 'center', alignItems: 'center' },
   emptyState: {
     flex: 1,
     alignItems: 'center',
