@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, Card, SegmentedButtons, ProgressBar } from 'react-native-paper';
-import { BarChart3, TrendingUp, Users, BookOpen, CheckSquare, Award } from 'lucide-react-native';
+import { BarChart3, TrendingUp, Users, BookOpen, CheckSquare } from 'lucide-react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useClassSelection } from '../../src/contexts/ClassSelectionContext';
 import { ClassSelector } from '../../src/components/ClassSelector';
@@ -15,16 +15,16 @@ interface AnalyticsData {
   totalClasses: number;
   attendanceRate: number;
   recentActivity: number;
-  topPerformingStudents: Array<{
+  topPerformingStudents: {
     id: string;
     name: string;
     attendanceRate: number;
-  }>;
-  classStats: Array<{
+  }[];
+  classStats: {
     className: string;
     attendanceRate: number;
     totalStudents: number;
-  }>;
+  }[];
 }
 
 export default function AnalyticsScreen() {

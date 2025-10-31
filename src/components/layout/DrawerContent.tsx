@@ -9,23 +9,24 @@ import {
   DrawerItem,
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
-import { 
-  Home, 
-  CalendarDays, 
-  Clock, 
-  BookOpen, 
-  CheckSquare, 
-  Users, 
-  Wrench, 
-  BarChart3, 
-  DollarSign, 
-  LogOut, 
-  Bell, 
-  Settings, 
-  User, 
+import {
+  Home,
+  CalendarDays,
+  Clock,
+  BookOpen,
+  CheckSquare,
+  Users,
+  Wrench,
+  BarChart3,
+  DollarSign,
+  LogOut,
+  Bell,
+  Settings,
+  User,
   ChevronRight,
   Star,
-  Activity
+  Activity,
+  FileText
 } from 'lucide-react-native';
 import { colors, spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
 import { useAuth } from '../../contexts/AuthContext';
@@ -36,7 +37,7 @@ type MenuItem = {
   label: string;
   icon: any;
   route: string;
-  roles?: Array<'superadmin' | 'cb_admin' | 'admin' | 'teacher' | 'student'>;
+  roles?: ('superadmin' | 'cb_admin' | 'admin' | 'teacher' | 'student')[];
   section: 'Main' | 'Academic' | 'Learning' | 'Settings' | 'CB Admin';
   badge?: number;
   isNew?: boolean;
@@ -97,22 +98,31 @@ const MENU: MenuItem[] = [
     section: 'Learning',
     description: 'Your syllabus'
   },
-  { 
-    key: 'attendance', 
-    label: 'Attendance', 
-    icon: CheckSquare, 
-    route: '/(tabs)/attendance', 
-    roles: ['admin', 'superadmin', 'cb_admin'], 
+  {
+    key: 'attendance',
+    label: 'Attendance',
+    icon: CheckSquare,
+    route: '/(tabs)/attendance',
+    roles: ['admin', 'superadmin', 'cb_admin'],
     section: 'Academic',
     description: 'Track student attendance',
     badge: 5
   },
-  { 
-    key: 'fees', 
-    label: 'Fees', 
-    icon: DollarSign, 
-    route: '/(tabs)/fees', 
-    roles: ['admin', 'superadmin', 'cb_admin'], 
+  {
+    key: 'assessments',
+    label: 'Assessments',
+    icon: FileText,
+    route: '/(tabs)/assessments',
+    section: 'Academic',
+    description: 'Tests and exams',
+    isNew: true
+  },
+  {
+    key: 'fees',
+    label: 'Fees',
+    icon: DollarSign,
+    route: '/(tabs)/fees',
+    roles: ['admin', 'superadmin', 'cb_admin'],
     section: 'Academic',
     description: 'Fee management',
     hasSubMenu: true
@@ -250,7 +260,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
       }
       
       router.push(item.route as any);
-    } catch (error) {
+    } catch (_error) {
       try {
         router.replace(item.route as any);
       } catch (fallbackError) {

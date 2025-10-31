@@ -55,11 +55,11 @@ export interface QuickGeneratePayload {
   startTime: string;
   numPeriods: number;
   periodDurationMin: number;
-  breaks: Array<{
+  breaks: {
     afterPeriod: number;
     durationMin: number;
     name: string;
-  }>;
+  }[];
 }
 
 export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCode?: string): UnifiedTimetableResult {

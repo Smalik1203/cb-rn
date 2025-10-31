@@ -6,10 +6,6 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { X } from 'lucide-react-native';
 import { WebView } from 'react-native-webview';
 import YoutubePlayer from 'react-native-youtube-iframe';
-import { SimpleYouTubePlayer } from './SimpleYouTubePlayer';
-import { CustomVideoPlayer } from './CustomVideoPlayer';
-import { EnhancedYouTubePlayer } from './EnhancedYouTubePlayer';
-import { YouTubeExtractor } from '../../services/youtubeExtractor';
 import { colors, spacing } from '../../../lib/design-system';
 import { removeYouTubeBranding } from '../../utils/youtubeBrandingRemoval';
 

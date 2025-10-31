@@ -3,12 +3,11 @@ import { View, StyleSheet } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useClassSelection } from '../../src/contexts/ClassSelectionContext';
-import { colors, spacing } from '../../lib/design-system';
+import { colors } from '../../lib/design-system';
 import { FeeComponents, FeePlans } from '../../src/components/fees';
 
 export default function FeesScreen() {
-  const { profile } = useAuth();
-  const { selectedClass, scope, isSuperAdmin } = useClassSelection();
+  const { scope } = useClassSelection();
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const [activeTab, setActiveTab] = useState<'components' | 'plans'>('components');
 

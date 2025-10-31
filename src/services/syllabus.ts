@@ -32,10 +32,10 @@ export type SyllabusTopic = {
 };
 
 export type SyllabusTree = {
-	chapters: Array<{
+	chapters: {
 		chapter: SyllabusChapter;
 		topics: SyllabusTopic[];
-	}>;
+	}[];
 };
 
 export async function fetchSubjectsForSchool(schoolCode: string) {

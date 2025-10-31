@@ -745,4 +745,380 @@ export const api = {
       return data || [];
     },
   },
+
+  // ==========================================
+  // TEST MANAGEMENT
+  // ==========================================
+
+  tests: {
+    async getBySchool(schoolCode: string, classInstanceId?: string) {
+      let query = supabase
+        .from('tests')
+        .select(`
+          *,
+          class_instances!inner(
+            id,
+            grade,
+            section,
+            school_code
+          ),
+          subjects(
+            id,
+            subject_name
+          )
+        `)
+        .eq('school_code', schoolCode)
+        .order('created_at', { ascending: false });
+
+      if (classInstanceId) {
+        query = query.eq('class_instance_id', classInstanceId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      return data || [];
+    },
+
+    async getById(testId: string) {
+      const { data, error } = await supabase
+        .from('tests')
+        .select(`
+          *,
+          class_instances!inner(
+            id,
+            grade,
+            section,
+            school_code
+          ),
+          subjects(
+            id,
+            subject_name
+          )
+        `)
+        .eq('id', testId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+
+    async create(testData: any) {
+      const { data, error } = await supabase
+        .from('tests')
+        .insert([testData])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+
+    async update(testId: string, testData: any) {
+      const { data, error } = await supabase
+        .from('tests')
+        .update(testData)
+        .eq('id', testId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+
+    async delete(testId: string) {
+      const { error } = await supabase
+        .from('tests')
+        .delete()
+        .eq('id', testId);
+
+      if (error) throw error;
+      return true;
+    },
+
+    async getWithStats(schoolCode: string, classInstanceId?: string) {
+      const tests = await this.getBySchool(schoolCode, classInstanceId);
+
+      // Get question counts and marks info for each test
+      const testsWithStats = await Promise.all(
+        tests.map(async (test: any) => {
+          let questionCount = 0;
+          let marksUploaded = 0;
+          let totalStudents = 0;
+          let attemptsCount = 0;
+
+          if (test.test_mode === 'online') {
+            // Get question count
+            const { count: qCount } = await supabase
+              .from('test_questions')
+              .select('*', { count: 'exact', head: true })
+              .eq('test_id', test.id);
+            questionCount = qCount || 0;
+
+            // Get attempts count
+            const { count: aCount } = await supabase
+              .from('test_attempts')
+              .select('*', { count: 'exact', head: true })
+              .eq('test_id', test.id);
+            attemptsCount = aCount || 0;
+          } else if (test.test_mode === 'offline') {
+            // Get marks uploaded count
+            const { count: mCount } = await supabase
+              .from('test_marks')
+              .select('*', { count: 'exact', head: true })
+              .eq('test_id', test.id);
+            marksUploaded = mCount || 0;
+          }
+
+          // Get total students in class
+          const { count: sCount } = await supabase
+            .from('student')
+            .select('*', { count: 'exact', head: true })
+            .eq('class_instance_id', test.class_instance_id);
+          totalStudents = sCount || 0;
+
+          return {
+            ...test,
+            class_name: `Grade ${test.class_instances?.grade} - ${test.class_instances?.section}`,
+            subject_name: test.subjects?.subject_name || 'Unknown',
+            question_count: questionCount,
+            marks_uploaded: marksUploaded,
+            total_students: totalStudents,
+            attempts_count: attemptsCount,
+          };
+        })
+      );
+
+      return testsWithStats;
+    },
+  },
+
+  testQuestions: {
+    async getByTest(testId: string) {
+      const { data, error } = await supabase
+        .from('test_questions')
+        .select('*')
+        .eq('test_id', testId)
+        .order('order_index', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    },
+
+    async create(questionData: any) {
+      const { data, error } = await supabase
+        .from('test_questions')
+        .insert([questionData])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+
+    async update(questionId: string, questionData: any) {
+      const { data, error } = await supabase
+        .from('test_questions')
+        .update(questionData)
+        .eq('id', questionId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+
+    async delete(questionId: string) {
+      const { error } = await supabase
+        .from('test_questions')
+        .delete()
+        .eq('id', questionId);
+
+      if (error) throw error;
+      return true;
+    },
+
+    async reorder(testId: string, questionIds: string[]) {
+      // Update order_index for each question
+      const updates = questionIds.map((id, index) =>
+        supabase
+          .from('test_questions')
+          .update({ order_index: index })
+          .eq('id', id)
+      );
+
+      await Promise.all(updates);
+      return true;
+    },
+  },
+
+  testMarks: {
+    async getByTest(testId: string) {
+      const { data, error } = await supabase
+        .from('test_marks')
+        .select(`
+          *,
+          student:student!inner(
+            id,
+            full_name,
+            student_code
+          )
+        `)
+        .eq('test_id', testId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
+
+    async getByStudent(studentId: string) {
+      const { data, error } = await supabase
+        .from('test_marks')
+        .select(`
+          *,
+          tests!inner(
+            id,
+            title,
+            test_type,
+            test_date,
+            max_marks
+          )
+        `)
+        .eq('student_id', studentId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
+
+    async create(markData: any) {
+      const { data, error } = await supabase
+        .from('test_marks')
+        .insert([markData])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+
+    async createBulk(marksData: any[]) {
+      const { data, error } = await supabase
+        .from('test_marks')
+        .insert(marksData)
+        .select();
+
+      if (error) throw error;
+      return data || [];
+    },
+
+    async update(markId: string, markData: any) {
+      const { data, error } = await supabase
+        .from('test_marks')
+        .update(markData)
+        .eq('id', markId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+
+    async delete(markId: string) {
+      const { error } = await supabase
+        .from('test_marks')
+        .delete()
+        .eq('id', markId);
+
+      if (error) throw error;
+      return true;
+    },
+  },
+
+  testAttempts: {
+    async getByTest(testId: string) {
+      const { data, error } = await supabase
+        .from('test_attempts')
+        .select(`
+          *,
+          student:student!inner(
+            id,
+            full_name,
+            student_code
+          )
+        `)
+        .eq('test_id', testId)
+        .order('started_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
+
+    async getByStudent(studentId: string, testId?: string) {
+      let query = supabase
+        .from('test_attempts')
+        .select(`
+          *,
+          tests!inner(
+            id,
+            title,
+            test_type,
+            test_date,
+            time_limit_seconds
+          )
+        `)
+        .eq('student_id', studentId)
+        .order('started_at', { ascending: false });
+
+      if (testId) {
+        query = query.eq('test_id', testId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      return data || [];
+    },
+
+    async create(attemptData: any) {
+      const { data, error } = await supabase
+        .from('test_attempts')
+        .insert([attemptData])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+
+    async update(attemptId: string, attemptData: any) {
+      const { data, error } = await supabase
+        .from('test_attempts')
+        .update(attemptData)
+        .eq('id', attemptId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+
+    async submit(attemptId: string, finalAnswers: any, earnedPoints: number, totalPoints: number) {
+      const { data, error } = await supabase
+        .from('test_attempts')
+        .update({
+          answers: finalAnswers,
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          earned_points: earnedPoints,
+          total_points: totalPoints,
+        })
+        .eq('id', attemptId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+  },
 };

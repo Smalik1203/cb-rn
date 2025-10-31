@@ -96,6 +96,8 @@ export default function FeePlans() {
   const [showComponentSelector, setShowComponentSelector] = useState(false);
   const [componentSearch, setComponentSearch] = useState('');
   const [editingComponentIndex, setEditingComponentIndex] = useState<number | null>(null);
+  const [paymentStep, setPaymentStep] = useState<'select' | 'details'>('select');
+  const [selectedPayments, setSelectedPayments] = useState<Record<string, string>>({});
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
 
   const { profile } = useAuth();
@@ -216,6 +218,8 @@ export default function FeePlans() {
     setPaymentMethod('cash');
     setReceiptNumber('');
     setRemarks('');
+    setPaymentStep('select');
+    setSelectedPayments({});
     setShowPaymentModal(true);
   };
 
@@ -223,15 +227,17 @@ export default function FeePlans() {
   // Submit payment
   const handleSubmitPayment = async () => {
     try {
-      if (!selectedStudentId || !selectedComponentId || !paymentAmount) {
-        Alert.alert('Error', 'Please select a component and enter payment amount');
+      if (!selectedStudentId) {
+        Alert.alert('Error', 'No student selected');
         return;
       }
 
-      const amountPaise = Math.round(parseFloat(paymentAmount) * 100);
-      
-      if (amountPaise <= 0) {
-        Alert.alert('Error', 'Please enter a valid payment amount');
+      const entries = Object.entries(selectedPayments)
+        .map(([componentId, amt]) => ({ componentId, amountPaise: Math.round((parseFloat(amt) || 0) * 100) }))
+        .filter(e => e.amountPaise > 0);
+
+      if (entries.length === 0) {
+        Alert.alert('Error', 'Select at least one component with a valid amount');
         return;
       }
 
@@ -239,24 +245,24 @@ export default function FeePlans() {
       const student = filteredStudents.find(s => s.id === selectedStudentId);
       const planId = student?.feeDetails?.plan?.id;
 
-      // Insert payment record
-      const { data, error } = await supabase
+      // Insert one row per selected component
+      const rows = entries.map(e => ({
+        school_code: schoolCode,
+        student_id: selectedStudentId,
+        plan_id: planId || null,
+        component_type_id: e.componentId,
+        amount_paise: e.amountPaise,
+        payment_method: paymentMethod,
+        payment_date: paymentDate.toISOString().split('T')[0],
+        transaction_id: receiptNumber || null,
+        receipt_number: receiptNumber || null,
+        remarks: remarks || null,
+        created_by: profile?.auth_id
+      }));
+
+      const { error } = await supabase
         .from('fee_payments')
-        .insert({
-          school_code: schoolCode,
-          student_id: selectedStudentId,
-          plan_id: planId || null,
-          component_type_id: selectedComponentId,
-          amount_paise: amountPaise,
-          payment_method: paymentMethod,
-          payment_date: paymentDate.toISOString().split('T')[0],
-          transaction_id: receiptNumber || null,
-          receipt_number: receiptNumber || null,
-          remarks: remarks || null,
-          created_by: profile?.auth_id
-        })
-        .select()
-        .single();
+        .insert(rows);
 
       if (error) {
         console.error('Payment error:', error);
@@ -275,10 +281,12 @@ export default function FeePlans() {
             setSelectedComponentId(null);
             setSelectedComponentName('');
             setPaymentAmount('');
+            setSelectedPayments({});
             setPaymentMethod('cash');
             setReceiptNumber('');
             setRemarks('');
             setPaymentDate(new Date());
+            setPaymentStep('select');
             
             // Refresh data
             refreshData();
@@ -479,7 +487,8 @@ export default function FeePlans() {
       setReceiptNumber('');
       setRemarks('');
     }
-    
+    setPaymentStep('select');
+    setSelectedPayments({});
     setShowPaymentModal(true);
   };
 
@@ -943,7 +952,7 @@ export default function FeePlans() {
                 Recording payment for {selectedStudentName}
             </Text>
 
-              {/* Components Table */}
+              {/* Step 1: Select Component */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Components</Text>
                 {(() => {
@@ -957,64 +966,38 @@ export default function FeePlans() {
           </View>
                     );
                   }
-                  
+                  // Selection-only list (multi-select)
                   return (
                     <View style={styles.componentsTable}>
-                      {/* Table Header */}
-                      <View style={styles.tableHeader}>
-                        <Text style={styles.tableHeaderText}>Select</Text>
-                        <Text style={styles.tableHeaderText}>Component</Text>
-                        <Text style={styles.tableHeaderText}>Outstanding Amount</Text>
-                        <Text style={styles.tableHeaderText}>Mode</Text>
-                        <Text style={styles.tableHeaderText}>Amount (₹)</Text>
-        </View>
-                      
-                      {/* Table Rows */}
-                      {existingPlan.items.map((item: any, index: number) => {
-                        const componentName = feeComponents?.find((c: any) => c.id === item.component_type_id)?.name || 'Unknown Component';
+                      {existingPlan.items.map((item: any) => {
+                        const componentName = feeComponents?.find((c: any) => c.id === item.component_type_id)?.name || 'Component';
                         const componentAmount = (item.amount_paise || 0) / 100;
-                        const isSelected = selectedComponentId === item.component_type_id;
-                        
+                        const isSelected = selectedPayments[item.component_type_id] !== undefined;
                         return (
-                          <View key={item.component_type_id} style={styles.tableRow}>
-          <TouchableOpacity
-                              style={styles.checkbox}
-                              onPress={() => {
-                                if (isSelected) {
-                                  setSelectedComponentId(null);
-                                  setSelectedComponentName('');
-                                  setPaymentAmount('');
+                          <TouchableOpacity
+                            key={item.component_type_id}
+                            style={[styles.tableRowMinimal, isSelected && { backgroundColor: colors.primary[25] }]}
+                            onPress={() => {
+                              setSelectedPayments(prev => {
+                                const next = { ...prev } as Record<string, string>;
+                                if (next[item.component_type_id] !== undefined) {
+                                  delete next[item.component_type_id];
                                 } else {
-                                  setSelectedComponentId(item.component_type_id);
-                                  setSelectedComponentName(componentName);
-                                  setPaymentAmount(String(componentAmount));
+                                  next[item.component_type_id] = String(componentAmount);
                                 }
-                              }}
-                            >
+                                return next;
+                              });
+                            }}
+                          >
+                            <View style={styles.checkbox}>
                               {isSelected && <Text style={styles.checkmark}>✓</Text>}
-          </TouchableOpacity>
-                            
-                            <Text style={styles.tableComponentName}>{componentName}</Text>
-                            
-                            <Text style={styles.tableOutstandingAmount}>₹{componentAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
-                            
-                            <View style={styles.modeContainer}>
-                              <Text style={styles.modeText}>Full</Text>
                             </View>
-                            
-                            <TextInput
-                              style={styles.amountInput}
-                              value={isSelected ? paymentAmount : ''}
-                              onChangeText={(text) => {
-                                if (isSelected) {
-                                  setPaymentAmount(text);
-                                }
-                              }}
-                              keyboardType="numeric"
-                              placeholder="0.00"
-                              editable={isSelected}
-          />
-        </View>
+                            <View style={styles.compNameMeta}>
+                              <Text style={styles.compNameText} numberOfLines={1}>{componentName}</Text>
+                              <Text style={styles.compMetaText}>Outstanding: ₹{componentAmount.toLocaleString('en-IN')}</Text>
+                            </View>
+                            <Text style={styles.tableOutstandingAmount}>₹{componentAmount.toLocaleString('en-IN')}</Text>
+                          </TouchableOpacity>
                         );
                       })}
                     </View>
@@ -1052,9 +1035,47 @@ export default function FeePlans() {
                 );
               })()}
 
-              {/* Payment Details */}
+              {/* Step 2: Payment Details */}
+              {paymentStep === 'details' && (
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Payment Details</Text>
+                {/* Selected components with custom amounts */}
+                <View style={styles.componentsTable}>
+                  {Object.entries(selectedPayments).length === 0 ? (
+                    <View style={styles.noComponentsContainer}><Text style={styles.noComponentsText}>No components selected</Text></View>
+                  ) : (
+                    Object.entries(selectedPayments).map(([compId, amtStr]) => {
+                      const name = feeComponents?.find((c: any) => c.id === compId)?.name || 'Component';
+                      return (
+                        <View key={compId} style={styles.tableRowMinimal}>
+                          <View style={styles.compNameMeta}>
+                            <Text style={styles.compNameText} numberOfLines={1}>{name}</Text>
+                          </View>
+                          <View style={styles.amountInputWrapper}>
+                            <Text style={styles.currencySymbol}>₹</Text>
+                            <TextInput
+                              style={styles.amountInput}
+                              value={amtStr}
+                              onChangeText={(text) => {
+                                setSelectedPayments(prev => ({ ...prev, [compId]: text }));
+                              }}
+                              keyboardType="numeric"
+                              placeholder="0"
+                            />
+                          </View>
+                        </View>
+                      );
+                    })
+                  )}
+                </View>
+
+                {/* Total */}
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryText}>Total</Text>
+                  <Text style={styles.summaryAmount}>
+                    ₹{Object.values(selectedPayments).reduce((sum, v) => sum + (parseFloat(v) || 0), 0).toLocaleString('en-IN')}
+                  </Text>
+                </View>
                 
                 <View style={styles.paymentDetailsRow}>
                   <Text style={styles.paymentLabel}>Payment Date *</Text>
@@ -1114,19 +1135,50 @@ export default function FeePlans() {
                   />
                 </View>
               </View>
+              )}
+
+              {/* Selection Summary */}
+              {selectedComponentId && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryText}>
+                    Paying for: {selectedComponentName || 'Component'}
+                  </Text>
+                  {paymentAmount ? (
+                    <Text style={styles.summaryAmount}>₹{Number(paymentAmount || 0).toLocaleString('en-IN')}</Text>
+                  ) : null}
+                </View>
+              )}
             </ScrollView>
 
 
-            <View style={styles.modalActions}>
-              <Button onPress={() => setShowPaymentModal(false)}>Cancel</Button>
-              <Button
-                mode="contained"
-                onPress={handleSubmitPayment}
-                disabled={!paymentAmount}
-              >
-                Record Payment
-              </Button>
-          </View>
+            {paymentStep === 'select' ? (
+              <View style={styles.modalActions}>
+                <Button onPress={() => setShowPaymentModal(false)}>Cancel</Button>
+                <Button
+                  mode="contained"
+                  onPress={() => setPaymentStep('details')}
+                  disabled={Object.keys(selectedPayments).length === 0}
+                >
+                  Continue
+                </Button>
+              </View>
+            ) : (
+              <>
+                {Object.keys(selectedPayments).length === 0 && (
+                  <Text style={styles.validationHint}>Select at least one component to continue</Text>
+                )}
+                <View style={styles.modalActions}>
+                  <Button onPress={() => setPaymentStep('select')}>Back</Button>
+                  <Button
+                    mode="contained"
+                    onPress={handleSubmitPayment}
+                    disabled={Object.values(selectedPayments).every(v => !v || Number(v) <= 0)}
+                  >
+                    Record Payment
+                  </Button>
+                </View>
+              </>
+            )}
           </PaperModal>
         )}
       </Portal>
@@ -1548,8 +1600,8 @@ const styles = {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     backgroundColor: colors.surface.primary,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.light,
@@ -1575,8 +1627,8 @@ const styles = {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     backgroundColor: colors.primary[600],
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderRadius: borderRadius.lg,
   },
   classPlanText: {
@@ -1588,8 +1640,8 @@ const styles = {
   searchContainer: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
     backgroundColor: colors.surface.primary,
   },
   searchInputContainer: {
@@ -1761,14 +1813,14 @@ const styles = {
     backgroundColor: colors.surface.primary,
     margin: spacing.lg,
     borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    padding: spacing.md,
     maxHeight: 600,
   },
   modalHeader: {
     flexDirection: 'row' as const,
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   modalTitle: {
     fontSize: 20,
@@ -1777,7 +1829,7 @@ const styles = {
   },
   totalSummary: {
     backgroundColor: colors.primary[50],
-    padding: spacing.md,
+    padding: spacing.sm,
     borderRadius: borderRadius.md,
     marginBottom: spacing.md,
     borderWidth: 1,
@@ -1801,7 +1853,7 @@ const styles = {
   modalBody: {
     minHeight: 150,
     maxHeight: 500,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   modalFooter: {
     flexDirection: 'row' as const,
@@ -1852,8 +1904,8 @@ const styles = {
     gap: spacing.sm,
   },
   paymentMethodOption: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
     backgroundColor: colors.background.secondary,
     borderRadius: borderRadius.md,
     borderWidth: 1,
@@ -1876,6 +1928,33 @@ const styles = {
     justifyContent: 'flex-end' as const,
     gap: spacing.md,
     marginTop: spacing.lg,
+  },
+  validationHint: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+    color: colors.text.secondary,
+    fontSize: 12,
+  },
+  summaryRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    backgroundColor: colors.background.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.xs,
+  },
+  summaryText: {
+    fontSize: 13,
+    color: colors.text.secondary,
+  },
+  summaryAmount: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+    color: colors.text.primary,
   },
   editPlanButton: {
     flexDirection: 'row' as const,
@@ -1958,7 +2037,7 @@ const styles = {
     marginBottom: spacing.xs,
   },
   componentCardContent: {
-    padding: spacing.sm,
+    padding: spacing.xs,
   },
   componentInputRow: {
     flexDirection: 'row' as const,
@@ -1998,8 +2077,8 @@ const styles = {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'space-between' as const,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.light,
   },
@@ -2166,8 +2245,18 @@ const styles = {
   tableHeader: {
     flexDirection: 'row' as const,
     backgroundColor: colors.background.secondary,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.xs,
+  },
+  tableHeaderMinimal: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    backgroundColor: colors.background.secondary,
+    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
   },
   tableHeaderText: {
     fontSize: 12,
@@ -2179,10 +2268,32 @@ const styles = {
   tableRow: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  tableRowMinimal: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.light,
+    gap: spacing.sm,
+  },
+  compNameMeta: {
+    flex: 1,
+    gap: 2,
+  },
+  compNameText: {
+    fontSize: 14,
+    color: colors.text.primary,
+    fontWeight: '600' as const,
+  },
+  compMetaText: {
+    fontSize: 12,
+    color: colors.text.secondary,
   },
   checkbox: {
     width: 20,
@@ -2231,8 +2342,8 @@ const styles = {
     marginBottom: spacing.xs,
   },
   datePickerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
     gap: spacing.sm,
     backgroundColor: colors.surface.primary,
     borderWidth: 1,
@@ -2318,19 +2429,16 @@ const styles = {
   },
   columnHeaders: {
     flexDirection: 'row' as const,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    backgroundColor: colors.primary[50],
+    backgroundColor: colors.background.secondary,
     borderTopLeftRadius: borderRadius.md,
     borderTopRightRadius: borderRadius.md,
-    borderBottomWidth: 2,
-    borderBottomColor: colors.primary[200],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
     alignItems: 'center' as const,
-    shadowColor: colors.primary[200],
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   studentColumn: {
     flex: 1,
@@ -2360,20 +2468,17 @@ const styles = {
   studentRow: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    paddingVertical: 16,
+    paddingVertical: 10,
     paddingHorizontal: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.light,
-    minHeight: 56,
+    minHeight: 48,
     backgroundColor: colors.surface.primary,
     marginHorizontal: spacing.xs,
-    marginVertical: 2,
+    marginVertical: 1,
     borderRadius: borderRadius.sm,
-    shadowColor: colors.neutral[200],
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   studentRowSelected: {
     backgroundColor: colors.primary[25],
@@ -2388,8 +2493,8 @@ const styles = {
     justifyContent: 'center' as const,
   },
   studentName: {
-    fontSize: 16,
-    fontWeight: '700' as const,
+    fontSize: 15,
+    fontWeight: '600' as const,
     color: colors.text.primary,
     lineHeight: 22,
     letterSpacing: 0.3,
@@ -2408,7 +2513,7 @@ const styles = {
     marginRight: spacing.sm,
   },
   amountText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700' as const,
     color: colors.text.primary,
     minWidth: 80,
@@ -2417,7 +2522,7 @@ const styles = {
     letterSpacing: 0.3,
   },
   outstandingAmount: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700' as const,
     color: colors.error[600],
     minWidth: 80,

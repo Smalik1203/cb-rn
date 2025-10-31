@@ -47,22 +47,27 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   private logErrorToService = (error: Error, errorInfo: ErrorInfo) => {
-    const errorReport = {
-      message: error.message,
-      stack: error.stack,
-      componentStack: errorInfo.componentStack,
-      timestamp: new Date().toISOString(),
-      userAgent: 'React Native App',
-      version: '1.0.0', // You can get this from package.json
-    };
-
     // In development, log to console
     if (__DEV__) {
+      console.error('Error Boundary caught error:', {
+        message: error.message,
+        stack: error.stack,
+        componentStack: errorInfo.componentStack,
+      });
     }
 
     // In production, you would send this to your error tracking service
     // Example: Sentry, Bugsnag, or your own error tracking endpoint
     if (!__DEV__) {
+      // Prepare error report for production tracking
+      // const errorReport = {
+      //   message: error.message,
+      //   stack: error.stack,
+      //   componentStack: errorInfo.componentStack,
+      //   timestamp: new Date().toISOString(),
+      //   userAgent: 'React Native App',
+      //   version: '1.0.0',
+      // };
       // Example: Sentry.captureException(error, { extra: errorInfo });
       // Example: Bugsnag.notify(error, { metaData: errorInfo });
     }
@@ -96,7 +101,7 @@ class ErrorBoundary extends Component<Props, State> {
             </Text>
             
             <Text variant="bodyLarge" style={styles.message}>
-              The app encountered an unexpected error. Don't worry, your data is safe.
+              The app encountered an unexpected error. Don&apos;t worry, your data is safe.
             </Text>
 
             {__DEV__ && this.state.error && (

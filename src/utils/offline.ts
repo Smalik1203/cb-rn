@@ -39,11 +39,11 @@ export function getNetworkType(): Promise<string | null> {
 
 // Offline queue for failed requests
 class OfflineQueue {
-  private queue: Array<{
+  private queue: {
     id: string;
     request: () => Promise<any>;
     timestamp: number;
-  }> = [];
+  }[] = [];
 
   add(request: () => Promise<any>): string {
     const id = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -67,7 +67,7 @@ class OfflineQueue {
     for (const item of requests) {
       try {
         await item.request();
-      } catch (error) {
+      } catch (_error) {
         // Re-add to queue if it fails
         this.queue.push(item);
       }

@@ -1,0 +1,36 @@
+{
+  "questions": [
+    {
+      "question_text": "What is the capital of France?",
+      "question_type": "mcq",
+      "points": 5,
+      "options": ["Paris", "London", "Berlin", "Madrid"],
+      "correct_answer": "Paris"
+    },
+    {
+      "question_text": "Solve: 2 + 2 = ?",
+      "question_type": "one_word",
+      "points": 3,
+      "correct_answer": "4"
+    },
+    {
+      "question_text": "Explain the process of photosynthesis in detail.",
+      "question_type": "long_answer",
+      "points": 10,
+      "correct_answer": "Plants use sunlight to convert CO2 and water into glucose and oxygen"
+    },
+    {
+      "question_text": "Which planet is known as the Red Planet?",
+      "question_type": "mcq",
+      "points": 5,
+      "options": ["Mars", "Venus", "Jupiter", "Saturn"],
+      "correct_answer": "Mars"
+    },
+    {
+      "question_text": "What is the chemical symbol for water?",
+      "question_type": "one_word",
+      "points": 2,
+      "correct_answer": "H2O"
+    }
+  ]
+}

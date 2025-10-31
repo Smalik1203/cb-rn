@@ -40,7 +40,7 @@ export default function CalendarScreen() {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [showClassDropdown, setShowClassDropdown] = useState(false);
-  const [classes, setClasses] = useState<Array<{ id: string; grade: number; section?: string }>>([]);
+  const [classes, setClasses] = useState<{ id: string; grade: number; section?: string }[]>([]);
   const [loadingClasses, setLoadingClasses] = useState(false);
   // Month picker state
   const [showMonthPicker, setShowMonthPicker] = useState(false);

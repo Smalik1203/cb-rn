@@ -967,7 +967,7 @@ export function ModernTimetableScreen() {
         {/* Clean Timetable Content */}
         <View style={styles.timetableContentContainer}>
           <View style={styles.scheduleHeader}>
-            <Text style={styles.sectionTitle}>Today's Schedule</Text>
+            <Text style={styles.sectionTitle}>Today&apos;s Schedule</Text>
             {slots.length > 0 && (
               <View style={styles.progressSummary}>
                 <Text style={styles.progressText}>
@@ -996,7 +996,7 @@ export function ModernTimetableScreen() {
               </View>
               <Text style={styles.cleanEmptyTitle}>No classes yet</Text>
               <Text style={styles.cleanEmptyMessage}>
-                Tap '+ Period' to start building your schedule for {dayjs(selectedDate).format('MMM D, YYYY')}.
+                Tap &apos;+ Period&apos; to start building your schedule for {dayjs(selectedDate).format('MMM D, YYYY')}.
               </Text>
             </View>
           ) : (

@@ -1,13 +1,12 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Dimensions } from 'react-native';
 import { Text } from 'react-native-paper';
-import { Calendar, CheckSquare, DollarSign, BookOpen, Users, BarChart3, TrendingUp, Clock, Award, Bell, Activity } from 'lucide-react-native';
+import { Calendar, CheckSquare, DollarSign, BookOpen, TrendingUp, Clock, Activity, Award } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { colors, typography, spacing, borderRadius, shadows } from '../../lib/design-system';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { useClass } from '../../src/hooks/useClasses';
 import { useDashboardStats, useRecentActivity } from '../../src/hooks/useDashboard';
-import { Card, Badge, Avatar } from '../../src/components/ui';
+import { Card } from '../../src/components/ui';
 import { ThreeStateView } from '../../src/components/common/ThreeStateView';
 import { LinearGradient } from 'expo-linear-gradient';
 import { log } from '../../src/lib/logger';
@@ -17,7 +16,6 @@ const { width } = Dimensions.get('window');
 export default function DashboardScreen() {
   const router = useRouter();
   const { profile, loading: authLoading } = useAuth();
-  const { data: classData } = useClass(profile?.class_instance_id || undefined);
   const [refreshing, setRefreshing] = React.useState(false);
   
   // Real data hooks

@@ -82,7 +82,8 @@ export const ClassSelectionProvider: React.FC<{ children: React.ReactNode }> = (
           const parsedScope = JSON.parse(stored);
           setAcademicYearIdState(parsedScope.academic_year_id);
         }
-      } catch (error) {
+      } catch (_error) {
+        // Ignore storage errors
       }
     };
     loadScope();
@@ -111,7 +112,8 @@ export const ClassSelectionProvider: React.FC<{ children: React.ReactNode }> = (
             class_instance_id: selectedClass?.id || null,
           }));
         }
-      } catch (error) {
+      } catch (_error) {
+        // Ignore initialization errors
       } finally {
         setScopeLoading(false);
       }

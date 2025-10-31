@@ -16,7 +16,7 @@ interface CalendarEventFormModalProps {
   event?: any;
   academicYearId?: string;
   schoolCode: string;
-  classes: Array<{ id: string; grade: number; section?: string }>;
+  classes: { id: string; grade: number; section?: string }[];
   isHoliday?: boolean;
   userId: string;
   onCancel: () => void;

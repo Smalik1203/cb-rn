@@ -1,9 +1,8 @@
 import { supabase } from '../lib/supabase';
-import { mapError, formatErrorForLog } from './errorMapper';
+import { mapError } from './errorMapper';
 import { DB } from '../types/db.constants';
 import type {
   Student,
-  StudentInsert,
   Admin,
   ClassInstance,
   Attendance,
@@ -16,9 +15,7 @@ import type {
   Test,
   TestQuestion,
   TimetableSlot,
-  TimetableSlotInsert,
   CalendarEvent,
-  CalendarEventInsert,
   Task,
   User,
   AcademicYear,

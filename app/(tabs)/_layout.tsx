@@ -1,14 +1,11 @@
 import React, { useEffect } from 'react';
-import { Tabs, Redirect } from 'expo-router';
-import { Home, Calendar, CheckSquare, DollarSign, BarChart3, Users, CalendarDays, BookOpen } from 'lucide-react-native';
+import { Tabs, useRouter } from 'expo-router';
+import { Home, Calendar, CheckSquare, DollarSign, BarChart3, Users, CalendarDays, BookOpen, FileText } from 'lucide-react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { colors, typography, spacing, borderRadius, shadows } from '../../lib/design-system';
 import { AppNavbar } from '../../src/components/layout/AppNavbarExpo';
-import { useRouter } from 'expo-router';
 
 export default function TabLayout() {
   const { profile, status, loading, bootstrapping } = useAuth();
-  const role = profile?.role;
   const router = useRouter();
 
   // Protect routes: redirect to login if no profile or not signed in
@@ -28,9 +25,6 @@ export default function TabLayout() {
   if (loading || bootstrapping || status !== 'signedIn' || !profile) {
     return null; // Will redirect via useEffect or show loading
   }
-
-  const showAdminTabs = role === 'admin' || role === 'superadmin' || role === 'cb_admin';
-  const showSuperAdminTabs = role === 'superadmin' || role === 'cb_admin';
 
   return (
     <Tabs
@@ -98,6 +92,14 @@ export default function TabLayout() {
         options={{
           title: 'Attendance',
           tabBarIcon: ({ size, color }) => <CheckSquare size={size} color={color} />,
+        }}
+      />
+
+      <Tabs.Screen
+        name="assessments"
+        options={{
+          title: 'Assessments',
+          tabBarIcon: ({ size, color }) => <FileText size={size} color={color} />,
         }}
       />
 

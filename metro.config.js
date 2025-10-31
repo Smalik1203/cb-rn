@@ -18,4 +18,12 @@ config.transformer.minifierConfig = {
   },
 };
 
+// Add support for template file extensions
+config.resolver.assetExts = [
+  ...config.resolver.assetExts,
+  'csv',
+  'txt',
+  'xlsx',
+];
+
 module.exports = config;

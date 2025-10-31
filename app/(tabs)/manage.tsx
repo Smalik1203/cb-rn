@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
-import { Text, Card, Button, SegmentedButtons, Chip, List, ActivityIndicator } from 'react-native-paper';
-import { Users, UserPlus, Settings, Shield, BookOpen, Calendar, TrendingUp, Activity, AlertCircle } from 'lucide-react-native';
+import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { Text, Card, Button, SegmentedButtons, ActivityIndicator } from 'react-native-paper';
+import { Users, UserPlus, Shield, BookOpen, Calendar, Activity, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { colors, typography, spacing, borderRadius, shadows } from '../../lib/design-system';
-import { useClasses } from '../../src/hooks/useClasses';
+import { colors, typography, spacing, borderRadius } from '../../lib/design-system';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../src/lib/supabase';
 import { DB } from '../../src/types/db.constants';
@@ -29,37 +28,6 @@ export default function ManageScreen() {
 
   const role = profile?.role;
   const canManage = role === 'admin' || role === 'superadmin' || role === 'cb_admin';
-
-  if (!canManage) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <View style={styles.headerLeft}>
-              <View style={styles.iconContainer}>
-                <Users size={32} color={colors.text.inverse} />
-              </View>
-              <View>
-                <Text variant="headlineSmall" style={styles.headerTitle}>
-                  Management
-                </Text>
-                <Text variant="bodyLarge" style={styles.headerSubtitle}>
-                  Access restricted to administrators
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-        <View style={styles.restrictedContainer}>
-          <Shield size={64} color={colors.text.tertiary} />
-          <Text variant="titleLarge" style={styles.restrictedTitle}>Access Restricted</Text>
-          <Text variant="bodyMedium" style={styles.restrictedMessage}>
-            Management features are only available to administrators.
-          </Text>
-        </View>
-      </View>
-    );
-  }
 
   // Fetch user statistics
   const { data: userStats, isLoading: userStatsLoading, error: userStatsError, refetch: refetchUserStats } = useQuery({
@@ -120,8 +88,40 @@ export default function ManageScreen() {
         totalStudents: studentsData?.length || 0,
       };
     },
-    enabled: !!profile?.school_code,
+    enabled: !!profile?.school_code && canManage,
   });
+
+  // Early return after all hooks
+  if (!canManage) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <View style={styles.headerLeft}>
+              <View style={styles.iconContainer}>
+                <Users size={32} color={colors.text.inverse} />
+              </View>
+              <View>
+                <Text variant="headlineSmall" style={styles.headerTitle}>
+                  Management
+                </Text>
+                <Text variant="bodyLarge" style={styles.headerSubtitle}>
+                  Access restricted to administrators
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+        <View style={styles.restrictedContainer}>
+          <Shield size={64} color={colors.text.tertiary} />
+          <Text variant="titleLarge" style={styles.restrictedTitle}>Access Restricted</Text>
+          <Text variant="bodyMedium" style={styles.restrictedMessage}>
+            Management features are only available to administrators.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   const handleRefresh = async () => {
     setRefreshing(true);

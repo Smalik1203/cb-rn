@@ -1,0 +1,36 @@
+# Question Template - TXT Format
+# Instructions:
+# - Each question block must be separated by "---"
+# - First line: [MCQ|ONE_WORD|LONG_ANSWER] Points: X
+# - Second line: Your question text
+# - For MCQ: Add options as A) B) C) D) and Answer: X
+# - For ONE_WORD and LONG_ANSWER: Add Answer: on the last line
+
+[MCQ] Points: 5
+What is the capital of France?
+A) Paris
+B) London
+C) Berlin
+D) Madrid
+Answer: A
+---
+[ONE_WORD] Points: 3
+Solve: 2 + 2 = ?
+Answer: 4
+---
+[LONG_ANSWER] Points: 10
+Explain the process of photosynthesis in detail.
+Answer: Plants use sunlight to convert CO2 and water into glucose and oxygen
+---
+[MCQ] Points: 5
+Which planet is known as the Red Planet?
+A) Mars
+B) Venus
+C) Jupiter
+D) Saturn
+Answer: A
+---
+[ONE_WORD] Points: 2
+What is the chemical symbol for water?
+Answer: H2O
+---

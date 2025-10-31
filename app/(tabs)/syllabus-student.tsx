@@ -564,7 +564,7 @@ export default function StudentCalendarScreen() {
                     </Text>
                     <Text variant="bodySmall" style={styles.countdownSubtext}>
                       {selectedEvent.daysUntil <= 2
-                        ? "Don't forget to prepare!"
+                        ? "Don&apos;t forget to prepare!"
                         : 'Mark your calendar'}
                     </Text>
                   </Card>

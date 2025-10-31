@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, Alert, TouchableOpacity, Modal, Dimensions } from 'react-native';
-import { Appbar, Card, List, ActivityIndicator, Button, Divider, ProgressBar, Text, IconButton, TextInput } from 'react-native-paper';
+import { Card, List, ActivityIndicator, Button, Text, IconButton, TextInput } from 'react-native-paper';
 import Svg, { Circle } from 'react-native-svg';
 import { BookOpen, FileText } from 'lucide-react-native';
 import StudentSyllabusTab from './syllabus-student';
@@ -38,8 +38,7 @@ function useInitialData() {
 }
 
 function TeacherSyllabusScreen() {
-    const { profile } = useAuth();
-    const { subjects, classes, loading: metaLoading, reload } = useInitialData();
+    const { subjects, classes, loading: metaLoading } = useInitialData();
     const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
     const [selectedClassId, setSelectedClassId] = useState<string>('');
     const [showClassDropdown, setShowClassDropdown] = useState(false);

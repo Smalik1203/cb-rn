@@ -67,7 +67,7 @@ const uploadToSupabase = async (file: any, pathPrefix: string): Promise<string> 
       .from(STORAGE_BUCKET)
       .upload(filePath, formData, {
         contentType: file.mimeType || 'application/octet-stream',
-        upsert: false, // Don't overwrite existing files
+        upsert: false, // Do not overwrite existing files
       });
 
     if (uploadError) {

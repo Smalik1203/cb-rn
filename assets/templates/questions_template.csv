@@ -1,0 +1,6 @@
+question_text,question_type,points,option_a,option_b,option_c,option_d,correct_answer
+What is the capital of France?,mcq,5,Paris,London,Berlin,Madrid,Paris
+Solve: 2 + 2 = ?,one_word,3,,,,, 4
+Explain the process of photosynthesis in detail.,long_answer,10,,,,,Plants use sunlight to convert CO2 and water into glucose and oxygen
+Which planet is known as the Red Planet?,mcq,5,Mars,Venus,Jupiter,Saturn,Mars
+What is the chemical symbol for water?,one_word,2,,,,,H2O

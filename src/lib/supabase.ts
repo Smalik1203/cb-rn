@@ -42,7 +42,7 @@ const migrateFromSecureStore = async () => {
           log.info(`Found existing SecureStore session for ${key}, clearing it`);
           await deleteItemAsync(key);
         }
-      } catch (error) {
+      } catch (_error) {
         // Ignore errors - key might not exist
       }
     }
@@ -71,7 +71,7 @@ log.info('Supabase client created successfully with AsyncStorage');
 // Test Supabase connection
 export const testSupabaseConnection = async () => {
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('schools')
       .select('count')
       .limit(1);

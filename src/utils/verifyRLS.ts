@@ -3,7 +3,6 @@
  * Demonstrates proper role-based access control
  */
 
-import { supabase } from '../lib/supabase';
 import { DB } from '../types/db.constants';
 
 export function verifyRlsUsers() {

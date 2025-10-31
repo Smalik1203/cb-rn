@@ -60,9 +60,7 @@ export async function verifyDataFetch() {
 
   // Summary
   const allSuccessful = !classError && !studentError && !attendanceError && !feeError && !calendarError;
-  const totalRecords = (classInstances?.length || 0) + (students?.length || 0) + 
-                       (attendance?.length || 0) + (feePayments?.length || 0) + 
-                       (calendarEvents?.length || 0);
+  // totalRecords calculated but kept for potential future use
 
   
   return {
@@ -83,13 +81,17 @@ export async function verifyWithAbortSignal() {
   const controller = new AbortController();
   
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from(DB.tables.attendance)
       .select('*')
       .limit(5)
       .abortSignal(controller.signal);
     
-  } catch (err) {
+    if (error) {
+      // Error handling if needed
+    }
+  } catch {
+    // Abort signal error handling - error intentionally ignored
   }
 }
 
@@ -102,14 +104,25 @@ export async function verifyPagination() {
     .range(0, 2)
     .order('full_name', { ascending: true });
   
+  if (error1) {
+    // Handle error
+    return;
+  }
+  
   const { data: page2, error: error2 } = await supabase
     .from(DB.tables.student)
     .select('id, full_name')
     .range(3, 5)
     .order('full_name', { ascending: true });
   
+  if (error2) {
+    // Handle error
+    return;
+  }
   
+  // Verify pagination results
   if (page1 && page2 && page1.length > 0 && page2.length > 0) {
+    // Pagination verified
   }
 }
 
