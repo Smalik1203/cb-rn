@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, Pressable, Linking, Animated } from 'react-native';
 import { Text } from 'react-native-paper';
-import { BookOpen, FileText, Video as VideoIcon, Plus, ChevronDown, Edit, Trash2, Download, Calendar, Play, MoreHorizontal } from 'lucide-react-native';
+import { BookOpen, FileText, Video as VideoIcon, Plus, Edit, Trash2, Download } from 'lucide-react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { colors, typography, spacing, borderRadius, shadows } from '../../lib/design-system';
 import { useAuth } from '../../src/contexts/AuthContext';

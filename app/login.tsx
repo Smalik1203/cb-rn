@@ -7,6 +7,8 @@ import { supabase } from '../src/lib/supabase';
 import { useAuth } from '../src/contexts/AuthContext';
 import { GraduationCap, Eye, EyeOff, Mail, Lock } from 'lucide-react-native';
 import { colors, typography, spacing, borderRadius, shadows } from '../lib/design-system';
+import { isRateLimited, getRemainingAttempts, getResetTime, clearRateLimit } from '../src/utils/rateLimiter';
+import { sanitizeEmail } from '../src/utils/sanitize';
 
 const { width, height } = Dimensions.get('window');
 
@@ -72,20 +74,47 @@ export default function LoginScreen() {
       return;
     }
 
+    // Sanitize email input
+    const sanitizedEmail = sanitizeEmail(email);
+    if (!sanitizedEmail) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address');
+      return;
+    }
+
+    // Check rate limiting
+    const rateLimitKey = sanitizedEmail.toLowerCase();
+    if (isRateLimited(rateLimitKey, 'login')) {
+      const resetTime = getResetTime(rateLimitKey, 'login');
+      const minutes = Math.floor(resetTime / 60);
+      const seconds = resetTime % 60;
+      Alert.alert(
+        'Too Many Attempts',
+        `Too many login attempts. Please try again in ${minutes > 0 ? `${minutes}m ` : ''}${seconds}s.`
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: sanitizedEmail,
         password: password,
       });
 
       if (error) {
-        Alert.alert('Login Failed', error.message);
+        const remaining = getRemainingAttempts(rateLimitKey, 'login');
+        if (remaining > 0) {
+          Alert.alert('Login Failed', `${error.message}\n\nRemaining attempts: ${remaining}`);
+        } else {
+          Alert.alert('Login Failed', error.message);
+        }
         setLoading(false);
         return;
       }
 
       if (data.user) {
+        // Clear rate limit on successful login
+        clearRateLimit(rateLimitKey);
         // Don't set loading to false here - let the auth context handle the flow
         // The auth context will either redirect to main app or show access denied
       }

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Dimensions } from 'react-native';
 import { Text } from 'react-native-paper';
-import { CalendarRange, UserCheck, CreditCard, NotebookText, UsersRound, LineChart, TrendingUp, Clock, Award, Bell, Activity, FileText, CalendarDays, CheckCircle2, Target, AlertCircle, FolderOpen } from 'lucide-react-native';
+import { CalendarRange, UserCheck, CreditCard, NotebookText, UsersRound, LineChart, TrendingUp, Bell, Activity, FileText, CalendarDays, CheckCircle2, Target, AlertCircle, FolderOpen } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { colors, typography, spacing, borderRadius, shadows } from '../../lib/design-system';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -9,7 +9,6 @@ import { useClass } from '../../src/hooks/useClasses';
 import { useDashboardStats, useRecentActivity, useUpcomingEvents, useFeeOverview, useTaskOverview } from '../../src/hooks/useDashboard';
 import { Card, Badge, Avatar } from '../../src/components/ui';
 import { ThreeStateView } from '../../src/components/common/ThreeStateView';
-import { LinearGradient } from 'expo-linear-gradient';
 import { log } from '../../src/lib/logger';
 
 const { width } = Dimensions.get('window');
@@ -35,14 +34,14 @@ export default function DashboardScreen() {
     profile?.auth_id || '', 
     profile?.class_instance_id || undefined
   );
-  const { data: upcomingEvents, isLoading: eventsLoading, refetch: refetchEvents } = useUpcomingEvents(
+  const { data: upcomingEvents, refetch: refetchEvents } = useUpcomingEvents(
     profile?.school_code || '',
     profile?.class_instance_id || undefined
   );
-  const { data: feeOverview, isLoading: feeLoading, refetch: refetchFee } = useFeeOverview(
+  const { data: feeOverview, refetch: refetchFee } = useFeeOverview(
     isStudent ? profile?.auth_id || '' : ''
   );
-  const { data: taskOverview, isLoading: taskLoading, refetch: refetchTask } = useTaskOverview(
+  const { data: taskOverview, refetch: refetchTask } = useTaskOverview(
     isStudent ? profile?.auth_id || '' : '',
     profile?.class_instance_id || undefined
   );
@@ -303,7 +302,7 @@ export default function DashboardScreen() {
                     <CalendarRange size={20} color={colors.primary[600]} />
                   </View>
                   <Text style={styles.classOverviewValue}>{stats.todaysClasses}</Text>
-                  <Text style={styles.classOverviewLabel}>Today's Classes</Text>
+                  <Text style={styles.classOverviewLabel}>Today&apos;s Classes</Text>
                 </View>
                 <View style={styles.classOverviewItem}>
                   <View style={[styles.classOverviewIconContainer, { backgroundColor: colors.warning[50] }]}>
@@ -489,7 +488,7 @@ export default function DashboardScreen() {
                   </View>
                   <Text style={styles.emptyStateTitle}>Fee plan not set up yet</Text>
                   <Text style={styles.emptyStateText}>
-                    Your school will assign your fee structure soon. You'll be notified once it's ready.
+                    Your school will assign your fee structure soon. You&apos;ll be notified once it&apos;s ready.
                   </Text>
                   <TouchableOpacity 
                     style={styles.emptyStateCTA}

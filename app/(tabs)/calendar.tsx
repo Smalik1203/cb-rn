@@ -1,13 +1,11 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
-import { Text, Card, Button, Chip } from 'react-native-paper';
+import { Text, Card, Button } from 'react-native-paper';
 import { 
   Plus, 
   ListTodo,
   Calendar as CalendarIcon,
   CalendarDays,
-  ChevronLeft,
-  ChevronRight,
   Users,
 } from 'lucide-react-native';
 import { useAuth } from '../../src/contexts/AuthContext';

@@ -4,7 +4,7 @@ import { colors, borderRadius, shadows, spacing, animation } from '../../../lib/
 
 interface CardProps {
   children: React.ReactNode;
-  style?: ViewStyle;
+  style?: ViewStyle | ViewStyle[];
   variant?: 'default' | 'elevated' | 'glass' | 'outlined';
   onPress?: () => void;
   disabled?: boolean;
