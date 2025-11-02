@@ -1,0 +1,2 @@
+export { FeesDetailView } from './FeesDetailView';
+

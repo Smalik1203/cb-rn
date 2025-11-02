@@ -1,0 +1,2 @@
+export { LearningDetailView } from './LearningDetailView';
+

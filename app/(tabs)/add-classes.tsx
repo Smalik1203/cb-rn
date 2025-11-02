@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Text, Portal, Modal } from 'react-native-paper';
-import { Calendar, BookOpen, Edit, Trash2, X, Plus } from 'lucide-react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { Text, Portal, Modal, Snackbar } from 'react-native-paper';
+import { Calendar, BookOpen, Edit, Trash2, X, Plus, CheckCircle, AlertCircle, Sparkles } from 'lucide-react-native';
 import { colors, spacing, borderRadius, typography, shadows } from '../../lib/design-system';
 import { Card, Button, Input, EmptyState, Badge } from '../../src/components/ui';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -10,6 +10,7 @@ import { useClassInstances, useCreateClassInstance, useUpdateClassInstance, useD
 import { useAdmins } from '../../src/hooks/useAdmins';
 import { ThreeStateView } from '../../src/components/common/ThreeStateView';
 import { Picker } from '@react-native-picker/picker';
+import * as Haptics from 'expo-haptics';
 
 export default function AddClassesScreen() {
   const { profile } = useAuth();
@@ -19,7 +20,8 @@ export default function AddClassesScreen() {
   // Queries
   const { data: academicYears = [] } = useAcademicYears(schoolCode);
   const { data: classInstances = [], isLoading: classesLoading, error: classesError, refetch: refetchClasses } = useClassInstances(schoolCode);
-  const { data: admins = [] } = useAdmins(schoolCode);
+  const { data: adminsData } = useAdmins(schoolCode);
+  const admins = adminsData?.data || [];
   const [mode, setMode] = useState<'create' | 'list'>('create');
 
   // Mutations
@@ -53,8 +55,106 @@ export default function AddClassesScreen() {
   const [editSection, setEditSection] = useState('');
   const [editTeacher, setEditTeacher] = useState('');
 
+  // Toast notification state
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
+
+  // Validation states
+  const [yearStartError, setYearStartError] = useState('');
+  const [yearEndError, setYearEndError] = useState('');
+  const [gradeError, setGradeError] = useState('');
+  const [sectionError, setSectionError] = useState('');
+
+  // Scroll ref for keyboard handling
+  const scrollViewRef = useRef<ScrollView>(null);
+
   // Role check
   const isSuperAdmin = profile?.role === 'superadmin';
+
+  // Toast helper
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+    Haptics.notificationAsync(
+      type === 'success'
+        ? Haptics.NotificationFeedbackType.Success
+        : Haptics.NotificationFeedbackType.Error
+    );
+  };
+
+  // Auto-fill end year when start year changes
+  useEffect(() => {
+    if (yearStart && yearStart.length === 4) {
+      const start = parseInt(yearStart);
+      if (!isNaN(start)) {
+        setYearEnd((start + 1).toString());
+        setYearStartError('');
+      }
+    }
+  }, [yearStart]);
+
+  // Real-time validation
+  const validateYearStart = (value: string) => {
+    if (!value) {
+      setYearStartError('Start year is required');
+      return false;
+    }
+    const year = parseInt(value);
+    if (isNaN(year) || year < 2000 || year > 2100) {
+      setYearStartError('Enter a valid year (2000-2100)');
+      return false;
+    }
+    setYearStartError('');
+    return true;
+  };
+
+  const validateYearEnd = (value: string) => {
+    if (!value) {
+      setYearEndError('End year is required');
+      return false;
+    }
+    const end = parseInt(value);
+    const start = parseInt(yearStart);
+    if (isNaN(end)) {
+      setYearEndError('Enter a valid year');
+      return false;
+    }
+    if (end !== start + 1) {
+      setYearEndError('Must be exactly one year after start');
+      return false;
+    }
+    setYearEndError('');
+    return true;
+  };
+
+  const validateGrade = (value: string) => {
+    if (!value) {
+      setGradeError('Grade is required');
+      return false;
+    }
+    const gradeNum = parseInt(value);
+    if (isNaN(gradeNum) || gradeNum < 1 || gradeNum > 12) {
+      setGradeError('Enter a grade between 1 and 12');
+      return false;
+    }
+    setGradeError('');
+    return true;
+  };
+
+  const validateSection = (value: string) => {
+    if (!value) {
+      setSectionError('Section is required');
+      return false;
+    }
+    if (!/^[A-Za-z]$/.test(value)) {
+      setSectionError('Enter a single letter (A-Z)');
+      return false;
+    }
+    setSectionError('');
+    return true;
+  };
 
   if (!isSuperAdmin) {
     return (
@@ -68,23 +168,19 @@ export default function AddClassesScreen() {
   }
 
   const handleCreateYear = async () => {
-    if (!yearStart || !yearEnd) {
-      Alert.alert('Validation Error', 'Please enter both start and end years');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const isStartValid = validateYearStart(yearStart);
+    const isEndValid = validateYearEnd(yearEnd);
+
+    if (!isStartValid || !isEndValid) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Please fix the errors in the form', 'error');
       return;
     }
 
     const start = parseInt(yearStart);
     const end = parseInt(yearEnd);
-
-    if (isNaN(start) || isNaN(end)) {
-      Alert.alert('Validation Error', 'Years must be valid numbers');
-      return;
-    }
-
-    if (end !== start + 1) {
-      Alert.alert('Validation Error', 'End year should be exactly one year after start year');
-      return;
-    }
 
     try {
       await createYearMutation.mutateAsync({
@@ -94,11 +190,11 @@ export default function AddClassesScreen() {
         school_name: schoolName || schoolCode!,
       });
 
-      Alert.alert('Success', 'Academic year created successfully!');
+      showToast(`Academic Year ${start}-${end} created successfully!`, 'success');
       setYearStart('');
       setYearEnd('');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to create academic year');
+      showToast(error.message || 'Failed to create academic year', 'error');
     }
   };
 
@@ -238,224 +334,341 @@ export default function AddClassesScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Segment */}
-        <View style={styles.segment}>
-          <TouchableOpacity style={[styles.segmentItem, mode === 'create' && styles.segmentItemActive]} onPress={() => setMode('create')}>
-            <Text style={styles.segmentText}>Create</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.segmentItem, mode === 'list' && styles.segmentItemActive]} onPress={() => setMode('list')}>
-            <Text style={styles.segmentText}>Existing</Text>
-          </TouchableOpacity>
+        {/* Compact Segment Selector */}
+        <View style={styles.segmentContainer}>
+          <View style={styles.segment}>
+            <TouchableOpacity
+              style={[styles.segmentItem, mode === 'create' && styles.segmentItemActive]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setMode('create');
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.segmentText, mode === 'create' && styles.segmentTextActive]}>
+                Create
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.segmentItem, mode === 'list' && styles.segmentItemActive]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setMode('list');
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.segmentText, mode === 'list' && styles.segmentTextActive]}>
+                Existing
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
         {/* Academic Year Section */}
         {mode === 'create' && (
-        <Card style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Calendar size={20} color={colors.success[600]} />
-            <Text style={styles.cardTitle}>Academic Year</Text>
-          </View>
-
-          <View style={styles.form}>
-            <View style={styles.formRow}>
-              <View style={styles.formCol}>
-                <Input
-                  label="Start Year"
-                  value={yearStart}
-                  onChangeText={setYearStart}
-                  placeholder="e.g., 2025"
-                  keyboardType="number-pad"
-                  maxLength={4}
-                />
-              </View>
-              <View style={styles.formCol}>
-                <Input
-                  label="End Year"
-                  value={yearEnd}
-                  onChangeText={setYearEnd}
-                  placeholder="e.g., 2026"
-                  keyboardType="number-pad"
-                  maxLength={4}
-                />
-              </View>
+          <Card style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Calendar size={24} color={colors.success[600]} />
+              <Text style={styles.cardTitle}>Academic Year</Text>
             </View>
 
-            <Button
-              title={createYearMutation.isPending ? 'Creating...' : 'Create Academic Year'}
-              onPress={handleCreateYear}
-              loading={createYearMutation.isPending}
-              disabled={createYearMutation.isPending}
-              icon={<Plus size={20} color={colors.surface.primary} />}
-            />
-          </View>
-        </Card>
+            <View style={styles.form}>
+              <View style={styles.formRow}>
+                <View style={styles.formCol}>
+                  <Input
+                    label="Start Year"
+                    value={yearStart}
+                    onChangeText={(text) => {
+                      setYearStart(text);
+                      if (text) validateYearStart(text);
+                    }}
+                    placeholder="e.g., 2025"
+                    keyboardType="number-pad"
+                    maxLength={4}
+                    error={yearStartError}
+                  />
+                  {yearStartError ? (
+                    <Text style={styles.errorText}>{yearStartError}</Text>
+                  ) : null}
+                </View>
+                <View style={styles.formCol}>
+                  <Input
+                    label="End Year"
+                    value={yearEnd}
+                    onChangeText={(text) => {
+                      setYearEnd(text);
+                      if (text) validateYearEnd(text);
+                    }}
+                    placeholder="e.g., 2026"
+                    keyboardType="number-pad"
+                    maxLength={4}
+                    error={yearEndError}
+                  />
+                  {yearEndError ? (
+                    <Text style={styles.errorText}>{yearEndError}</Text>
+                  ) : null}
+                </View>
+              </View>
+
+              <Button
+                title={createYearMutation.isPending ? 'Creating...' : 'Create Academic Year'}
+                onPress={handleCreateYear}
+                loading={createYearMutation.isPending}
+                disabled={createYearMutation.isPending || !yearStart || !yearEnd}
+                icon={<Plus size={20} color={colors.surface.primary} />}
+                style={styles.submitButton}
+              />
+            </View>
+          </Card>
         )}
 
         {/* Academic Years List */}
         {academicYears.length > 0 && (
           <Card style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>Academic Years</Text>
-              <Badge variant="success">{academicYears.length}</Badge>
-            </View>
-
-            <View style={styles.list}>
-              {academicYears.map((year) => (
-                <View key={year.id} style={styles.listItem}>
-                  <View style={styles.listItemInfo}>
-                    <Text style={styles.listItemTitle}>
-                      {year.year_start} - {year.year_end}
-                    </Text>
-                    <Badge variant={year.is_active ? 'success' : 'default'}>
-                      {year.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </View>
-
-                  <View style={styles.listItemActions}>
-                    <TouchableOpacity onPress={() => handleEditYear(year)} style={styles.actionButton}>
-                      <Edit size={18} color={colors.info[600]} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleDeleteYear(year.id)} style={styles.actionButton}>
-                      <Trash2 size={18} color={colors.error[600]} />
-                    </TouchableOpacity>
-                  </View>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>Academic Years</Text>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{academicYears.length}</Text>
                 </View>
-              ))}
-            </View>
-          </Card>
+              </View>
+
+              <View style={styles.list}>
+                {academicYears.map((year) => (
+                  <View
+                    key={year.id}
+                    style={styles.listItem}
+                  >
+                    <View style={styles.listItemContent}>
+                      <View style={styles.listItemInfo}>
+                        <Text style={styles.listItemTitle}>
+                          {year.year_start} - {year.year_end}
+                        </Text>
+                        <View style={styles.listItemMeta}>
+                          <View style={[styles.statusBadge, { backgroundColor: year.is_active ? colors.success[100] : colors.neutral[100] }]}>
+                            <Text style={[styles.statusBadgeText, { color: year.is_active ? colors.success[700] : colors.neutral[700] }]}>
+                              {year.is_active ? 'Active' : 'Inactive'}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                      <View style={styles.listItemActions}>
+                        <TouchableOpacity
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            handleEditYear(year);
+                          }}
+                          style={styles.actionButton}
+                          activeOpacity={0.7}
+                        >
+                          <Edit size={18} color={colors.info[600]} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            handleDeleteYear(year.id);
+                          }}
+                          style={styles.actionButton}
+                          activeOpacity={0.7}
+                        >
+                          <Trash2 size={18} color={colors.error[600]} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </Card>
         )}
 
         {/* Tip Card */}
-        {academicYears.length === 0 && (
+        {academicYears.length === 0 && mode === 'create' && (
           <Card style={[styles.card, styles.tipCard]}>
-            <Text style={styles.tipText}>
-              💡 <Text style={styles.tipBold}>Tip:</Text> Create an academic year first before adding classes
-            </Text>
-          </Card>
+              <View style={styles.tipContent}>
+                <Sparkles size={20} color={colors.info[600]} />
+                <Text style={styles.tipText}>
+                  Create an academic year first before adding classes
+                </Text>
+              </View>
+            </Card>
         )}
 
         {/* Add Class Section */}
         {mode === 'create' && (
-        <Card style={styles.card}>
-          <View style={styles.cardHeader}>
-            <BookOpen size={20} color={colors.primary[600]} />
-            <Text style={styles.cardTitle}>Class</Text>
-          </View>
-
-          <View style={styles.form}>
-            <View>
-              <Text style={styles.label}>Academic Year</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={selectedAcademicYear}
-                  onValueChange={setSelectedAcademicYear}
-                  enabled={academicYears.length > 0}
-                  style={styles.picker}
-                >
-                  <Picker.Item label="Select Academic Year" value="" />
-                  {academicYears.map((year) => (
-                    <Picker.Item
-                      key={year.id}
-                      label={`${year.year_start} - ${year.year_end}`}
-                      value={year.id}
-                    />
-                  ))}
-                </Picker>
-              </View>
+          <Card style={styles.card}>
+            <View style={styles.cardHeader}>
+              <BookOpen size={24} color={colors.primary[600]} />
+              <Text style={styles.cardTitle}>Create Class</Text>
             </View>
 
-            <View style={styles.formRow}>
-              <View style={styles.formCol}>
-                <Input
-                  label="Grade"
-                  value={grade}
-                  onChangeText={setGrade}
-                  placeholder="e.g., 10"
-                  keyboardType="number-pad"
-                />
+            <View style={styles.form}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Academic Year</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={selectedAcademicYear}
+                    onValueChange={(value) => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setSelectedAcademicYear(value);
+                    }}
+                    enabled={academicYears.length > 0}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="Select Academic Year" value="" />
+                    {academicYears.map((year) => (
+                      <Picker.Item
+                        key={year.id}
+                        label={`${year.year_start} - ${year.year_end}`}
+                        value={year.id}
+                      />
+                    ))}
+                  </Picker>
+                </View>
+                {academicYears.length === 0 && (
+                  <Text style={styles.helperText}>Create an academic year first</Text>
+                )}
               </View>
-              <View style={styles.formCol}>
-                <Input
-                  label="Section"
-                  value={section}
-                  onChangeText={setSection}
-                  placeholder="e.g., A"
-                  autoCapitalize="characters"
-                />
-              </View>
-            </View>
 
-            <View>
-              <Text style={styles.label}>Class Admin</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={selectedTeacher}
-                  onValueChange={setSelectedTeacher}
-                  enabled={admins.length > 0}
-                  style={styles.picker}
-                >
-                  <Picker.Item label="Select Class Admin" value="" />
-                  {admins.map((admin) => (
-                    <Picker.Item key={admin.id} label={admin.full_name} value={admin.id} />
-                  ))}
-                </Picker>
+              <View style={styles.formRow}>
+                <View style={styles.formCol}>
+                  <Input
+                    label="Grade"
+                    value={grade}
+                    onChangeText={(text) => {
+                      setGrade(text);
+                      if (text) validateGrade(text);
+                    }}
+                    placeholder="e.g., 10"
+                    keyboardType="number-pad"
+                    error={gradeError}
+                  />
+                  {gradeError ? (
+                    <Text style={styles.errorText}>{gradeError}</Text>
+                  ) : null}
+                </View>
+                <View style={styles.formCol}>
+                  <Input
+                    label="Section"
+                    value={section}
+                    onChangeText={(text) => {
+                      setSection(text);
+                      if (text) validateSection(text);
+                    }}
+                    placeholder="e.g., A"
+                    autoCapitalize="characters"
+                    maxLength={1}
+                    error={sectionError}
+                  />
+                  {sectionError ? (
+                    <Text style={styles.errorText}>{sectionError}</Text>
+                  ) : null}
+                </View>
               </View>
-            </View>
 
-            <Button
-              title={createClassMutation.isPending ? 'Creating...' : 'Create Class'}
-              onPress={handleCreateClass}
-              loading={createClassMutation.isPending}
-              disabled={createClassMutation.isPending || academicYears.length === 0}
-              icon={<Plus size={20} color={colors.surface.primary} />}
-            />
-          </View>
-        </Card>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Class Admin</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={selectedTeacher}
+                    onValueChange={(value) => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setSelectedTeacher(value);
+                    }}
+                    enabled={admins.length > 0}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="Select Class Admin" value="" />
+                    {admins.map((admin) => (
+                      <Picker.Item key={admin.id} label={admin.full_name} value={admin.id} />
+                    ))}
+                  </Picker>
+                </View>
+                {admins.length === 0 && (
+                  <Text style={styles.helperText}>No admins available</Text>
+                )}
+              </View>
+
+              <Button
+                title={createClassMutation.isPending ? 'Creating...' : 'Create Class'}
+                onPress={handleCreateClass}
+                loading={createClassMutation.isPending}
+                disabled={
+                  createClassMutation.isPending ||
+                  academicYears.length === 0 ||
+                  !grade ||
+                  !section ||
+                  !selectedAcademicYear ||
+                  !selectedTeacher
+                }
+                icon={<Plus size={20} color={colors.surface.primary} />}
+                style={styles.submitButton}
+              />
+            </View>
+          </Card>
         )}
 
         {/* Classes List */}
         {mode === 'list' && (
-        <Card style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Existing Classes</Text>
-            <Badge variant="info">{classInstances.length}</Badge>
-          </View>
-
-          <ThreeStateView
-            state={classesLoading ? 'loading' : classesError ? 'error' : classInstances.length === 0 ? 'empty' : 'success'}
-            loadingMessage="Loading classes..."
-            errorMessage="Failed to load classes"
-            errorDetails={classesError?.message}
-            emptyMessage="No classes have been created yet"
-            onRetry={refetchClasses}
-          >
-            <View style={styles.list}>
-              {classInstances.map((classInstance) => (
-                <View key={classInstance.id} style={styles.listItem}>
-                  <View style={styles.classInfo}>
-                    <Text style={styles.listItemTitle}>
-                      Grade {classInstance.grade} - Section {classInstance.section}
-                    </Text>
-                    <Text style={styles.listItemSubtitle}>
-                      {classInstance.year?.year_start} - {classInstance.year?.year_end}
-                    </Text>
-                    <Text style={styles.listItemSubtitle}>
-                      Teacher: {classInstance.teacher?.full_name || 'Not assigned'}
-                    </Text>
-                  </View>
-
-                  <View style={styles.listItemActions}>
-                    <TouchableOpacity onPress={() => handleEditClass(classInstance)} style={styles.actionButton}>
-                      <Edit size={18} color={colors.info[600]} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleDeleteClass(classInstance.id)} style={styles.actionButton}>
-                      <Trash2 size={18} color={colors.error[600]} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
+          <Card style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Existing Classes</Text>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{classInstances.length}</Text>
+              </View>
             </View>
-          </ThreeStateView>
-        </Card>
+
+            <ThreeStateView
+              state={classesLoading ? 'loading' : classesError ? 'error' : classInstances.length === 0 ? 'empty' : 'success'}
+              loadingMessage="Loading classes..."
+              errorMessage="Failed to load classes"
+              errorDetails={classesError?.message}
+              emptyMessage="No classes have been created yet"
+              onRetry={refetchClasses}
+            >
+              <View style={styles.list}>
+                {classInstances.map((classInstance) => (
+                  <View
+                    key={classInstance.id}
+                    style={styles.listItem}
+                  >
+                    <View style={styles.listItemContent}>
+                      <View style={styles.classInfo}>
+                        <Text style={styles.listItemTitle}>
+                          Grade {classInstance.grade} - Section {classInstance.section}
+                        </Text>
+                        <Text style={styles.listItemSubtitle}>
+                          {classInstance.year?.year_start} - {classInstance.year?.year_end}
+                        </Text>
+                        <Text style={styles.listItemSubtitle}>
+                          {classInstance.teacher?.full_name || 'No teacher assigned'}
+                        </Text>
+                      </View>
+                      <View style={styles.listItemActions}>
+                        <TouchableOpacity
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            handleEditClass(classInstance);
+                          }}
+                          style={styles.actionButton}
+                          activeOpacity={0.7}
+                        >
+                          <Edit size={18} color={colors.info[600]} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            handleDeleteClass(classInstance.id);
+                          }}
+                          style={styles.actionButton}
+                          activeOpacity={0.7}
+                        >
+                          <Trash2 size={18} color={colors.error[600]} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </ThreeStateView>
+          </Card>
         )}
       </ScrollView>
 
@@ -463,12 +676,22 @@ export default function AddClassesScreen() {
       <Portal>
         <Modal
           visible={editYearModalVisible}
-          onDismiss={() => setEditYearModalVisible(false)}
+          onDismiss={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setEditYearModalVisible(false);
+          }}
           contentContainerStyle={styles.modal}
         >
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Edit Academic Year</Text>
-            <TouchableOpacity onPress={() => setEditYearModalVisible(false)}>
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setEditYearModalVisible(false);
+              }}
+              style={styles.closeButton}
+              activeOpacity={0.7}
+            >
               <X size={24} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
@@ -522,12 +745,22 @@ export default function AddClassesScreen() {
       <Portal>
         <Modal
           visible={editClassModalVisible}
-          onDismiss={() => setEditClassModalVisible(false)}
+          onDismiss={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setEditClassModalVisible(false);
+          }}
           contentContainerStyle={styles.modal}
         >
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Edit Class</Text>
-            <TouchableOpacity onPress={() => setEditClassModalVisible(false)}>
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setEditClassModalVisible(false);
+              }}
+              style={styles.closeButton}
+              activeOpacity={0.7}
+            >
               <X size={24} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
@@ -587,7 +820,7 @@ export default function AddClassesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.primary,
+    backgroundColor: colors.background.app,
   },
   scrollView: {
     flex: 1,
@@ -595,6 +828,10 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: spacing.md,
     paddingBottom: spacing.xl,
+  },
+  // Segment Selector
+  segmentContainer: {
+    marginBottom: spacing.md,
   },
   segment: {
     flexDirection: 'row',
@@ -616,24 +853,16 @@ const styles = StyleSheet.create({
     ...shadows.sm,
   },
   segmentText: {
-    color: colors.text.primary,
+    color: colors.text.secondary,
     fontWeight: '600',
   },
+  segmentTextActive: {
+    color: colors.text.primary,
+  },
+  // Cards
   card: {
     marginBottom: spacing.md,
     padding: spacing.md,
-  },
-  tipCard: {
-    backgroundColor: colors.info[50],
-    borderColor: colors.info[200],
-  },
-  tipText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-  },
-  tipBold: {
-    fontWeight: typography.fontWeight.semibold as any,
-    color: colors.text.primary,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -647,48 +876,104 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
     flex: 1,
   },
+  badge: {
+    backgroundColor: colors.primary[100],
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+  },
+  badgeText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold as any,
+    color: colors.primary[700],
+  },
+  // Form
   form: {
     gap: spacing.md,
   },
+  inputGroup: {
+    marginBottom: spacing.sm,
+  },
   label: {
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium as any,
+    fontWeight: typography.fontWeight.semibold as any,
     color: colors.text.primary,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
   pickerContainer: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border.light,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     backgroundColor: colors.surface.primary,
+    overflow: 'hidden',
+    ...shadows.xs,
   },
   picker: {
-    height: 44,
+    height: 50,
+    color: colors.text.primary,
   },
   formRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   formCol: {
     flex: 1,
   },
+  submitButton: {
+    marginTop: spacing.sm,
+  },
+  helperText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
+    marginTop: spacing.xs,
+    marginLeft: spacing.xs,
+  },
+  errorText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.error[600],
+    marginTop: spacing.xs,
+    marginLeft: spacing.xs,
+  },
+  // Tip Card
+  tipCard: {
+    backgroundColor: colors.info[50],
+    borderColor: colors.info[200],
+  },
+  tipContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  tipText: {
+    flex: 1,
+    fontSize: typography.fontSize.sm,
+    color: colors.info[700],
+    lineHeight: typography.lineHeight.relaxed,
+  },
+  // List Items
   list: {
     gap: spacing.md,
   },
   listItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     padding: spacing.md,
     backgroundColor: colors.surface.secondary,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border.light,
   },
-  listItemInfo: {
-    flex: 1,
+  listItemContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  listItemInfo: {
+    flex: 1,
+  },
+  listItemMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+    gap: spacing.xs,
   },
   classInfo: {
     flex: 1,
@@ -704,6 +989,16 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     marginBottom: spacing.xs / 2,
   },
+  statusBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs / 2,
+    borderRadius: borderRadius.full,
+    alignSelf: 'flex-start',
+  },
+  statusBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium as any,
+  },
   listItemActions: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -712,13 +1007,17 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     borderRadius: borderRadius.md,
     backgroundColor: colors.surface.primary,
-    ...shadows.sm,
+    ...shadows.xs,
   },
+  // Switch
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.surface.secondary,
+    borderRadius: borderRadius.md,
   },
   switchLabel: {
     fontSize: typography.fontSize.base,
@@ -726,19 +1025,19 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
   },
   switch: {
-    width: 50,
-    height: 30,
+    width: 52,
+    height: 32,
     borderRadius: borderRadius.full,
     backgroundColor: colors.neutral[300],
-    padding: spacing.xs / 2,
+    padding: 3,
     justifyContent: 'center',
   },
   switchActive: {
     backgroundColor: colors.success[500],
   },
   switchThumb: {
-    width: 22,
-    height: 22,
+    width: 26,
+    height: 26,
     borderRadius: borderRadius.full,
     backgroundColor: colors.surface.primary,
     ...shadows.sm,
@@ -746,34 +1045,50 @@ const styles = StyleSheet.create({
   switchThumbActive: {
     alignSelf: 'flex-end',
   },
+  // Modal
   modal: {
     backgroundColor: colors.surface.primary,
     marginHorizontal: spacing.xl,
     borderRadius: borderRadius.xl,
-    padding: spacing.lg,
-    maxHeight: '80%',
+    padding: spacing.xl,
+    maxHeight: '85%',
+    ...shadows.xl,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
   },
   modalTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.semibold as any,
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.bold as any,
     color: colors.text.primary,
   },
   modalContent: {
-    gap: spacing.md,
+    gap: spacing.lg,
   },
   modalActions: {
     flexDirection: 'row',
     gap: spacing.md,
-    marginTop: spacing.md,
+    marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
   },
   modalButton: {
     flex: 1,
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.neutral[100],
   },
 });
 

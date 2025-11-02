@@ -1,0 +1,2 @@
+export { SyllabusProgressDetailView } from './SyllabusProgressDetailView';
+
