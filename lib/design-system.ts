@@ -1,21 +1,21 @@
 import { ViewStyle, TextStyle } from 'react-native';
 
-// Modern Educational SaaS Color Palette
+// Krishnaveni Talent School Color Palette - Orange Theme
 export const colors = {
-  // Primary Brand Colors - Deep Blue with Purple Accent
+  // Primary Brand Colors - Orange (KTS Logo Colors)
   primary: {
-    50: '#f0f4ff',
-    100: '#e0e7ff',
-    200: '#c7d2fe',
-    300: '#a5b4fc',
-    400: '#818cf8',
-    500: '#6366f1',
-    600: '#4f46e5',
-    700: '#4338ca',
-    800: '#3730a3',
-    900: '#312e81',
-    950: '#1e1b4b',
-    main: '#6366f1', // Main primary color
+    50: '#fff5f0',
+    100: '#ffe8dc',
+    200: '#ffd4c0',
+    300: '#ffb89d',
+    400: '#ff9a7a',
+    500: '#FF8C42', // Light orange
+    600: '#FF6B35', // Main orange from logo
+    700: '#E55A2B',
+    800: '#CC4A21',
+    900: '#B33A17',
+    950: '#8A2B0F',
+    main: '#FF6B35', // Main primary color (from logo)
   },
 
   // Secondary - Modern Teal
@@ -82,19 +82,19 @@ export const colors = {
     main: '#ef4444', // Main error color
   },
 
-  // Info - Modern Blue
+  // Info - Dark Blue (from KTS logo)
   info: {
-    50: '#eff6ff',
-    100: '#dbeafe',
-    200: '#bfdbfe',
-    300: '#93c5fd',
-    400: '#60a5fa',
-    500: '#3b82f6',
-    600: '#2563eb',
-    700: '#1d4ed8',
-    800: '#1e40af',
-    900: '#1e3a8a',
-    950: '#172554',
+    50: '#e8eaf6',
+    100: '#c5cae9',
+    200: '#9fa8da',
+    300: '#7986cb',
+    400: '#5c6bc0',
+    500: '#3f51b5',
+    600: '#3949ab',
+    700: '#303f9f',
+    800: '#283593',
+    900: '#1A237E', // Dark blue from KTS logo
+    950: '#0d1338',
   },
 
   // Neutral - Modern Grays
@@ -112,76 +112,76 @@ export const colors = {
     950: '#0a0a0a',
   },
 
-  // Background System
+  // Background System - Warm Orange Tones
   background: {
     primary: '#ffffff',
-    secondary: '#f8fafc',
-    tertiary: '#f1f5f9',
-    quaternary: '#e2e8f0',
-    dark: '#0f172a',
-    app: '#f8fafc',
+    secondary: '#fff8f5', // Very light orange tint
+    tertiary: '#fff5f0', // Light orange tint
+    quaternary: '#ffe8dc', // Warm orange background
+    dark: '#1A237E', // Dark blue from logo
+    app: '#fffbf9', // Warm off-white
     elevated: '#ffffff',
-    glass: 'rgba(255, 255, 255, 0.8)',
-    default: '#f8fafc', // Default background
-    light: '#f1f5f9', // Light background
+    glass: 'rgba(255, 255, 255, 0.9)',
+    default: '#fffbf9', // Default background - warm white
+    light: '#fff5f0', // Light background - orange tint
     paper: '#ffffff', // Paper background
     card: '#ffffff', // Card background
   },
 
-  // Surface System
+  // Surface System - Warm Orange Tones
   surface: {
     primary: '#ffffff',
-    secondary: '#f8fafc',
-    tertiary: '#f1f5f9',
+    secondary: '#fff8f5', // Very light orange tint
+    tertiary: '#fff5f0', // Light orange tint
     elevated: '#ffffff',
-    overlay: 'rgba(15, 23, 42, 0.6)',
-    glass: 'rgba(255, 255, 255, 0.9)',
-    dark: '#1e293b',
-    light: '#f1f5f9', // Light surface
+    overlay: 'rgba(26, 35, 126, 0.6)', // Dark blue overlay
+    glass: 'rgba(255, 255, 255, 0.95)',
+    dark: '#1A237E', // Dark blue from logo
+    light: '#fff5f0', // Light surface - orange tint
     paper: '#ffffff', // Paper surface
   },
 
-  // Border System
+  // Border System - Orange Accents
   border: {
-    light: '#e2e8f0',
-    DEFAULT: '#cbd5e1',
-    dark: '#94a3b8',
-    accent: '#6366f1',
+    light: '#ffe8dc', // Light orange border
+    DEFAULT: '#ffd4c0', // Medium orange border
+    dark: '#FF8C42', // Orange border
+    accent: '#FF6B35', // Main orange accent
   },
 
   // Text System - Senior-level accessibility standards
   text: {
-    primary: '#000000',        // Pure black for maximum readability
+    primary: '#1A1A1A',        // Near black for maximum readability
     secondary: '#374151',      // Dark gray for secondary text
     tertiary: '#6b7280',       // Medium gray for tertiary text
     quaternary: '#9ca3af',     // Light gray for disabled text
     inverse: '#ffffff',        // White for dark backgrounds
     disabled: '#d1d5db',       // Light gray for disabled states
-    accent: '#6366f1',         // Brand color for links/accents
+    accent: '#FF6B35',         // Orange brand color for links/accents
   },
 
-  // Modern Gradients
+  // Modern Gradients - Orange Theme
   gradient: {
-    primary: ['#6366f1', '#8b5cf6', '#a855f7'],
-    secondary: ['#14b8a6', '#06b6d4', '#0ea5e9'],
+    primary: ['#FF6B35', '#FF8C42', '#FFA85C'], // Main orange gradient
+    secondary: ['#FF8C42', '#FFB89D', '#FFD4C0'], // Light orange gradient
     success: ['#22c55e', '#16a34a', '#15803d'],
-    warning: ['#f59e0b', '#f97316', '#ef4444'],
-    sunset: ['#f59e0b', '#ef4444', '#ec4899'],
-    ocean: ['#0ea5e9', '#3b82f6', '#6366f1'],
+    warning: ['#FF6B35', '#f97316', '#ef4444'], // Orange to red
+    sunset: ['#FF6B35', '#ef4444', '#ec4899'], // Orange sunset
+    ocean: ['#1A237E', '#3949ab', '#5c6bc0'], // Dark blue gradient
     forest: ['#22c55e', '#16a34a', '#15803d'],
-    cosmic: ['#8b5cf6', '#a855f7', '#c084fc'],
+    cosmic: ['#FF6B35', '#FF8C42', '#FFB89D'], // Orange cosmic
   },
 
-  // Special Educational Colors
+  // Special Educational Colors - Orange Accented
   education: {
-    math: '#3b82f6',
+    math: '#FF6B35', // Orange
     science: '#10b981',
-    english: '#f59e0b',
+    english: '#FF8C42', // Light orange
     history: '#ef4444',
-    art: '#8b5cf6',
+    art: '#1A237E', // Dark blue from logo
     music: '#ec4899',
-    sports: '#06b6d4',
-    library: '#84cc16',
+    sports: '#FF6B35', // Orange
+    library: '#FF8C42', // Light orange
   },
 };
 
@@ -285,10 +285,10 @@ export const shadows = {
     elevation: 0,
   },
   glow: {
-    shadowColor: colors.primary[500],
+    shadowColor: colors.primary[600], // Orange glow
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
     elevation: 0,
   },
 };

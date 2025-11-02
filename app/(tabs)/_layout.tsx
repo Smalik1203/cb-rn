@@ -148,14 +148,6 @@ export default function TabLayout() {
 
       {/* Super Admin Screens */}
       <Tabs.Screen
-        name="setup"
-        options={{
-          title: 'Setup School',
-          href: showSuperAdminTabs ? '/(tabs)/setup' : null,
-        }}
-      />
-
-      <Tabs.Screen
         name="add-admin"
         options={{
           title: 'Add Admins',

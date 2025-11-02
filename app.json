@@ -1,15 +1,17 @@
 {
   "expo": {
-    "name": "ClassBridge Mobile",
-    "slug": "classbridge-mobile",
+    "name": "Krishnaveni Talent School",
+    "slug": "krishnaveni-talent-school",
     "version": "1.0.0",
     "orientation": "default",
-    "scheme": "classbridge",
-    "userInterfaceStyle": "automatic",
+    "scheme": "krishnaveni",
+    "icon": "./assets/images/Image.png",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.classbridge.mobile",
+      "bundleIdentifier": "com.krishnaveni.talentschool",
+      "icon": "./assets/images/Image.png",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false,
@@ -19,19 +21,33 @@
               "NSIncludesSubdomains": false
             }
           }
-        }
+        },
+        "UISupportedInterfaceOrientations": [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationPortraitUpsideDown",
+          "UIInterfaceOrientationLandscapeLeft",
+          "UIInterfaceOrientationLandscapeRight"
+        ],
+        "UISupportedInterfaceOrientations~ipad": [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationPortraitUpsideDown",
+          "UIInterfaceOrientationLandscapeLeft",
+          "UIInterfaceOrientationLandscapeRight"
+        ]
       }
     },
     "android": {
-      "package": "com.classbridge.mobile",
+      "package": "com.krishnaveni.talentschool",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/Image.png",
+        "backgroundColor": "#FF6B35"
       },
+      "icon": "./assets/images/Image.png",
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE"
-      ]
+      ],
+      "screenOrientation": "unspecified"
     },
     "web": {
       "bundler": "metro",

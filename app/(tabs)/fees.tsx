@@ -2,24 +2,35 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useClassSelection } from '../../src/contexts/ClassSelectionContext';
+import { useAuth } from '../../src/contexts/AuthContext';
 import { colors, spacing, borderRadius, typography, shadows } from '../../lib/design-system';
-import { FeeComponents, FeePlans } from '../../src/components/fees';
+import { FeeComponents, FeePlans, StudentFeesView } from '../../src/components/fees';
 import { Settings, CreditCard } from 'lucide-react-native';
 
 export default function FeesScreen() {
+  const { profile } = useAuth();
   const { scope } = useClassSelection();
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const [activeTab, setActiveTab] = useState<'components' | 'plans'>('components');
 
-  // Update active tab based on URL parameter
+  const isStudent = profile?.role === 'student';
+
+  // Update active tab based on URL parameter (must be called before any early returns)
   useEffect(() => {
-    if (tab === 'components' || tab === 'plans') {
-      setActiveTab(tab);
-    } else {
-      // Default to components if no tab specified
-      setActiveTab('components');
+    if (!isStudent) {
+      if (tab === 'components' || tab === 'plans') {
+        setActiveTab(tab);
+      } else {
+        // Default to components if no tab specified
+        setActiveTab('components');
+      }
     }
-  }, [tab]);
+  }, [tab, isStudent]);
+
+  // Show student view if user is a student
+  if (isStudent) {
+    return <StudentFeesView />;
+  }
 
 
   return (

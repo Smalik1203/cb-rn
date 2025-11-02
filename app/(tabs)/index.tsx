@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Dimensions } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Dimensions, Animated } from 'react-native';
 import { Text } from 'react-native-paper';
-import { CalendarRange, UserCheck, CreditCard, NotebookText, UsersRound, LineChart, TrendingUp, Bell, Activity, FileText, CalendarDays, CheckCircle2, Target, AlertCircle, FolderOpen } from 'lucide-react-native';
+import { CalendarRange, UserCheck, CreditCard, NotebookText, UsersRound, LineChart, TrendingUp, Bell, Activity, FileText, CalendarDays, CheckCircle2, Target, AlertCircle, FolderOpen, ArrowUpRight, ArrowDownRight, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { colors, typography, spacing, borderRadius, shadows } from '../../lib/design-system';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -9,6 +9,7 @@ import { useClass } from '../../src/hooks/useClasses';
 import { useDashboardStats, useRecentActivity, useUpcomingEvents, useFeeOverview, useTaskOverview } from '../../src/hooks/useDashboard';
 import { Card, Badge, Avatar } from '../../src/components/ui';
 import { ThreeStateView } from '../../src/components/common/ThreeStateView';
+import { ProgressRing } from '../../src/components/analytics/ProgressRing';
 import { log } from '../../src/lib/logger';
 
 const { width } = Dimensions.get('window');
@@ -130,7 +131,7 @@ export default function DashboardScreen() {
     },
   ];
 
-  // Dynamic stats based on real data
+  // Dynamic stats based on real data with navigation and trends
   const dashboardStats = stats ? [
     {
       title: 'Today\'s Classes',
@@ -139,6 +140,9 @@ export default function DashboardScreen() {
       icon: CalendarRange,
       color: colors.primary[600],
       bgColor: colors.primary[50],
+      route: '/(tabs)/timetable',
+      showProgress: false,
+      trend: null,
     },
     {
       title: isStudent ? 'Month Attendance' : 'Total Students',
@@ -147,6 +151,10 @@ export default function DashboardScreen() {
       icon: isStudent ? TrendingUp : UsersRound,
       color: isStudent ? (stats.attendancePercentage >= 90 ? colors.success[600] : stats.attendancePercentage >= 80 ? colors.info[600] : stats.attendancePercentage >= 75 ? colors.warning[600] : colors.error[600]) : colors.info[600],
       bgColor: isStudent ? (stats.attendancePercentage >= 90 ? colors.success[50] : stats.attendancePercentage >= 80 ? colors.info[50] : stats.attendancePercentage >= 75 ? colors.warning[50] : colors.error[50]) : colors.info[50],
+      route: isStudent ? '/(tabs)/attendance' : '/(tabs)/manage',
+      showProgress: isStudent,
+      progressValue: isStudent ? stats.attendancePercentage : undefined,
+      trend: isStudent ? (stats.attendancePercentage >= 75 ? 'up' : 'down') : null,
     },
     {
       title: 'Assignments',
@@ -155,6 +163,9 @@ export default function DashboardScreen() {
       icon: FileText,
       color: stats.pendingAssignments > 0 ? colors.warning[600] : colors.success[600],
       bgColor: stats.pendingAssignments > 0 ? colors.warning[50] : colors.success[50],
+      route: '/(tabs)/tasks',
+      showProgress: false,
+      trend: null,
     },
     {
       title: 'Upcoming Tests',
@@ -163,6 +174,9 @@ export default function DashboardScreen() {
       icon: Target,
       color: stats.upcomingTests > 0 ? colors.error[600] : colors.success[600],
       bgColor: stats.upcomingTests > 0 ? colors.error[50] : colors.success[50],
+      route: '/(tabs)/assessments',
+      showProgress: false,
+      trend: null,
     },
     ...(isStudent ? [{
       title: 'Week Attendance',
@@ -171,9 +185,17 @@ export default function DashboardScreen() {
       icon: UserCheck,
       color: stats.weekAttendance >= 90 ? colors.success[600] : stats.weekAttendance >= 75 ? colors.info[600] : colors.warning[600],
       bgColor: stats.weekAttendance >= 90 ? colors.success[50] : stats.weekAttendance >= 75 ? colors.info[50] : colors.warning[50],
+      route: '/(tabs)/attendance',
+      showProgress: true,
+      progressValue: stats.weekAttendance,
+      trend: stats.weekAttendance >= 75 ? 'up' : 'down',
     }] : []),
   ] : [];
 
+  // Get most recent task/test for quick access
+  const mostRecentTask = recentActivity?.find(a => a.type === 'assignment');
+  const mostRecentTest = recentActivity?.find(a => a.type === 'test');
+  
   const viewState = (authLoading || statsLoading || activityLoading) ? 'loading' : (statsError || activityError) ? 'error' : !profile ? 'empty' : 'success';
   
   // Determine if user has incomplete profile (fallback profile)
@@ -232,9 +254,6 @@ export default function DashboardScreen() {
             >
               <View style={styles.notificationIconContainer}>
                 <Bell size={22} color={colors.primary[600]} />
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>3</Text>
-                </View>
               </View>
             </TouchableOpacity>
           </View>
@@ -265,28 +284,115 @@ export default function DashboardScreen() {
 
         {/* Stats Grid - Enhanced with Visual Hierarchy */}
         <View style={styles.statsSection}>
-          <Text style={styles.sectionTitleBold}>Overview</Text>
           <View style={styles.statsGrid}>
-            {dashboardStats && dashboardStats.map((stat, index) => (
-              <TouchableOpacity 
-                key={index} 
-                style={styles.statCard}
-                activeOpacity={0.8}
-              >
-                <View style={styles.statHeader}>
-                  <View style={[styles.statIconContainer, { backgroundColor: stat.bgColor }]}>
-                    <stat.icon size={18} color={stat.color} strokeWidth={2.5} />
+            {statsLoading ? (
+              // Skeleton loaders for stats
+              Array.from({ length: isStudent ? 5 : 4 }).map((_, index) => (
+                <View key={index} style={[styles.statCard, styles.statCardSkeleton]}>
+                  <View style={[styles.statSkeletonIcon, { backgroundColor: colors.neutral[200] }]} />
+                  <View style={[styles.statSkeletonValue, { backgroundColor: colors.neutral[200] }]} />
+                  <View style={[styles.statSkeletonTitle, { backgroundColor: colors.neutral[200] }]} />
+                  <View style={[styles.statSkeletonChange, { backgroundColor: colors.neutral[200] }]} />
+                </View>
+              ))
+            ) : (
+              dashboardStats && dashboardStats.map((stat, index) => (
+                <TouchableOpacity 
+                  key={index} 
+                  style={styles.statCard}
+                  activeOpacity={0.7}
+                  onPress={() => stat.route && router.push(stat.route as any)}
+                >
+                  <View style={styles.statHeader}>
+                    <View style={[styles.statIconContainer, { backgroundColor: stat.bgColor }]}>
+                      <stat.icon size={18} color={stat.color} strokeWidth={2.5} />
+                    </View>
+                    {stat.trend && (
+                      <View style={styles.trendIndicator}>
+                        {stat.trend === 'up' ? (
+                          <ArrowUpRight size={12} color={colors.success[600]} />
+                        ) : (
+                          <ArrowDownRight size={12} color={colors.error[600]} />
+                        )}
+                      </View>
+                    )}
+                    {stat.route && (
+                      <ChevronRight size={14} color={colors.text.tertiary} style={styles.chevronIcon} />
+                    )}
                   </View>
-                </View>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statTitle}>{stat.title}</Text>
-                <View style={[styles.statIndicator, { backgroundColor: stat.color }]}>
-                  <Text style={styles.statChange}>{stat.change}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+                  {stat.showProgress && stat.progressValue !== undefined ? (
+                    <View style={styles.statProgressContainer}>
+                      <ProgressRing
+                        progress={stat.progressValue}
+                        size={60}
+                        strokeWidth={6}
+                        color={stat.color}
+                        backgroundColor={colors.neutral[100]}
+                        showPercentage={false}
+                      />
+                      <Text style={styles.statProgressValue}>{stat.value}</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.statValue}>{stat.value}</Text>
+                  )}
+                  <Text style={styles.statTitle}>{stat.title}</Text>
+                  <View style={[styles.statIndicator, { backgroundColor: stat.color }]}>
+                    <Text style={styles.statChange}>{stat.change}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
           </View>
         </View>
+
+        {/* Quick Access - Most Recent Items */}
+        {(mostRecentTask || mostRecentTest) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Quick Access</Text>
+            <View style={styles.quickAccessContainer}>
+              {mostRecentTask && (
+                <TouchableOpacity
+                  style={styles.quickAccessCard}
+                  onPress={() => router.push('/(tabs)/tasks')}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.quickAccessIcon, { backgroundColor: colors.info[50] }]}>
+                    <FileText size={20} color={colors.info[600]} />
+                  </View>
+                  <View style={styles.quickAccessContent}>
+                    <Text style={styles.quickAccessTitle} numberOfLines={1}>
+                      {mostRecentTask.title}
+                    </Text>
+                    <Text style={styles.quickAccessSubtitle} numberOfLines={1}>
+                      {mostRecentTask.subtitle}
+                    </Text>
+                  </View>
+                  <ChevronRight size={16} color={colors.text.tertiary} />
+                </TouchableOpacity>
+              )}
+              {mostRecentTest && (
+                <TouchableOpacity
+                  style={styles.quickAccessCard}
+                  onPress={() => router.push('/(tabs)/assessments')}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.quickAccessIcon, { backgroundColor: colors.secondary[50] }]}>
+                    <Target size={20} color={colors.secondary[600]} />
+                  </View>
+                  <View style={styles.quickAccessContent}>
+                    <Text style={styles.quickAccessTitle} numberOfLines={1}>
+                      {mostRecentTest.title}
+                    </Text>
+                    <Text style={styles.quickAccessSubtitle} numberOfLines={1}>
+                      {mostRecentTest.subtitle}
+                    </Text>
+                  </View>
+                  <ChevronRight size={16} color={colors.text.tertiary} />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
 
         {/* Class Overview (Admin/Teacher Only) */}
         {isAdmin && stats && (
@@ -691,31 +797,12 @@ const styles = StyleSheet.create({
     padding: spacing.xs,
   },
   notificationIconContainer: {
-    position: 'relative',
     width: 44,
     height: 44,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.primary[50],
     borderRadius: borderRadius.full,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    backgroundColor: colors.error[600],
-    borderRadius: 10,
-    width: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.background.primary,
-  },
-  notificationBadgeText: {
-    fontSize: 10,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.inverse,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -729,7 +816,13 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
     ...shadows.sm,
   },
+  statCardSkeleton: {
+    opacity: 0.6,
+  },
   statHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: spacing.sm,
   },
   statIconContainer: {
@@ -738,6 +831,26 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  trendIndicator: {
+    marginLeft: 'auto',
+    marginRight: spacing.xs,
+    padding: 2,
+  },
+  chevronIcon: {
+    marginLeft: 'auto',
+  },
+  statProgressContainer: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: spacing.xs,
+  },
+  statProgressValue: {
+    position: 'absolute',
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
   },
   statValue: {
     fontSize: typography.fontSize['2xl'],
@@ -762,6 +875,31 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.bold,
     color: colors.text.inverse,
+  },
+  // Skeleton styles
+  statSkeletonIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.sm,
+  },
+  statSkeletonValue: {
+    width: '60%',
+    height: 28,
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.xs,
+  },
+  statSkeletonTitle: {
+    width: '80%',
+    height: 14,
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.xs,
+  },
+  statSkeletonChange: {
+    width: '50%',
+    height: 20,
+    borderRadius: borderRadius.sm,
+    marginTop: spacing.xs,
   },
   section: {
     paddingHorizontal: spacing.md,
@@ -926,12 +1064,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     marginBottom: spacing.md,
   },
-  sectionTitleBold: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.md,
-  },
   activityCard: {
     padding: spacing.md,
   },
@@ -1005,6 +1137,41 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.inverse,
+  },
+  quickAccessContainer: {
+    gap: spacing.sm,
+  },
+  quickAccessCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface.primary,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    ...shadows.sm,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
+  quickAccessIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: borderRadius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  quickAccessContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  quickAccessTitle: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    marginBottom: 2,
+  },
+  quickAccessSubtitle: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.secondary,
   },
   classOverviewCard: {
     padding: spacing.md,

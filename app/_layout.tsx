@@ -5,6 +5,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { PaperProvider } from 'react-native-paper';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { useEffect } from 'react';
+import * as SystemUI from 'expo-system-ui';
 import { queryClient } from '../src/lib/queryClient';
 import { AuthProvider } from '../src/contexts/AuthContext';
 import { ClassSelectionProvider } from '../src/contexts/ClassSelectionContext';
@@ -15,6 +17,11 @@ import { DrawerContent } from '../src/components/layout/DrawerContent';
 
 export default function RootLayout() {
   useFrameworkReady();
+
+  // Force light mode at runtime
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync('#fffbf9'); // Match app background color
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

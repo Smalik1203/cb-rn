@@ -31,7 +31,6 @@ import {
   Layers,
   ReceiptText,
   FolderOpen,
-  Zap,
   FileText
 } from 'lucide-react-native';
 import { colors, spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
@@ -75,8 +74,7 @@ const MENU: MenuItem[] = [
     icon: CalendarRange, 
     route: '/(tabs)/timetable', 
     section: 'Main',
-    description: 'Class schedules',
-    badge: 2
+    description: 'Class schedules'
   },
   { 
     key: 'resources', 
@@ -111,8 +109,7 @@ const MENU: MenuItem[] = [
     route: '/(tabs)/attendance', 
     roles: ['admin', 'superadmin', 'cb_admin'], 
     section: 'Academic',
-    description: 'Track student attendance',
-    badge: 5
+    description: 'Track student attendance'
   },
   {
     key: 'assessments',
@@ -180,16 +177,6 @@ const MENU: MenuItem[] = [
     roles: ['admin', 'superadmin', 'cb_admin'], 
     section: 'Academic',
     description: 'Class administration'
-  },
-  {
-    key: 'setup',
-    label: 'Setup School',
-    icon: Zap,
-    route: '/(tabs)/setup',
-    roles: ['superadmin'],
-    section: 'Admin',
-    description: 'Quick school setup wizard',
-    isNew: true
   },
   {
     key: 'add_admin',

@@ -96,7 +96,7 @@ function CleanTimetableCard({
               activeOpacity={0.6}
             >
               <View style={styles.menuIconContainer}>
-                <Edit size={18} color="#0ea5e9" />
+                <Edit size={18} color={colors.info[500]} />
               </View>
             </TouchableOpacity>
           </View>
@@ -108,7 +108,7 @@ function CleanTimetableCard({
             {slot.topic_name && (
               <View style={styles.cleanTopicInfo}>
                 <View style={styles.cleanInfoLabelRow}>
-                  <BookOpen size={12} color="#6b7280" />
+                  <BookOpen size={12} color={colors.text.secondary} />
                   <Text style={styles.cleanTopicLabel}>Topic:</Text>
                 </View>
                 <Text style={styles.cleanTopicText} numberOfLines={2}>
@@ -119,7 +119,7 @@ function CleanTimetableCard({
             {slot.teacher_name && (
               <View style={styles.cleanTeacherInfo}>
                 <View style={styles.cleanInfoLabelRow}>
-                  <User size={12} color="#6b7280" />
+                  <User size={12} color={colors.text.secondary} />
                   <Text style={styles.cleanTeacherLabel}>Teacher:</Text>
                 </View>
                 <Text style={styles.cleanTeacherText} numberOfLines={1}>
@@ -191,7 +191,7 @@ function ModernTimetableSlotCard({
           style={styles.modernCardMenu}
           activeOpacity={0.7}
         >
-          <MoreVertical size={20} color="#6b7280" />
+          <MoreVertical size={20} color={colors.text.secondary} />
         </TouchableOpacity>
       </View>
     );
@@ -224,7 +224,7 @@ function ModernTimetableSlotCard({
             style={styles.modernCardMenu}
             activeOpacity={0.7}
           >
-            <MoreVertical size={20} color="#6b7280" />
+            <MoreVertical size={20} color={colors.text.secondary} />
           </TouchableOpacity>
         </View>
         
@@ -253,9 +253,9 @@ function ModernTimetableSlotCard({
             activeOpacity={0.7}
           >
             {isTaught ? (
-              <CheckCircle size={16} color="#16a34a" />
+              <CheckCircle size={16} color={colors.success[600]} />
             ) : (
-              <Circle size={16} color="#6b7280" />
+              <Circle size={16} color={colors.text.secondary} />
             )}
             <Text style={[
               styles.modernStatusText,
@@ -1177,8 +1177,8 @@ export function ModernTimetableScreen() {
               mode="outlined" 
               onPress={closeModal} 
               style={styles.cancelButton}
-              buttonColor="#ffffff"
-              textColor="#374151"
+              buttonColor={colors.surface.primary}
+              textColor={colors.text.primary}
               labelStyle={styles.buttonLabel}
             >
               Cancel
@@ -1187,8 +1187,8 @@ export function ModernTimetableScreen() {
               mode="contained"
               onPress={editingSlot ? handleEditSlot : handleAddSlot}
               style={styles.saveButton}
-              buttonColor="#6366f1"
-              textColor="#ffffff"
+              buttonColor={colors.primary[600]}
+              textColor={colors.text.inverse}
               labelStyle={styles.buttonLabel}
             >
               {editingSlot ? 'Update' : 'Add'}
@@ -1273,8 +1273,8 @@ export function ModernTimetableScreen() {
           <Text style={styles.warningText}>⚠️ This will replace any existing slots for this date.</Text>
 
           <View style={styles.modalActions}>
-            <Button mode="outlined" onPress={() => setShowQuickGenerateModal(false)} style={styles.cancelButton} textColor="#374151" labelStyle={styles.buttonLabel}>Cancel</Button>
-            <Button mode="contained" onPress={handleQuickGenerate} style={styles.confirmButton} buttonColor="#6366f1" textColor="#ffffff" labelStyle={styles.buttonLabel}>OK</Button>
+            <Button mode="outlined" onPress={() => setShowQuickGenerateModal(false)} style={styles.cancelButton} textColor={colors.text.primary} labelStyle={styles.buttonLabel}>Cancel</Button>
+            <Button mode="contained" onPress={handleQuickGenerate} style={styles.confirmButton} buttonColor={colors.primary[600]} textColor={colors.text.inverse} labelStyle={styles.buttonLabel}>OK</Button>
           </View>
         </Modal>
       </Portal>
@@ -1317,7 +1317,7 @@ export function ModernTimetableScreen() {
                   {subject.subject_name}
                 </Text>
                 {slotForm.subject_id === subject.id && (
-                  <CheckCircle size={20} color="#6366f1" />
+                  <CheckCircle size={20} color={colors.primary[600]} />
                 )}
               </TouchableOpacity>
             ))}
@@ -1363,7 +1363,7 @@ export function ModernTimetableScreen() {
                   {teacher.full_name}
                 </Text>
                 {slotForm.teacher_id === teacher.id && (
-                  <CheckCircle size={20} color="#6366f1" />
+                  <CheckCircle size={20} color={colors.primary[600]} />
                 )}
               </TouchableOpacity>
             ))}
@@ -1409,7 +1409,7 @@ export function ModernTimetableScreen() {
                   {getChapterName(chapter.chapter_id)}
                 </Text>
                 {slotForm.syllabus_chapter_id === chapter.chapter_id && (
-                  <CheckCircle size={20} color="#6366f1" />
+                  <CheckCircle size={20} color={colors.primary[600]} />
                 )}
               </TouchableOpacity>
             ))}
@@ -1455,7 +1455,7 @@ export function ModernTimetableScreen() {
                   {getTopicName(topic.topic_id)}
                 </Text>
                 {slotForm.syllabus_topic_id === topic.topic_id && (
-                  <CheckCircle size={20} color="#6366f1" />
+                  <CheckCircle size={20} color={colors.primary[600]} />
                 )}
               </TouchableOpacity>
             ))}
@@ -1554,7 +1554,7 @@ export function ModernTimetableScreen() {
           }}
           activeOpacity={0.85}
         >
-          <Plus size={24} color="#ffffff" />
+          <Plus size={24} color={colors.text.inverse} />
         </TouchableOpacity>
       )}
 
@@ -1610,7 +1610,7 @@ export function ModernTimetableScreen() {
                 }}
                 activeOpacity={0.8}
               >
-                <Settings size={18} color="#f59e0b" />
+                <Settings size={18} color={colors.warning[600]} />
                 <Text style={styles.actionText}>Quick Generate</Text>
               </TouchableOpacity>
             </View>
@@ -1619,7 +1619,7 @@ export function ModernTimetableScreen() {
                 mode="outlined"
                 onPress={() => setShowActionsModal(false)}
                 style={styles.actionsModalCancelButton}
-                textColor="#374151"
+                textColor={colors.text.primary}
               >
                 Close
               </Button>
@@ -1634,17 +1634,17 @@ export function ModernTimetableScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f4ff',
+    backgroundColor: colors.background.app,
   },
   
   // Modern Header
   header: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface.primary,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     paddingTop: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: colors.border.light,
     ...shadows.sm,
   },
   headerContent: {
@@ -1661,15 +1661,15 @@ const styles = StyleSheet.create({
   backButton: {
     padding: spacing.sm,
     borderRadius: borderRadius.md,
-    backgroundColor: '#f0f4ff',
+    backgroundColor: colors.background.tertiary,
     borderWidth: 1,
-    borderColor: '#c7d2fe',
+    borderColor: colors.border.light,
     ...shadows.xs,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000000',
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
   },
   refreshHint: {
     flexDirection: 'row',
@@ -1678,8 +1678,9 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   refreshHintText: {
-    fontSize: 11,
-    color: '#9ca3af',
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.normal,
+    color: colors.text.tertiary,
     marginLeft: 4,
     fontStyle: 'italic',
   },
@@ -1691,7 +1692,7 @@ const styles = StyleSheet.create({
   headerActionButton: {
     padding: spacing.sm,
     borderRadius: borderRadius.md,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.neutral[50],
     ...shadows.xs,
   },
 
@@ -1701,9 +1702,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     gap: spacing.md,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface.primary,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: colors.border.light,
   },
   quickActionButton: {
     flex: 1,
@@ -1712,31 +1713,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    backgroundColor: '#6366f1',
+    backgroundColor: colors.primary[600],
     borderRadius: borderRadius.lg,
     gap: spacing.sm,
     ...shadows.sm,
   },
   quickActionButtonSecondary: {
-    backgroundColor: '#f0f4ff',
+    backgroundColor: colors.background.tertiary,
     borderWidth: 1,
-    borderColor: '#c7d2fe',
+    borderColor: colors.border.light,
   },
   quickActionText: {
-    fontSize: 14,
-    color: '#ffffff',
-    fontWeight: '600',
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.inverse,
   },
   quickActionTextSecondary: {
-    color: '#6366f1',
+    color: colors.primary[600],
   },
   quickActionButtonTertiary: {
-    backgroundColor: '#f0f4ff',
+    backgroundColor: colors.background.tertiary,
     borderWidth: 1,
-    borderColor: '#c7d2fe',
+    borderColor: colors.border.light,
   },
   quickActionTextTertiary: {
-    color: '#6366f1',
+    color: colors.primary[600],
   },
 
   // Main Scroll View
@@ -1749,52 +1750,52 @@ const styles = StyleSheet.create({
 
   // Clean UI Styles
   cleanHeader: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#ffffff',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface.primary,
   },
   cleanTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 4,
+    fontSize: typography.fontSize['3xl'],
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
   },
   cleanSubtitle: {
-    fontSize: 16,
-    color: '#6b7280',
-    fontWeight: '500',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.secondary,
   },
   quickActionsContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   // Filter bar styles (match calendar)
   filterBar: {
     flexDirection: 'row',
-    backgroundColor: '#FAFBFC',
+    backgroundColor: colors.background.secondary,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#E6E8EF',
+    borderBottomColor: colors.border.light,
     gap: spacing.md,
   },
   filterItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.full,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     gap: spacing.sm,
     flex: 1,
     borderWidth: 1,
-    borderColor: '#E6E8EF',
+    borderColor: colors.border.light,
   },
   filterIcon: {
     width: 32,
     height: 32,
-    borderRadius: 16,
-    backgroundColor: '#4F46E5',
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.primary[600],
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1803,32 +1804,29 @@ const styles = StyleSheet.create({
   },
   filterContent: { flex: 1 },
   filterLabel: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.normal,
+    color: colors.text.secondary,
     marginBottom: 2,
   },
   filterValue: {
-    color: '#111827',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
   },
 
   // Floating button
   fab: {
     position: 'absolute',
-    bottom: 16,
-    right: 16,
+    bottom: spacing.md,
+    right: spacing.md,
     width: 56,
     height: 56,
-    borderRadius: 28,
-    backgroundColor: '#4F46E5',
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.primary[600],
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
+    ...shadows.lg,
   },
   fabSecondary: {
     display: 'none',
@@ -1850,11 +1848,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginTop: 'auto',
     marginBottom: 'auto',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    ...shadows.lg,
   },
   actionsModalHeader: {
     flexDirection: 'row',
@@ -1951,15 +1945,15 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 12,
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.md,
   },
   actionText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
   },
   sectionTitle: {
     fontSize: 20,
@@ -2129,42 +2123,37 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   cleanPeriodCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.md,
+    ...shadows.sm,
     flexDirection: 'row',
     overflow: 'hidden',
     minHeight: 100, // Increased height to show all content
     borderLeftWidth: 4,
-    borderLeftColor: '#e5e7eb', // Default gray for pending
-    marginHorizontal: 4,
-    marginBottom: 8,
+    borderLeftColor: colors.neutral[300], // Default gray for pending
+    marginHorizontal: spacing.xs,
+    marginBottom: spacing.sm,
   },
   cleanCurrentCard: {
     borderWidth: 2,
-    borderColor: '#10b981',
-    shadowOpacity: 0.15,
-    elevation: 4,
+    borderColor: colors.success[600],
+    ...shadows.md,
   },
   cleanUpcomingCard: {
     borderWidth: 1,
-    borderColor: '#3b82f6',
+    borderColor: colors.info[600],
   },
   cleanPastCard: {
     opacity: 0.7,
   },
   cleanCompletedCard: {
-    borderLeftColor: '#8b5cf6', // Purple for completed
-    backgroundColor: '#faf5ff', // Light purple background
+    borderLeftColor: colors.secondary[600], // Secondary color for completed
+    backgroundColor: colors.secondary[50], // Light secondary background
     borderLeftWidth: 4,
   },
   cleanPendingCard: {
-    borderLeftColor: '#8b5cf6', // Purple for pending
-    backgroundColor: '#ffffff', // White background
+    borderLeftColor: colors.primary[600], // Primary orange for pending
+    backgroundColor: colors.surface.primary, // White background
     borderLeftWidth: 4,
   },
   cleanPeriodLeftBorder: {
@@ -2196,27 +2185,23 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   cleanTimeText: {
-    fontSize: isTablet ? 15 : 13,
-    fontWeight: '700',
-    color: '#1f2937',
-    lineHeight: isTablet ? 16 : 14,
+    fontSize: isTablet ? typography.fontSize.base : typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    lineHeight: isTablet ? typography.lineHeight.snug : typography.lineHeight.normal,
     textAlign: 'left',
     flexShrink: 0,
   },
   cleanCardMenu: {
-    padding: 8,
+    padding: spacing.sm,
     minWidth: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
-    backgroundColor: '#f0f9ff',
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.info[50],
     borderWidth: 1,
-    borderColor: '#bae6fd',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 1,
+    borderColor: colors.info[200],
+    ...shadows.xs,
   },
   menuIconContainer: {
     width: 24,
@@ -2226,10 +2211,10 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   cleanSubjectName: {
-    fontSize: isTablet ? 18 : 16,
-    fontWeight: '700',
-    color: '#1f2937',
-    lineHeight: isTablet ? 20 : 18,
+    fontSize: isTablet ? typography.fontSize.lg : typography.fontSize.base,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    lineHeight: isTablet ? typography.lineHeight.snug : typography.lineHeight.normal,
     textAlign: 'left',
     flex: 1,
     flexWrap: 'wrap',
@@ -2241,21 +2226,22 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   cleanPlanText: {
-    fontSize: 14,
-    color: '#6b7280',
-    lineHeight: 20,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.normal,
+    color: colors.text.secondary,
+    lineHeight: typography.lineHeight.normal,
     marginBottom: 0,
   },
   cleanInfoRow: {
     flexDirection: 'row',
-    gap: isTablet ? 16 : 12,
-    marginTop: 6,
-    marginBottom: 4,
+    gap: isTablet ? spacing.md : spacing.md,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
     paddingHorizontal: 0,
     alignItems: 'flex-start',
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
-    paddingTop: 6,
+    borderTopColor: colors.border.light,
+    paddingTop: spacing.xs,
   },
   cleanTopicInfo: {
     flex: 2,
@@ -2266,53 +2252,49 @@ const styles = StyleSheet.create({
     minWidth: 0, // Allow text to wrap
   },
   cleanTopicLabel: {
-    fontSize: 11,
-    color: '#6b7280',
-    fontWeight: '600',
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.secondary,
     marginBottom: 3,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: typography.letterSpacing.wide,
   },
   cleanTopicText: {
-    fontSize: isTablet ? 16 : 14,
-    color: '#1f2937',
-    fontWeight: '600',
-    lineHeight: isTablet ? 20 : 16,
+    fontSize: isTablet ? typography.fontSize.base : typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    lineHeight: isTablet ? typography.lineHeight.normal : typography.lineHeight.snug,
     flexWrap: 'wrap',
   },
   cleanTeacherLabel: {
-    fontSize: 11,
-    color: '#6b7280',
-    fontWeight: '600',
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.secondary,
     marginBottom: 3,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: typography.letterSpacing.wide,
   },
   cleanTeacherText: {
-    fontSize: isTablet ? 15 : 13,
-    color: '#1f2937',
-    fontWeight: '600',
-    lineHeight: isTablet ? 18 : 14,
+    fontSize: isTablet ? typography.fontSize.base : typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    lineHeight: isTablet ? typography.lineHeight.normal : typography.lineHeight.snug,
     flexWrap: 'wrap',
   },
   cleanBreakCard: {
-    backgroundColor: '#fefce8',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: colors.warning[50],
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
-    elevation: 1,
+    ...shadows.xs,
     minHeight: 100, // Increased height to match period cards
     opacity: 0.9,
     borderLeftWidth: 4,
-    borderLeftColor: '#a16207',
-    marginHorizontal: 4,
-    marginBottom: 8,
+    borderLeftColor: colors.warning[700],
+    marginHorizontal: spacing.xs,
+    marginBottom: spacing.sm,
   },
   cleanBreakContent: {
     flexDirection: 'row',
@@ -2326,123 +2308,115 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cleanBreakTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#92400e',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.warning[800],
     marginBottom: 2,
   },
   cleanBreakTime: {
-    fontSize: 14,
-    color: '#a16207',
-    fontWeight: '500',
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.warning[700],
   },
 
   // Slot Menu Styles
   slotMenuContainer: {
-    backgroundColor: '#ffffff',
-    margin: 20,
-    borderRadius: 16,
+    backgroundColor: colors.surface.primary,
+    margin: spacing.lg,
+    borderRadius: borderRadius.xl,
     padding: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    ...shadows.lg,
   },
   slotMenuHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    padding: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: colors.border.light,
   },
   slotMenuTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1f2937',
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
   },
   slotMenuActions: {
-    padding: 8,
+    padding: spacing.sm,
   },
   slotMenuAction: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    gap: 12,
-    borderRadius: 12,
-    marginVertical: 4,
+    padding: spacing.md,
+    gap: spacing.md,
+    borderRadius: borderRadius.md,
+    marginVertical: spacing.xs,
   },
   slotMenuDeleteAction: {
-    backgroundColor: '#fef2f2',
+    backgroundColor: colors.error[50],
   },
   slotMenuActionText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
   },
   slotMenuDeleteText: {
-    color: '#ef4444',
+    color: colors.error[600],
   },
   slotMenuMarkAction: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.neutral[50],
   },
   slotMenuUnmarkAction: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.neutral[50],
   },
   slotMenuMarkText: {
-    color: '#6b7280',
+    color: colors.text.secondary,
   },
   slotMenuUnmarkText: {
-    color: '#6b7280',
+    color: colors.text.secondary,
   },
 
   // Modern Bottom Action Buttons
   bottomActions: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 12,
-    backgroundColor: '#f8fafc',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
+    backgroundColor: colors.neutral[50],
     borderTopWidth: 1,
-    borderTopColor: '#cbd5e1',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    borderTopColor: colors.border.light,
+    ...shadows.md,
   },
   bottomActionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: '#1d4ed8',
-    gap: 8,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primary[600],
+    gap: spacing.sm,
   },
   bottomActionButtonSecondary: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface.primary,
     borderWidth: 1,
-    borderColor: '#f59e0b',
+    borderColor: colors.warning[600],
   },
   bottomActionButtonTertiary: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface.primary,
     borderWidth: 1,
-    borderColor: '#8b5cf6',
+    borderColor: colors.secondary[600],
   },
   bottomActionText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#ffffff',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.inverse,
   },
   bottomActionTextSecondary: {
-    color: '#6366f1',
+    color: colors.primary[600],
   },
   bottomActionTextTertiary: {
-    color: '#6366f1',
+    color: colors.primary[600],
   },
 
   // Loading States
@@ -2459,15 +2433,16 @@ const styles = StyleSheet.create({
   loadingSpinner: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: borderRadius.full,
     borderWidth: 3,
-    borderColor: '#c7d2fe',
-    borderTopColor: '#6366f1',
+    borderColor: colors.primary[200],
+    borderTopColor: colors.primary[600],
     // Add rotation animation here if needed
   },
   loadingText: {
-    fontSize: 16,
-    color: '#374151',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.normal,
+    color: colors.text.primary,
   },
 
   // Error States
@@ -2478,19 +2453,20 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   errorTitle: {
-    fontSize: 24,
-    color: '#ef4444',
-    fontWeight: '600',
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.error[600],
     marginBottom: spacing.sm,
   },
   errorMessage: {
-    fontSize: 16,
-    color: '#374151',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.normal,
+    color: colors.text.primary,
     textAlign: 'center',
     marginBottom: spacing.lg,
   },
   retryButton: {
-    backgroundColor: '#6366f1',
+    backgroundColor: colors.primary[600],
   },
 
   // Empty States
@@ -2500,30 +2476,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.xl,
     paddingVertical: 80,
-    backgroundColor: '#f8faff',
-    borderRadius: 20,
-    margin: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    backgroundColor: colors.surface.secondary,
+    borderRadius: borderRadius.xl,
+    margin: spacing.sm,
+    ...shadows.sm,
   },
   emptyStateIcon: {
     marginBottom: spacing.lg,
   },
   emptyStateTitle: {
-    fontSize: 24,
-    color: '#000000',
-    fontWeight: '600',
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
     marginBottom: spacing.md,
     textAlign: 'center',
   },
   emptyStateMessage: {
-    fontSize: 16,
-    color: '#374151',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.normal,
+    color: colors.text.primary,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: typography.lineHeight.relaxed,
   },
 
   // Timetable
@@ -2539,7 +2512,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.xl,
     paddingVertical: 80,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface.primary,
   },
   emptyTimetableIcon: {
     marginBottom: spacing.lg,
@@ -3281,135 +3254,122 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dateChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginRight: 6,
-    borderRadius: 10,
-    backgroundColor: '#f0f9ff',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    marginRight: spacing.xs,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.info[50],
     alignItems: 'center',
     minWidth: 48,
     height: 40,
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#7dd3fc',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 1,
+    borderColor: colors.info[200],
+    ...shadows.xs,
   },
   dateChipSelected: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#1d4ed8',
+    backgroundColor: colors.primary[600],
+    borderColor: colors.primary[700],
   },
   dateChipToday: {
-    backgroundColor: '#bfdbfe',
-    borderColor: '#3b82f6',
+    backgroundColor: colors.primary[200],
+    borderColor: colors.primary[600],
   },
   dateChipDay: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '500',
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.secondary,
     textTransform: 'uppercase',
   },
   dateChipDaySelected: {
-    color: '#ffffff',
+    color: colors.text.inverse,
   },
   dateChipDate: {
-    fontSize: 16,
-    color: '#111827',
-    fontWeight: '600',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
     marginTop: 2,
   },
   dateChipDateSelected: {
-    color: '#ffffff',
+    color: colors.text.inverse,
   },
   
   // Modern Timetable
   modernScrollView: {
     flex: 1,
-    backgroundColor: '#f0f4ff',
+    backgroundColor: colors.background.app,
   },
   modernSlotsContainer: {
-    padding: 16,
-    backgroundColor: '#f8faff',
-    borderRadius: 20,
-    margin: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    padding: spacing.md,
+    backgroundColor: colors.surface.secondary,
+    borderRadius: borderRadius.xl,
+    margin: spacing.sm,
+    ...shadows.sm,
   },
   timetableHeaders: {
     flexDirection: 'row',
-    marginBottom: 12,
-    paddingHorizontal: 4,
-    backgroundColor: '#e0e7ff',
-    paddingVertical: 8,
-    borderRadius: 12,
-    marginHorizontal: 4,
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.xs,
+    backgroundColor: colors.primary[100],
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    marginHorizontal: spacing.xs,
   },
   timeHeader: {
-    fontSize: 12,
-    color: '#1d4ed8',
-    fontWeight: '700',
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.info[900],
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: typography.letterSpacing.wide,
     flex: 0.3,
   },
   subjectHeader: {
-    fontSize: 12,
-    color: '#1d4ed8',
-    fontWeight: '700',
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.info[900],
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: typography.letterSpacing.wide,
     flex: 0.7,
   },
   
   // Modern Period Cards
   modernPeriodCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    marginBottom: 10,
-    padding: 16,
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.md,
+    padding: spacing.md,
     flexDirection: 'row',
     borderLeftWidth: 4,
-    borderLeftColor: '#3b82f6',
+    borderLeftColor: colors.info[600],
     borderWidth: 1,
-    borderColor: '#e0f2fe',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
+    borderColor: colors.info[100],
+    ...shadows.DEFAULT,
   },
   modernCurrentPeriodCard: {
-    borderLeftColor: '#059669',
-    borderColor: '#a7f3d0',
-    shadowOpacity: 0.15,
-    elevation: 4,
+    borderLeftColor: colors.success[600],
+    borderColor: colors.success[200],
+    ...shadows.md,
   },
   modernUpcomingPeriodCard: {
-    borderLeftColor: '#3b82f6',
+    borderLeftColor: colors.info[600],
   },
   modernPastPeriodCard: {
     opacity: 0.7,
   },
   modernPeriodTime: {
     flex: 0.3,
-    marginRight: 16,
+    marginRight: spacing.md,
   },
   modernPeriodTimeText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
     marginBottom: 2,
   },
   modernPeriodTimeEnd: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '500',
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.secondary,
   },
   modernPeriodContent: {
     flex: 0.7,

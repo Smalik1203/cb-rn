@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, Alert, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { TextInput, Text, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../src/lib/supabase';
 import { useAuth } from '../src/contexts/AuthContext';
-import { GraduationCap, Eye, EyeOff, Mail, Lock } from 'lucide-react-native';
+import { Eye, EyeOff, Mail, Lock } from 'lucide-react-native';
 import { colors, typography, spacing, borderRadius, shadows } from '../lib/design-system';
 import { isRateLimited, getRemainingAttempts, getResetTime, clearRateLimit } from '../src/utils/rateLimiter';
 import { sanitizeEmail } from '../src/utils/sanitize';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { height } = Dimensions.get('window');
 
@@ -62,7 +64,7 @@ export default function LoginScreen() {
   if (auth.loading) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={colors.primary[500]} />
+        <ActivityIndicator size="large" color="#FF6B35" />
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
@@ -130,109 +132,164 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
+      <LinearGradient
+        colors={['#FFFFFF', '#FFFBF9', '#FFF5F0', '#FFE8DC']}
+        style={styles.gradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.formContainer}>
-            <View style={styles.logoSection}>
-              <View style={styles.logoContainer}>
-                <GraduationCap size={80} color={colors.primary[600]} />
-              </View>
-
-              <Text variant="displayMedium" style={styles.title}>
-                ClassBridge
-              </Text>
-              <Text variant="titleLarge" style={styles.subtitle}>
-                School Management System
-              </Text>
-              <Text style={styles.description}>
-                Connect, Learn, and Excel Together
-              </Text>
-            </View>
-
-            <View style={styles.formSection}>
-              <View style={styles.inputContainer}>
-                <View style={styles.inputWrapper}>
-                  <View style={styles.inputIcon}>
-                    <Mail size={20} color={colors.neutral[400]} />
-                  </View>
-                  <TextInput
-                    label="Email Address"
-                    value={email}
-                    onChangeText={setEmail}
-                    mode="outlined"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    disabled={loading}
-                    style={styles.input}
-                    theme={{
-                      colors: {
-                        primary: colors.primary[500],
-                        background: colors.surface.primary,
-                        surface: colors.surface.primary,
-                        outline: colors.neutral[300],
-                      },
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
+        >
+          <ScrollView 
+            contentContainerStyle={styles.scrollContent} 
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
+            <View style={styles.formContainer}>
+              {/* Logo Section */}
+              <View style={styles.logoSection}>
+                <View style={styles.logoContainer}>
+                  <Image
+                    source={require('../assets/images/Image.png')}
+                    style={styles.logoImage}
+                    contentFit="cover"
+                    transition={200}
+                    cachePolicy="memory-disk"
+                    onError={(error) => {
+                      console.error('Logo image failed to load:', error);
+                    }}
+                    onLoad={() => {
+                      console.log('Logo image loaded successfully');
                     }}
                   />
                 </View>
 
-                <View style={styles.inputWrapper}>
-                  <View style={styles.inputIcon}>
-                    <Lock size={20} color={colors.neutral[400]} />
-                  </View>
-                  <TextInput
-                    label="Password"
-                    value={password}
-                    onChangeText={setPassword}
-                    mode="outlined"
-                    secureTextEntry={!showPassword}
-                    disabled={loading}
-                    style={styles.input}
-                    onSubmitEditing={handleLogin}
-                    theme={{
-                      colors: {
-                        primary: colors.primary[500],
-                        background: colors.surface.primary,
-                        surface: colors.surface.primary,
-                        outline: colors.neutral[300],
-                      },
-                    }}
-                  />
-                  <TouchableOpacity
-                    style={styles.passwordToggle}
-                    onPress={() => setShowPassword(!showPassword)}
+                <Text style={styles.title}>Krishnaveni Talent School</Text>
+                <View style={styles.taglineContainer}>
+                  <LinearGradient
+                    colors={['#FF6B35', '#FF8C42']}
+                    style={styles.taglineBanner}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
                   >
-                    {showPassword ? (
-                      <EyeOff size={20} color={colors.neutral[400]} />
-                    ) : (
-                      <Eye size={20} color={colors.neutral[400]} />
-                    )}
+                    <Text style={styles.tagline}>MENTORED FOR LIFE</Text>
+                  </LinearGradient>
+                </View>
+              </View>
+
+              {/* Form Section */}
+              <View style={styles.formSection}>
+                <View style={styles.card}>
+                  <Text style={styles.welcomeText}>Welcome Back</Text>
+                  <Text style={styles.subtitleText}>Sign in to continue to your account</Text>
+
+                  <View style={styles.inputContainer}>
+                    <View style={styles.inputWrapper}>
+                      <View style={styles.inputIcon}>
+                        <Mail size={22} color="#FF6B35" />
+                      </View>
+                      <TextInput
+                        label="Email Address"
+                        value={email}
+                        onChangeText={setEmail}
+                        mode="outlined"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoComplete="email"
+                        disabled={loading}
+                        style={styles.input}
+                        contentStyle={styles.inputContent}
+                        theme={{
+                          colors: {
+                            primary: '#FF6B35',
+                            background: '#FFFFFF',
+                            surface: '#FFFFFF',
+                            outline: '#E0E0E0',
+                            onSurface: '#1A1A1A',
+                            placeholder: '#9E9E9E',
+                          },
+                        }}
+                      />
+                    </View>
+
+                    <View style={styles.inputWrapper}>
+                      <View style={styles.inputIcon}>
+                        <Lock size={22} color="#FF6B35" />
+                      </View>
+                      <TextInput
+                        label="Password"
+                        value={password}
+                        onChangeText={setPassword}
+                        mode="outlined"
+                        secureTextEntry={!showPassword}
+                        autoComplete="password"
+                        disabled={loading}
+                        style={styles.input}
+                        contentStyle={styles.inputContent}
+                        onSubmitEditing={handleLogin}
+                        theme={{
+                          colors: {
+                            primary: '#FF6B35',
+                            background: '#FFFFFF',
+                            surface: '#FFFFFF',
+                            outline: '#E0E0E0',
+                            onSurface: '#1A1A1A',
+                            placeholder: '#9E9E9E',
+                          },
+                        }}
+                      />
+                      <TouchableOpacity
+                        style={styles.passwordToggle}
+                        onPress={() => setShowPassword(!showPassword)}
+                        disabled={loading}
+                      >
+                        {showPassword ? (
+                          <EyeOff size={22} color="#666666" />
+                        ) : (
+                          <Eye size={22} color="#666666" />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={handleLogin}
+                    disabled={loading || !email || !password}
+                    style={[
+                      styles.loginButton,
+                      (loading || !email || !password) && styles.loginButtonDisabled
+                    ]}
+                    activeOpacity={0.8}
+                  >
+                    <LinearGradient
+                      colors={loading || !email || !password ? ['#CCCCCC', '#AAAAAA'] : ['#FF6B35', '#FF8C42']}
+                      style={styles.loginButtonGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                    >
+                      {loading ? (
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                      ) : (
+                        <Text style={styles.loginButtonText}>Sign In</Text>
+                      )}
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    onPress={handleForgotPassword} 
+                    style={styles.forgotPassword}
+                    disabled={loading}
+                  >
+                    <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
                   </TouchableOpacity>
                 </View>
               </View>
-
-              <TouchableOpacity
-                onPress={handleLogin}
-                disabled={loading}
-                style={[styles.loginButton, loading && styles.loginButtonDisabled]}
-                activeOpacity={0.8}
-              >
-                {loading ? (
-                  <ActivityIndicator color={colors.text.inverse} size="small" />
-                ) : (
-                  <Text style={styles.loginButtonText}>Sign In</Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotPassword}>
-                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-              </TouchableOpacity>
             </View>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </LinearGradient>
     </SafeAreaView>
   );
 }
@@ -240,7 +297,10 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.primary,
+    backgroundColor: '#FFFFFF',
+  },
+  gradient: {
+    flex: 1,
   },
   keyboardView: {
     flex: 1,
@@ -248,51 +308,89 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingVertical: spacing['10'],
+    paddingVertical: spacing['8'],
     minHeight: height,
   },
   formContainer: {
-    padding: spacing['6'],
+    paddingHorizontal: spacing['6'],
     alignItems: 'center',
     width: '100%',
   },
   logoSection: {
     alignItems: 'center',
-    marginBottom: spacing['12'],
+    marginBottom: spacing['8'],
+    width: '100%',
   },
   logoContainer: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: colors.primary[50],
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing['6'],
-    ...shadows.md,
+    ...shadows.lg,
+    borderWidth: 3,
+    borderColor: '#FFE8DC',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 75,
   },
   title: {
-    color: colors.text.primary,
-    fontWeight: typography.fontWeight.bold,
-    marginBottom: spacing['2'],
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1A237E',
+    marginBottom: spacing['3'],
     textAlign: 'center',
+    letterSpacing: 0.5,
   },
-  subtitle: {
-    color: colors.text.secondary,
-    marginBottom: spacing['2'],
-    textAlign: 'center',
+  taglineContainer: {
+    marginTop: spacing['2'],
+    width: '100%',
+    alignItems: 'center',
   },
-  description: {
-    color: colors.text.tertiary,
-    fontSize: typography.fontSize.base,
+  taglineBanner: {
+    paddingVertical: spacing['2'],
+    paddingHorizontal: spacing['6'],
+    borderRadius: borderRadius.full,
+    ...shadows.sm,
+  },
+  tagline: {
+    color: '#FFFFFF',
+    fontSize: typography.fontSize.sm,
+    fontWeight: 'bold',
+    letterSpacing: 2,
     textAlign: 'center',
-    fontWeight: typography.fontWeight.medium,
   },
   formSection: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 420,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: borderRadius['2xl'],
+    padding: spacing['6'],
+    ...shadows.lg,
+    borderWidth: 1,
+    borderColor: '#FFE8DC',
+  },
+  welcomeText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+    marginBottom: spacing['1'],
+    textAlign: 'center',
+  },
+  subtitleText: {
+    fontSize: typography.fontSize.base,
+    color: '#666666',
+    marginBottom: spacing['6'],
+    textAlign: 'center',
   },
   inputContainer: {
-    marginBottom: spacing['8'],
+    marginBottom: spacing['6'],
   },
   inputWrapper: {
     position: 'relative',
@@ -301,49 +399,56 @@ const styles = StyleSheet.create({
   inputIcon: {
     position: 'absolute',
     left: spacing['4'],
-    top: spacing['4'],
-    zIndex: 1,
+    top: spacing['5'],
+    zIndex: 10,
+    backgroundColor: '#FFFFFF',
+    padding: spacing['1'],
   },
   input: {
     paddingLeft: spacing['12'],
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.xl,
-    ...shadows.sm,
+    backgroundColor: '#FFFFFF',
+  },
+  inputContent: {
+    fontSize: typography.fontSize.base,
   },
   passwordToggle: {
     position: 'absolute',
     right: spacing['4'],
-    top: spacing['4'],
-    zIndex: 1,
+    top: spacing['5'],
+    zIndex: 10,
     padding: spacing['1'],
+    backgroundColor: '#FFFFFF',
   },
   loginButton: {
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.primary[500],
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
+    marginBottom: spacing['4'],
+    ...shadows.md,
+  },
+  loginButtonGradient: {
     paddingVertical: spacing['4'],
     paddingHorizontal: spacing['6'],
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing['6'],
-    ...shadows.md,
+    minHeight: 52,
   },
   loginButtonDisabled: {
     opacity: 0.6,
-    backgroundColor: colors.neutral[400],
   },
   loginButtonText: {
-    color: colors.text.inverse,
+    color: '#FFFFFF',
     fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   forgotPassword: {
     alignItems: 'center',
     paddingVertical: spacing['2'],
   },
   forgotPasswordText: {
-    color: colors.primary[600],
+    color: '#FF6B35',
     fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: '600',
   },
   centered: {
     justifyContent: 'center',
@@ -351,7 +456,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: spacing['4'],
-    color: colors.text.secondary,
+    color: '#666666',
     fontSize: typography.fontSize.base,
   },
 });

@@ -55,7 +55,7 @@ export function StudentTimetableScreen() {
           <Text style={styles.headerTitle}>Daily Schedule</Text>
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary.main} />
+          <ActivityIndicator size="large" color={colors.primary[600]} />
           <Text style={styles.loadingText}>Loading timetable...</Text>
         </View>
       </View>
@@ -221,24 +221,27 @@ export function StudentTimetableScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.default,
+    backgroundColor: colors.background.app,
   },
   header: {
-    backgroundColor: colors.primary.main,
+    backgroundColor: colors.primary[600],
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
     paddingTop: spacing.xl,
   },
   headerTitle: {
-    ...typography.h2,
+    fontSize: typography.fontSize['3xl'],
+    fontWeight: typography.fontWeight.bold,
     color: colors.text.inverse,
-    fontWeight: 'bold',
+    lineHeight: typography.lineHeight.tight,
   },
   headerSubtitle: {
-    ...typography.body1,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.normal,
     color: colors.text.inverse,
     opacity: 0.9,
     marginTop: spacing.xs,
+    lineHeight: typography.lineHeight.normal,
   },
   dateNavigation: {
     flexDirection: 'row',
@@ -246,25 +249,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    backgroundColor: colors.background.paper,
+    backgroundColor: colors.surface.primary,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.light,
   },
   navButton: {
     padding: spacing.sm,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.background.default,
+    backgroundColor: colors.background.app,
   },
   todayButton: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.primary.main,
+    backgroundColor: colors.primary[600],
   },
   todayButtonText: {
-    ...typography.button,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.inverse,
-    fontWeight: '600',
+    lineHeight: typography.lineHeight.normal,
   },
   scrollView: {
     flex: 1,
@@ -290,19 +294,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   slotTime: {
-    ...typography.body2,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.secondary,
     marginLeft: spacing.xs,
-    fontWeight: '600',
+    lineHeight: typography.lineHeight.normal,
   },
   periodChip: {
     backgroundColor: colors.primary[100],
-    borderColor: colors.primary.main,
+    borderColor: colors.primary[600],
   },
   periodChipText: {
-    ...typography.caption,
-    color: colors.primary.main,
-    fontWeight: '600',
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.primary[600],
+    lineHeight: typography.lineHeight.normal,
   },
   periodContent: {
     gap: spacing.sm,
@@ -312,10 +318,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   subjectText: {
-    ...typography.h3,
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
-    fontWeight: '600',
     marginLeft: spacing.sm,
+    lineHeight: typography.lineHeight.tight,
   },
   detailRow: {
     flexDirection: 'row',
@@ -327,34 +334,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   teacherText: {
-    ...typography.body1,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.normal,
     color: colors.text.secondary,
     marginLeft: spacing.sm,
+    lineHeight: typography.lineHeight.normal,
   },
   planContainer: {
     marginTop: spacing.sm,
     padding: spacing.sm,
-    backgroundColor: colors.background.light,
+    backgroundColor: colors.background.tertiary,
     borderRadius: borderRadius.sm,
   },
   planLabel: {
-    ...typography.caption,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.secondary,
-    fontWeight: '600',
     marginBottom: spacing.xs,
+    lineHeight: typography.lineHeight.normal,
   },
   planText: {
-    ...typography.body2,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.normal,
     color: colors.text.primary,
+    lineHeight: typography.lineHeight.normal,
   },
   breakContent: {
     alignItems: 'center',
     paddingVertical: spacing.sm,
   },
   breakText: {
-    ...typography.h3,
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.secondary,
-    fontWeight: '600',
+    lineHeight: typography.lineHeight.tight,
   },
   loadingContainer: {
     flex: 1,
@@ -363,9 +376,11 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   loadingText: {
-    ...typography.body1,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.normal,
     color: colors.text.secondary,
     marginTop: spacing.md,
+    lineHeight: typography.lineHeight.normal,
   },
   errorContainer: {
     flex: 1,
@@ -374,19 +389,22 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   errorTitle: {
-    ...typography.h3,
-    color: colors.error.main,
-    fontWeight: '600',
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.error[600],
     marginBottom: spacing.sm,
+    lineHeight: typography.lineHeight.tight,
   },
   errorMessage: {
-    ...typography.body1,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.normal,
     color: colors.text.secondary,
     textAlign: 'center',
     marginBottom: spacing.lg,
+    lineHeight: typography.lineHeight.normal,
   },
   retryButton: {
-    backgroundColor: colors.primary.main,
+    backgroundColor: colors.primary[600],
   },
   emptyContainer: {
     flex: 1,
@@ -395,15 +413,18 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   emptyTitle: {
-    ...typography.h3,
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.secondary,
-    fontWeight: '600',
     marginBottom: spacing.sm,
+    lineHeight: typography.lineHeight.tight,
   },
   emptyMessage: {
-    ...typography.body1,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.normal,
     color: colors.text.secondary,
     textAlign: 'center',
+    lineHeight: typography.lineHeight.normal,
   },
   // New improved styles
   primaryHeader: {
@@ -416,20 +437,22 @@ const styles = StyleSheet.create({
     ...shadows.sm,
   },
   primaryTitle: {
-    ...typography.h1,
+    fontSize: typography.fontSize['4xl'],
+    fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
-    fontWeight: '700',
     marginBottom: spacing.xs,
+    lineHeight: typography.lineHeight.tight,
   },
   contextSubtitle: {
-    ...typography.body1,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
     color: colors.text.secondary,
-    fontWeight: '500',
+    lineHeight: typography.lineHeight.normal,
   },
   dateNavButton: {
     padding: spacing.sm,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.background.default,
+    backgroundColor: colors.background.app,
     ...shadows.xs,
   },
   dateDisplay: {
@@ -438,9 +461,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   dateText: {
-    ...typography.h3,
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
-    fontWeight: '600',
+    lineHeight: typography.lineHeight.tight,
   },
   todayChip: {
     paddingHorizontal: spacing.sm,
@@ -451,14 +475,15 @@ const styles = StyleSheet.create({
     borderColor: colors.primary[200],
   },
   todayChipText: {
-    ...typography.body2,
-    color: colors.primary.main,
-    fontWeight: '600',
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.primary[600],
+    lineHeight: typography.lineHeight.normal,
   },
   periodCard: {
     backgroundColor: colors.primary[50],
     borderLeftWidth: 4,
-    borderLeftColor: colors.primary.main,
+    borderLeftColor: colors.primary[600],
   },
   breakCard: {
     backgroundColor: colors.neutral[50],
@@ -466,32 +491,36 @@ const styles = StyleSheet.create({
     borderLeftColor: colors.neutral[300],
   },
   periodBadge: {
-    backgroundColor: colors.primary.main,
+    backgroundColor: colors.primary[600],
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.full,
     marginLeft: spacing.sm,
   },
   periodBadgeText: {
-    ...typography.caption,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.inverse,
-    fontWeight: '600',
+    lineHeight: typography.lineHeight.normal,
   },
   subjectTitle: {
-    ...typography.h3,
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
-    fontWeight: '700',
     marginBottom: spacing.xs,
+    lineHeight: typography.lineHeight.tight,
   },
   teacherName: {
-    ...typography.body1,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
     color: colors.text.secondary,
-    fontWeight: '500',
+    lineHeight: typography.lineHeight.normal,
   },
   breakTitle: {
-    ...typography.h3,
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.secondary,
-    fontWeight: '600',
     fontStyle: 'italic',
+    lineHeight: typography.lineHeight.tight,
   },
 });
