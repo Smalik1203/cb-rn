@@ -42,7 +42,7 @@ export function rankRows<T>(
   rows: T[],
   getValue: (row: T) => number,
   order: SortOrder = 'desc'
-): Array<{ rank: number; data: T }> {
+): { rank: number; data: T }[] {
   // Sort rows by value
   const sorted = [...rows].sort((a, b) => {
     const valA = getValue(a);
@@ -51,7 +51,7 @@ export function rankRows<T>(
   });
 
   // Assign ranks (handle ties by giving same rank)
-  const ranked: Array<{ rank: number; data: T }> = [];
+  const ranked: { rank: number; data: T }[] = [];
   let currentRank = 1;
   let prevValue: number | null = null;
 

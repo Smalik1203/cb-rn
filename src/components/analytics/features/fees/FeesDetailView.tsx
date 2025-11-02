@@ -40,7 +40,7 @@ export const FeesDetailView: React.FC<FeesDetailViewProps> = ({
         percentage: totalOutstanding > 0 ? (value / totalOutstanding) * 100 : 0,
       };
     })
-    .filter(Boolean) as Array<{ label: string; value: number; color: string; percentage: number }>;
+    .filter(Boolean) as { label: string; value: number; color: string; percentage: number }[];
 
   return (
     <>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { Text, Card, Chip } from 'react-native-paper';
+import { Text, Card } from 'react-native-paper';
 import { Users, ChevronDown } from 'lucide-react-native';
 import { useClassSelection } from '../contexts/ClassSelectionContext';
 import { colors, typography, spacing, borderRadius, shadows } from '../../lib/design-system';

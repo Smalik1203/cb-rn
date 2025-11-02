@@ -151,12 +151,12 @@ export interface SyllabusRow {
 export interface SyllabusDetailRow extends SyllabusRow {
   teacherId: string;
   teacherName: string;
-  chapters: Array<{
+  chapters: {
     chapterId: string;
     chapterName: string;
     completedTopics: number;
     totalTopics: number;
-  }>;
+  }[];
 }
 
 // 6. OPERATIONS MODULE
@@ -174,12 +174,12 @@ export interface OperationsRow {
 export interface OperationsDetailRow extends OperationsRow {
   email: string | null;
   phone: string | null;
-  classes: Array<{
+  classes: {
     classId: string;
     className: string;
     subjectName: string;
     periods: number;
-  }>;
+  }[];
 }
 
 // ==============================================================================
@@ -258,12 +258,12 @@ export interface AcademicsAggregation {
   totalStudents: number;
   avgScore: number;
   participationRate: number;
-  subjectSummaries: Array<{
+  subjectSummaries: {
     subjectId: string;
     subjectName: string;
     avgScore: number;
     testCount: number;
-  }>;
+  }[];
   studentSummaries: AcademicsRow[];
 }
 

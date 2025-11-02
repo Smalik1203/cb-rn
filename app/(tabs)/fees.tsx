@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { useAuth } from '../../src/contexts/AuthContext';
 import { useClassSelection } from '../../src/contexts/ClassSelectionContext';
 import { colors, spacing, borderRadius, typography, shadows } from '../../lib/design-system';
 import { FeeComponents, FeePlans } from '../../src/components/fees';

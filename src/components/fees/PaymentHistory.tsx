@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Platform, Modal, Animated, ScrollView, TextInput, Alert } from 'react-native';
-import { Portal, Modal as PaperModal, Button } from 'react-native-paper';
+import { Portal, Modal as PaperModal, Button , Searchbar } from 'react-native-paper';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Searchbar } from 'react-native-paper';
 import { colors, spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
 import { supabase } from '../../lib/supabase';
 import { useClassSelection } from '../../contexts/ClassSelectionContext';

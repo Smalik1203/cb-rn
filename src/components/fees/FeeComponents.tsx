@@ -302,7 +302,7 @@ export function FeeComponents({ schoolCode }: FeeComponentsProps) {
             </View>
             <Text style={styles.emptyTitle}>No Results Found</Text>
             <Text style={styles.emptyText}>
-              No components match "{searchQuery}"
+              No components match &quot;{searchQuery}&quot;
             </Text>
             <TouchableOpacity
               style={styles.emptyActionButton}

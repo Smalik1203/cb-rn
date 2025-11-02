@@ -68,6 +68,34 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, 
 
 log.info('Supabase client created successfully with AsyncStorage');
 
+// Suppress non-critical refresh token errors in console (app handles them gracefully)
+// This error occurs when Supabase tries to refresh an expired/invalid token - it's expected behavior
+if (__DEV__) {
+  const originalError = console.error;
+  console.error = (...args: any[]) => {
+    // Only filter Supabase auth refresh token errors - these are non-critical
+    const firstArg = args[0];
+    const isRefreshTokenError = 
+      (typeof firstArg === 'string' && (
+        firstArg.includes('Invalid Refresh Token') ||
+        firstArg.includes('Refresh Token Not Found') ||
+        firstArg.includes('AuthApiError')
+      )) ||
+      (firstArg?.message && (
+        firstArg.message.includes('Invalid Refresh Token') ||
+        firstArg.message.includes('Refresh Token Not Found')
+      )) ||
+      (typeof args[1] === 'string' && args[1].includes('Invalid Refresh Token'));
+    
+    if (isRefreshTokenError) {
+      // Suppress this specific error - it's expected when tokens expire and is handled by AuthContext
+      return;
+    }
+    // Log all other errors normally
+    originalError.apply(console, args);
+  };
+}
+
 // Test Supabase connection
 export const testSupabaseConnection = async () => {
   try {

@@ -43,7 +43,7 @@ type MenuItem = {
   label: string;
   icon: any;
   route: string;
-  roles?: Array<'superadmin' | 'cb_admin' | 'admin' | 'teacher' | 'student'>;
+  roles?: ('superadmin' | 'cb_admin' | 'admin' | 'teacher' | 'student')[];
   section: 'Main' | 'Academic' | 'Learning' | 'Admin' | 'Settings' | 'CB Admin';
   badge?: number;
   isNew?: boolean;

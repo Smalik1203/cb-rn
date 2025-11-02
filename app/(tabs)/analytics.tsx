@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { Text, Card, ActivityIndicator, Surface } from 'react-native-paper';
 import { BarChart3, Users, DollarSign, Calendar, Target, BookOpen, TrendingUp } from 'lucide-react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -55,25 +55,6 @@ const SkeletonCard: React.FC = () => (
     <View style={styles.skeletonLine} />
     <View style={[styles.skeletonLine, { width: '60%' }]} />
   </View>
-);
-
-// Feature Card Component
-const FeatureCard: React.FC<{
-  icon: any;
-  title: string;
-  value: string;
-  subtitle: string;
-  color: string;
-  onPress: () => void;
-}> = ({ icon: Icon, title, value, subtitle, color, onPress }) => (
-  <Surface style={styles.featureCard} elevation={1}>
-    <View style={[styles.featureIconBg, { backgroundColor: color + '15' }]}>
-      <Icon size={28} color={color} />
-    </View>
-    <Text variant="labelMedium" style={styles.featureCardTitle}>{title}</Text>
-    <Text variant="displaySmall" style={[styles.featureCardValue, { color }]}>{value}</Text>
-    <Text variant="bodySmall" style={styles.featureCardSubtitle}>{subtitle}</Text>
-  </Surface>
 );
 
 // Super Admin Dashboard Component
@@ -614,7 +595,7 @@ export default function AnalyticsScreen() {
       setTimeout(() => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }, 300);
-    } catch (error) {
+    } catch (_error) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setRefreshing(false);

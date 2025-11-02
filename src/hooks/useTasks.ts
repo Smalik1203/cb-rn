@@ -14,13 +14,13 @@ export interface Task {
   assigned_date: string;
   due_date: string;
   max_marks: number | null;
-  attachments: Array<{
+  attachments: {
     bucket: string;
     path: string;
     name: string;
     size: number;
     mime: string;
-  }>;
+  }[];
   is_active: boolean;
   created_by: string;
   created_at: string;
@@ -35,13 +35,13 @@ export interface TaskSubmission {
   task_id: string;
   student_id: string;
   submission_text: string | null;
-  attachments: Array<{
+  attachments: {
     bucket: string;
     path: string;
     name: string;
     size: number;
     mime: string;
-  }>;
+  }[];
   submitted_at: string;
   status: 'submitted' | 'graded' | 'returned' | 'late';
   marks_obtained: number | null;

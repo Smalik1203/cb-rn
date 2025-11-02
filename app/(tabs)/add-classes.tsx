@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import { Text, Portal, Modal, Snackbar } from 'react-native-paper';
-import { Calendar, BookOpen, Edit, Trash2, X, Plus, CheckCircle, AlertCircle, Sparkles } from 'lucide-react-native';
+import React, { useState, useEffect } from 'react';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { Text, Portal, Modal } from 'react-native-paper';
+import { Calendar, BookOpen, Edit, Trash2, X, Plus, Sparkles } from 'lucide-react-native';
 import { colors, spacing, borderRadius, typography, shadows } from '../../lib/design-system';
-import { Card, Button, Input, EmptyState, Badge } from '../../src/components/ui';
+import { Card, Button, Input, EmptyState } from '../../src/components/ui';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useAcademicYears, useCreateAcademicYear, useUpdateAcademicYear, useDeleteAcademicYear } from '../../src/hooks/useAcademicYears';
 import { useClassInstances, useCreateClassInstance, useUpdateClassInstance, useDeleteClassInstance } from '../../src/hooks/useClassInstances';
@@ -65,9 +65,6 @@ export default function AddClassesScreen() {
   const [yearEndError, setYearEndError] = useState('');
   const [gradeError, setGradeError] = useState('');
   const [sectionError, setSectionError] = useState('');
-
-  // Scroll ref for keyboard handling
-  const scrollViewRef = useRef<ScrollView>(null);
 
   // Role check
   const isSuperAdmin = profile?.role === 'superadmin';

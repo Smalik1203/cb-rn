@@ -3,22 +3,22 @@
 export interface SuperAdminAnalytics {
   attendance: {
     avgRate: number;
-    trend7Days: Array<{ date: string; rate: number }>;
-    trend30Days: Array<{ date: string; rate: number }>;
-    classesByConsistency: Array<{
+    trend7Days: { date: string; rate: number }[];
+    trend30Days: { date: string; rate: number }[];
+    classesByConsistency: {
       classId: string;
       className: string;
       avgRate: number;
       trend: 'improving' | 'stable';
-    }>;
+    }[];
   };
   academics: {
-    avgScoreBySubject: Array<{
+    avgScoreBySubject: {
       subjectId: string;
       subjectName: string;
       avgScore: number;
       participationRate: number;
-    }>;
+    }[];
     participationRate: number;
   };
   fees: {
@@ -35,27 +35,27 @@ export interface SuperAdminAnalytics {
   };
   operations: {
     timetableCoverage: number;
-    teacherLoadBalance: Array<{
+    teacherLoadBalance: {
       teacherId: string;
       teacherName: string;
       totalPeriods: number;
       conductedPeriods: number;
-    }>;
+    }[];
   };
   syllabus: {
     overallProgress: number;
-    progressBySubject: Array<{
+    progressBySubject: {
       subjectId: string;
       subjectName: string;
       completedTopics: number;
       totalTopics: number;
       progress: number;
-    }>;
-    progressByClass: Array<{
+    }[];
+    progressByClass: {
       classId: string;
       className: string;
       progress: number;
-    }>;
+    }[];
   };
   engagement: {
     testParticipation: number;
@@ -71,43 +71,43 @@ export interface SuperAdminAnalytics {
 
 export interface AdminAnalytics {
   presence: {
-    weeklyTrend: Array<{
+    weeklyTrend: {
       date: string;
       rate: number;
       presentCount: number;
       totalStudents: number;
-    }>;
+    }[];
     steadyParticipation: number;
     currentRate: number;
   };
   learning: {
-    quizAvgTrend: Array<{ date: string; avgScore: number }>;
+    quizAvgTrend: { date: string; avgScore: number }[];
     assignmentOnTimeRate: number;
-    subjectCompletion: Array<{
+    subjectCompletion: {
       subjectId: string;
       subjectName: string;
       completionPercent: number;
-    }>;
+    }[];
   };
   syllabus: {
-    progressBySubject: Array<{
+    progressBySubject: {
       subjectId: string;
       subjectName: string;
       completedTopics: number;
       totalTopics: number;
       progress: number;
-    }>;
+    }[];
   };
   operations: {
     plannedPeriods: number;
     conductedPeriods: number;
     coveragePercent: number;
-    weeklyTrend: Array<{
+    weeklyTrend: {
       date: string;
       planned: number;
       conducted: number;
       coverage: number;
-    }>;
+    }[];
   };
   engagement: {
     quizParticipation: number;
@@ -124,22 +124,22 @@ export interface StudentAnalytics {
   attendanceRhythm: {
     daysAttendedThisMonth: number;
     totalDaysThisMonth: number;
-    fourWeekTrend: Array<{
+    fourWeekTrend: {
       week: number;
       presentDays: number;
       totalDays: number;
       rate: number;
-    }>;
+    }[];
     currentRate: number;
   };
   learning: {
-    subjectScoreTrend: Array<{
+    subjectScoreTrend: {
       subjectId: string;
       subjectName: string;
       avgScore: number;
       testCount: number;
-      recentTrend: Array<{ date: string; score: number }>;
-    }>;
+      recentTrend: { date: string; score: number }[];
+    }[];
     assignmentOnTimeStreak: number;
     totalAssignments: number;
   };
@@ -150,13 +150,13 @@ export interface StudentAnalytics {
       bestScore: number;
       recentScore: number;
     };
-    syllabusProgress: Array<{
+    syllabusProgress: {
       subjectId: string;
       subjectName: string;
       completedTopics: number;
       totalTopics: number;
       progress: number;
-    }>;
+    }[];
   };
   fees: {
     totalBilled: number;

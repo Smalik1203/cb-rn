@@ -285,7 +285,7 @@ export function ModernTimetableScreen() {
     numPeriods: 6,
     periodDurationMin: 40,
     startTime: '09:00',
-    breaks: [] as Array<{ afterPeriod: number; durationMin: number; name: string }>,
+    breaks: [] as { afterPeriod: number; durationMin: number; name: string }[],
   });
   const [selectedSlotForMenu, setSelectedSlotForMenu] = useState<any>(null);
 

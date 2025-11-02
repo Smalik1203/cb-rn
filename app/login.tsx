@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, Alert, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
-import { TextInput, Button, Text, ActivityIndicator, Chip } from 'react-native-paper';
+import { TextInput, Text, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../src/lib/supabase';
@@ -10,7 +10,7 @@ import { colors, typography, spacing, borderRadius, shadows } from '../lib/desig
 import { isRateLimited, getRemainingAttempts, getResetTime, clearRateLimit } from '../src/utils/rateLimiter';
 import { sanitizeEmail } from '../src/utils/sanitize';
 
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 
 export default function LoginScreen() {
   const router = useRouter();
