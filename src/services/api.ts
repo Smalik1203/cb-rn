@@ -51,7 +51,7 @@ export interface AttendanceInput {
 export interface FeePayment {
   id: string;
   student_id: string;
-  amount_paise: number;
+  amount_inr: number;
   payment_date: string;
   payment_method: string | null;
   component_type_id: string;
@@ -465,12 +465,13 @@ export const api = {
       if (studentsError) throw studentsError;
       if (!students || students.length === 0) return [];
 
-      // Get attendance data for all students
+      // Get attendance data for all students, filtered by class_instance_id
       const studentIds = students.map(s => s.id);
       const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance')
         .select('student_id, status')
         .in('student_id', studentIds)
+        .eq('class_instance_id', classId)
         .gte('date', startDate)
         .lte('date', endDate);
 

@@ -34,7 +34,7 @@ npx expo start
   - Subject selection (required)
   - Assigned Date (date picker)
   - Due Date (date picker)
-  - File Attachments (document picker, max 10MB)
+  - File Attachments (document picker, no size limit)
   - Description (optional, 1000 chars)
   - Instructions (optional, 1000 chars)
 
@@ -112,7 +112,7 @@ All data is fetched from and saved to Supabase:
 ## Notes
 
 - File upload to Supabase Storage is prepared but requires additional setup
-- Maximum file size: 10MB per file
+- No file size limit (upload progress shown)
 - Supported file types: Images, PDF, DOC, DOCX, TXT
 - Tasks are soft-deleted (is_active = false)
 - Students can only see tasks for their assigned class

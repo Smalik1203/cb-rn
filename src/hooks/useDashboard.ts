@@ -50,6 +50,19 @@ export function useDashboardStats(userId: string, classInstanceId?: string, role
   return useQuery({
     queryKey: ['dashboard-stats', userId, classInstanceId, role],
     queryFn: async (): Promise<DashboardStats> => {
+      // Guard against invalid UUID values
+      if (!userId || !classInstanceId) {
+        return {
+          todaysClasses: 0,
+          attendancePercentage: 0,
+          weekAttendance: 0,
+          pendingAssignments: 0,
+          upcomingTests: 0,
+          achievements: 0,
+          totalStudents: 0,
+        };
+      }
+
       const today = new Date().toISOString().split('T')[0];
       const weekStart = new Date();
       weekStart.setDate(weekStart.getDate() - weekStart.getDay());
@@ -148,73 +161,92 @@ export function useRecentActivity(userId: string, classInstanceId?: string) {
   return useQuery({
     queryKey: ['recent-activity', userId, classInstanceId],
     queryFn: async (): Promise<RecentActivity[]> => {
+      // Guard against invalid UUID values
+      if (!userId) {
+        return [];
+      }
+
       const activities: RecentActivity[] = [];
       
       // Get recent attendance records
-      const { data: attendanceData, error: attendanceError } = await supabase
-        .from(DB.tables.attendance)
-        .select('id, status, date, created_at')
-        .eq('student_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(2);
-      
-      if (!attendanceError && attendanceData) {
-        attendanceData.forEach(record => {
-          activities.push({
-            id: record.id,
-            type: 'attendance',
-            title: `Attendance marked`,
-            subtitle: `${new Date(record.date).toLocaleDateString()} - ${record.status === 'present' ? 'Present' : record.status === 'absent' ? 'Absent' : 'Late'}`,
-            timestamp: record.created_at,
-            icon: 'CheckSquare',
-            color: record.status === 'present' ? 'success' : 'error',
+      try {
+        const { data: attendanceData, error: attendanceError } = await supabase
+          .from(DB.tables.attendance)
+          .select('id, status, date, created_at')
+          .eq('student_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(2);
+        
+        if (!attendanceError && attendanceData) {
+          attendanceData.forEach(record => {
+            activities.push({
+              id: record.id,
+              type: 'attendance',
+              title: `Attendance marked`,
+              subtitle: `${new Date(record.date).toLocaleDateString()} - ${record.status === 'present' ? 'Present' : record.status === 'absent' ? 'Absent' : 'Late'}`,
+              timestamp: record.created_at,
+              icon: 'CheckSquare',
+              color: record.status === 'present' ? 'success' : 'error',
+            });
           });
-        });
+        }
+      } catch (error) {
+        console.warn('Error fetching recent attendance:', error);
       }
 
-      // Get recent tasks
-      const { data: tasksData } = await supabase
-        .from('tasks')
-        .select('id, title, due_date, created_at, subjects(subject_name)')
-        .eq('class_instance_id', classInstanceId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(2);
+      // Get recent tasks (only if classInstanceId is provided)
+      if (classInstanceId) {
+        try {
+          const { data: tasksData, error: tasksError } = await supabase
+            .from('tasks')
+            .select('id, title, due_date, created_at, subjects(subject_name)')
+            .eq('class_instance_id', classInstanceId)
+            .eq('is_active', true)
+            .order('created_at', { ascending: false })
+            .limit(2);
 
-      if (tasksData) {
-        tasksData.forEach((task: any) => {
-          activities.push({
-            id: task.id,
-            type: 'assignment',
-            title: task.title,
-            subtitle: `${task.subjects?.subject_name || 'General'} - Due ${new Date(task.due_date).toLocaleDateString()}`,
-            timestamp: task.created_at,
-            icon: 'BookOpen',
-            color: 'info',
-          });
-        });
+          if (!tasksError && tasksData) {
+            tasksData.forEach((task: any) => {
+              activities.push({
+                id: task.id,
+                type: 'assignment',
+                title: task.title,
+                subtitle: `${task.subjects?.subject_name || 'General'} - Due ${new Date(task.due_date).toLocaleDateString()}`,
+                timestamp: task.created_at,
+                icon: 'BookOpen',
+                color: 'info',
+              });
+            });
+          }
+        } catch (error) {
+          console.warn('Error fetching recent tasks:', error);
+        }
       }
 
       // Get recent test scores
-      const { data: testScoresData } = await supabase
-        .from('test_marks')
-        .select('id, marks_obtained, max_marks, created_at, tests(title)')
-        .eq('student_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(2);
+      try {
+        const { data: testScoresData, error: testScoresError } = await supabase
+          .from('test_marks')
+          .select('id, marks_obtained, max_marks, created_at, tests(title)')
+          .eq('student_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(2);
 
-      if (testScoresData) {
-        testScoresData.forEach((score: any) => {
-          activities.push({
-            id: score.id,
-            type: 'test',
-            title: `Test graded: ${score.tests?.title}`,
-            subtitle: `Score: ${score.marks_obtained}/${score.max_marks}`,
-            timestamp: score.created_at,
-            icon: 'Award',
-            color: 'secondary',
+        if (!testScoresError && testScoresData) {
+          testScoresData.forEach((score: any) => {
+            activities.push({
+              id: score.id,
+              type: 'test',
+              title: `Test graded: ${score.tests?.title}`,
+              subtitle: `Score: ${score.marks_obtained}/${score.max_marks}`,
+              timestamp: score.created_at,
+              icon: 'Award',
+              color: 'secondary',
+            });
           });
-        });
+        }
+      } catch (error) {
+        console.warn('Error fetching recent test scores:', error);
       }
       
       return activities
@@ -230,6 +262,11 @@ export function useUpcomingEvents(schoolCode: string, classInstanceId?: string) 
   return useQuery({
     queryKey: ['upcoming-events', schoolCode, classInstanceId],
     queryFn: async (): Promise<UpcomingEvent[]> => {
+      // Guard against invalid school code
+      if (!schoolCode) {
+        return [];
+      }
+
       const today = new Date().toISOString().split('T')[0];
       const nextMonth = new Date();
       nextMonth.setDate(nextMonth.getDate() + 30);
@@ -270,12 +307,17 @@ export function useFeeOverview(studentId: string) {
   return useQuery({
     queryKey: ['fee-overview', studentId],
     queryFn: async (): Promise<FeeOverview> => {
+      // Guard against invalid student ID
+      if (!studentId) {
+        return { totalFee: 0, paidAmount: 0, pendingAmount: 0 };
+      }
+
       // Get active fee plan for student
       const { data: feePlan } = await supabase
         .from('fee_student_plans')
         .select(`
           id,
-          fee_student_plan_items(amount_paise, quantity)
+          fee_student_plan_items(amount_inr, quantity)
         `)
         .eq('student_id', studentId)
         .eq('status', 'active')
@@ -287,21 +329,21 @@ export function useFeeOverview(studentId: string) {
 
       // Calculate total fee
       const totalFee = (feePlan.fee_student_plan_items || []).reduce(
-        (sum: number, item: any) => sum + (item.amount_paise * (item.quantity || 1)),
+        (sum: number, item: any) => sum + (item.amount_inr * (item.quantity || 1)),
         0
-      ) / 100; // Convert paise to rupees
+      );
 
       // Get total paid amount
       const { data: payments } = await supabase
         .from('fee_payments')
-        .select('amount_paise')
+        .select('amount_inr')
         .eq('student_id', studentId)
         .eq('plan_id', feePlan.id);
 
       const paidAmount = (payments || []).reduce(
-        (sum, payment) => sum + payment.amount_paise,
+        (sum, payment) => sum + payment.amount_inr,
         0
-      ) / 100;
+      );
 
       const pendingAmount = totalFee - paidAmount;
 
@@ -320,6 +362,17 @@ export function useTaskOverview(studentId: string, classInstanceId?: string) {
   return useQuery({
     queryKey: ['task-overview', studentId, classInstanceId],
     queryFn: async (): Promise<TaskOverview> => {
+      // Guard against invalid ID values
+      if (!studentId || !classInstanceId) {
+        return {
+          total: 0,
+          completed: 0,
+          pending: 0,
+          overdue: 0,
+          dueThisWeek: 0,
+        };
+      }
+
       const today = new Date().toISOString().split('T')[0];
       const weekEnd = new Date();
       weekEnd.setDate(weekEnd.getDate() + 7);

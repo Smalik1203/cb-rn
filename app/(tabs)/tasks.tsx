@@ -383,7 +383,8 @@ export default function TasksScreen() {
   
   // Fetch classes and subjects for filters
   const { data: classes } = useClasses(schoolCode);
-  const { data: subjects } = useSubjects(schoolCode);
+  const { data: subjectsResult } = useSubjects(schoolCode);
+  const subjects = subjectsResult?.data || [];
   
   const { data: adminTasks, isLoading: adminLoading, refetch: refetchAdmin } = useTasks(
     schoolCode,

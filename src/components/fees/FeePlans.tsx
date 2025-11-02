@@ -7,6 +7,7 @@ import {
   TextInput,
   Alert,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { Portal, Modal as PaperModal, Button } from 'react-native-paper';
@@ -19,38 +20,35 @@ import {
   Plus, 
   Edit3, 
   Edit,
-  CreditCard,
   ChevronRight,
   DollarSign,
-  Calendar,
   User,
   ChevronDown,
-  Trash2
+  Trash2,
+  Settings2,
+  CheckCircle2
 } from 'lucide-react-native';
-import { format } from 'date-fns';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { useClassSelection } from '../../contexts/ClassSelectionContext';
 import { useClasses } from '../../hooks/useClasses';
 import { useStudents } from '../../hooks/useStudents';
 import { ClassSelector } from '../ClassSelector';
-import { DatePickerModal } from '../common/DatePickerModal';
 import { supabase } from '../../data/supabaseClient';
 import { getClassStudentsFees, getFeeComponentTypes } from '../../data/queries';
 import { colors, spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
 // Helper function for formatting amounts
-const formatAmount = (paise: number): string => {
-  return `₹${(paise / 100).toLocaleString('en-IN')}`;
+const formatAmount = (amount: number): string => {
+  return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
-const formatAmountCompact = (paise: number): string => {
-  const amount = paise / 100;
+const formatAmountCompact = (amount: number): string => {
   if (amount >= 100000) {
     return `₹${(amount / 100000).toFixed(1)}L`;
   } else if (amount >= 1000) {
     return `₹${(amount / 1000).toFixed(1)}K`;
   }
-  return `₹${amount.toLocaleString('en-IN')}`;
+  return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 type FilterType = 'all' | 'has_plan' | 'no_plan';
@@ -63,27 +61,16 @@ interface StudentFeeData {
   plan_id: string;
   component_type_id: string;
   component_name: string;
-  plan_amount_paise: number;
-  collected_amount_paise: number;
-  outstanding_amount_paise: number;
+  plan_amount_inr: number;
+  collected_amount_inr: number;
+  outstanding_amount_inr: number;
   collection_percentage: number;
 }
 
 export default function FeePlans() {
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showClassSelector, setShowClassSelector] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
-  const [selectedStudentName, setSelectedStudentName] = useState<string>('');
-  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
-  const [selectedComponentName, setSelectedComponentName] = useState<string>('');
-  const [paymentAmount, setPaymentAmount] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<string>('cash');
-  const [receiptNumber, setReceiptNumber] = useState<string>('');
-  const [remarks, setRemarks] = useState<string>('');
-  const [paymentDate, setPaymentDate] = useState<Date>(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showClassPlanModal, setShowClassPlanModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -93,21 +80,22 @@ export default function FeePlans() {
   const [savingPlan, setSavingPlan] = useState(false);
   const [classPlanItems, setClassPlanItems] = useState<any[]>([]);
   const [savingClassPlan, setSavingClassPlan] = useState(false);
+  const [loadingClassPlan, setLoadingClassPlan] = useState(false);
+  const [hasExistingClassPlan, setHasExistingClassPlan] = useState(false);
   const [showComponentSelector, setShowComponentSelector] = useState(false);
   const [componentSearch, setComponentSearch] = useState('');
   const [editingComponentIndex, setEditingComponentIndex] = useState<number | null>(null);
-  const [paymentStep, setPaymentStep] = useState<'select' | 'details'>('select');
-  const [selectedPayments, setSelectedPayments] = useState<Record<string, string>>({});
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
 
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const { selectedClass, scope, setSelectedClass } = useClassSelection();
   const { data: classes = [] } = useClasses(scope.school_code);
-  const { data: students = [], isLoading: studentsLoading } = useStudents(
+  const { data: studentsResponse, isLoading: studentsLoading } = useStudents(
     selectedClass?.id,
     scope.school_code
   );
+  const students = studentsResponse?.data || [];
 
   const schoolCode = scope.school_code;
   const selectedClassId = selectedClass?.id;
@@ -208,97 +196,6 @@ export default function FeePlans() {
     }
   };
 
-  // Handle payment collection
-  const handleCollectPayment = (studentId: string, studentName: string, componentTypeId: string, componentName: string) => {
-    setSelectedStudentId(studentId);
-    setSelectedStudentName(studentName);
-    setSelectedComponentId(componentTypeId);
-    setSelectedComponentName(componentName);
-    setPaymentAmount('');
-    setPaymentMethod('cash');
-    setReceiptNumber('');
-    setRemarks('');
-    setPaymentStep('select');
-    setSelectedPayments({});
-    setShowPaymentModal(true);
-  };
-
-
-  // Submit payment
-  const handleSubmitPayment = async () => {
-    try {
-      if (!selectedStudentId) {
-        Alert.alert('Error', 'No student selected');
-        return;
-      }
-
-      const entries = Object.entries(selectedPayments)
-        .map(([componentId, amt]) => ({ componentId, amountPaise: Math.round((parseFloat(amt) || 0) * 100) }))
-        .filter(e => e.amountPaise > 0);
-
-      if (entries.length === 0) {
-        Alert.alert('Error', 'Select at least one component with a valid amount');
-        return;
-      }
-
-      // Get the plan_id for this student and component
-      const student = filteredStudents.find(s => s.id === selectedStudentId);
-      const planId = student?.feeDetails?.plan?.id;
-
-      // Insert one row per selected component
-      const rows = entries.map(e => ({
-        school_code: schoolCode,
-        student_id: selectedStudentId,
-        plan_id: planId || null,
-        component_type_id: e.componentId,
-        amount_paise: e.amountPaise,
-        payment_method: paymentMethod,
-        payment_date: paymentDate.toISOString().split('T')[0],
-        transaction_id: receiptNumber || null,
-        receipt_number: receiptNumber || null,
-        remarks: remarks || null,
-        created_by: profile?.auth_id
-      }));
-
-      const { error } = await supabase
-        .from('fee_payments')
-        .insert(rows);
-
-      if (error) {
-        console.error('Payment error:', error);
-        Alert.alert('Error', error.message || 'Failed to record payment');
-        return;
-      }
-
-      Alert.alert('Success', 'Payment recorded successfully!', [
-        {
-          text: 'OK',
-          onPress: () => {
-            // Reset form
-            setShowPaymentModal(false);
-            setSelectedStudentId(null);
-            setSelectedStudentName('');
-            setSelectedComponentId(null);
-            setSelectedComponentName('');
-            setPaymentAmount('');
-            setSelectedPayments({});
-            setPaymentMethod('cash');
-            setReceiptNumber('');
-            setRemarks('');
-            setPaymentDate(new Date());
-            setPaymentStep('select');
-            
-            // Refresh data
-            refreshData();
-          }
-        }
-      ]);
-
-    } catch (error: any) {
-      console.error('Payment submission error:', error);
-      Alert.alert('Error', error.message || 'Failed to record payment');
-    }
-  };
   
   // Handle edit plan
   const handleEditPlan = async (student: any) => {
@@ -346,7 +243,7 @@ export default function FeePlans() {
       // Load existing items
       const { data: items, error: itemsErr } = await supabase
         .from('fee_student_plan_items')
-        .select('component_type_id, amount_paise')
+        .select('component_type_id, amount_inr')
         .eq('plan_id', planId);
       if (itemsErr) throw itemsErr;
 
@@ -357,7 +254,7 @@ export default function FeePlans() {
   
       const mappedItems = (items || []).map((it: any) => ({
         component_type_id: it.component_type_id,
-        amount_inr: (Number(it.amount_paise || 0) / 100)
+        amount_inr: Number(it.amount_inr || 0)
       }));
       
       console.log('Plan items loaded:', mappedItems);
@@ -372,29 +269,6 @@ export default function FeePlans() {
     }
   };
 
-  // Handle record payment
-  const handleRecordPayment = (student: any) => {
-    if (!student.feeDetails?.plan) {
-      Alert.alert('No Fee Plan', 'This student does not have a fee plan. Please create a fee plan first.');
-      return;
-    }
-    
-    // For now, show a simple alert. This can be enhanced with a proper payment modal later
-    Alert.alert(
-      'Record Payment',
-      `Record payment for ${student.full_name}?\n\nTotal Due: ${formatAmount(student.feeDetails?.balance || 0)}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Record Payment', 
-          onPress: () => {
-            // TODO: Implement payment recording logic
-            Alert.alert('Success', 'Payment recorded successfully!');
-          }
-        }
-      ]
-    );
-  };
 
   // Handle student selection
   const toggleStudentSelection = (studentId: string) => {
@@ -436,7 +310,7 @@ export default function FeePlans() {
       if (existingPlan?.items && existingPlan.items.length > 0) {
         mappedItems = existingPlan.items.map((it: any) => ({
           component_type_id: it.component_type_id,
-          amount_inr: (Number(it.amount_paise || 0) / 100)
+          amount_inr: Number(it.amount_inr || 0)
         }));
         console.log('Loaded existing plan items:', mappedItems);
       } else {
@@ -453,51 +327,13 @@ export default function FeePlans() {
     }
   };
 
-  const handleBulkPayment = () => {
-    if (selectedStudentIds.size === 0) return;
-    
-    // For bulk payment, we'll work with the first selected student
-    const firstStudentId = Array.from(selectedStudentIds)[0];
-    const student = filteredStudents.find(s => s.id === firstStudentId);
-    
-    if (student) {
-      setSelectedStudentId(student.id);
-      setSelectedStudentName(student.full_name);
-      
-      // Load the student's fee components for payment
-      const existingPlan = student.feeDetails?.plan;
-      if (existingPlan?.items && existingPlan.items.length > 0) {
-        // Set the first component as default
-        const firstComponent = existingPlan.items[0];
-        setSelectedComponentId(firstComponent.component_type_id);
-        const componentName = feeComponents?.find((c: any) => c.id === firstComponent.component_type_id)?.name || 'Unknown Component';
-        setSelectedComponentName(componentName);
-        
-        // Calculate outstanding amount for this component
-        const componentPaid = 0; // TODO: Calculate from payments
-        const componentOutstanding = (firstComponent.amount_paise || 0) / 100 - componentPaid;
-        setPaymentAmount(componentOutstanding > 0 ? String(componentOutstanding) : '');
-      } else {
-        setSelectedComponentId(null);
-        setSelectedComponentName('No components available');
-        setPaymentAmount('');
-      }
-      
-      setPaymentMethod('cash');
-      setReceiptNumber('');
-      setRemarks('');
-    }
-    setPaymentStep('select');
-    setSelectedPayments({});
-    setShowPaymentModal(true);
-  };
 
   // Add plan item
   const addPlanItem = () => {
     setShowComponentSelector(true);
   };
 
-  // Select component and add to plan
+  // Select component and add to plan (for component selector modal)
   const selectComponent = (componentId: string) => {
     if (editingComponentIndex !== null) {
       // Update existing component
@@ -534,8 +370,8 @@ export default function FeePlans() {
       // Auto-set amount if component has default
       if (field === 'component_type_id' && value && feeComponents) {
         const component = feeComponents.find((c: any) => c.id === value);
-        if (component?.default_amount_paise) {
-          newItems[index].amount_inr = component.default_amount_paise / 100;
+        if (component?.default_amount_inr) {
+          newItems[index].amount_inr = component.default_amount_inr;
         }
       }
       return newItems;
@@ -594,7 +430,7 @@ export default function FeePlans() {
               const toUpsert = planItems.map(item => ({
                 plan_id: editingStudent.planId,
                 component_type_id: item.component_type_id,
-                amount_paise: Math.round((item.amount_inr || 0) * 100)
+                amount_inr: item.amount_inr || 0
               }));
 
               if (toUpsert.length > 0) {
@@ -623,17 +459,65 @@ export default function FeePlans() {
   };
 
   // Open class plan editor
-  const openClassPlanEditor = () => {
-    // Seed with components that have defaults
-    const defaults = (feeComponents || [])
-      .filter((c: any) => Number(c.default_amount_paise || 0) > 0)
-      .map((c: any) => ({ 
-        component_type_id: c.id, 
-        amount_inr: Number(c.default_amount_paise) / 100 
-      }));
+  const openClassPlanEditor = async () => {
+    setLoadingClassPlan(true);
+    setHasExistingClassPlan(false);
+    
+    try {
+      // First, try to find an existing plan from any student in the class
+      let existingPlanItems: any[] = [];
+      
+      // Find a student who has a plan
+      const studentWithPlan = studentsWithFeeData.find((student: any) => 
+        student.feeDetails?.plan && student.feeDetails.plan.items && student.feeDetails.plan.items.length > 0
+      );
+      
+      if (studentWithPlan && studentWithPlan.feeDetails?.plan?.id) {
+        // Load existing plan items
+        const { data: planItems, error: itemsError } = await supabase
+          .from('fee_student_plan_items')
+          .select('component_type_id, amount_inr, quantity')
+          .eq('plan_id', studentWithPlan.feeDetails.plan.id);
+        
+        if (!itemsError && planItems && planItems.length > 0) {
+          // Map existing items to the format we need
+          existingPlanItems = planItems.map((item: any) => ({
+            component_type_id: item.component_type_id,
+            amount_inr: Number(item.amount_inr || 0) * Number(item.quantity || 1),
+          }));
+          setHasExistingClassPlan(true);
+        }
+      }
+      
+      // If we found existing items, use them; otherwise use defaults
+      if (existingPlanItems.length > 0) {
+        setClassPlanItems(existingPlanItems);
+      } else {
+        // Seed with components that have defaults
+        const defaults = (feeComponents || [])
+          .filter((c: any) => Number(c.default_amount_inr || 0) > 0)
+          .map((c: any) => ({ 
+            component_type_id: c.id, 
+            amount_inr: Number(c.default_amount_inr || 0)
+          }));
 
-    setClassPlanItems(defaults.length > 0 ? defaults : [{ component_type_id: null, amount_inr: 0 }]);
-    setShowClassPlanModal(true);
+        setClassPlanItems(defaults.length > 0 ? defaults : [{ component_type_id: null, amount_inr: 0 }]);
+      }
+    } catch (error: any) {
+      console.error('Error loading class plan:', error);
+      // Fallback to defaults if loading fails
+      const defaults = (feeComponents || [])
+        .filter((c: any) => Number(c.default_amount_inr || 0) > 0)
+        .map((c: any) => ({ 
+          component_type_id: c.id, 
+          amount_inr: Number(c.default_amount_inr || 0)
+        }));
+
+      setClassPlanItems(defaults.length > 0 ? defaults : [{ component_type_id: null, amount_inr: 0 }]);
+    } finally {
+      setLoadingClassPlan(false);
+      setShowClassPlanModal(true);
+    }
   };
 
   // Add class plan item
@@ -665,8 +549,8 @@ export default function FeePlans() {
       // Auto-set amount if component has default
       if (field === 'component_type_id' && value && feeComponents) {
         const component = feeComponents.find((c: any) => c.id === value);
-        if (component?.default_amount_paise) {
-          newItems[index].amount_inr = component.default_amount_paise / 100;
+        if (component?.default_amount_inr) {
+          newItems[index].amount_inr = component.default_amount_inr;
         }
       }
       return newItems;
@@ -760,7 +644,7 @@ export default function FeePlans() {
               // 3) Insert new items for each plan
               const baseItems = classPlanItems.map(i => ({
                 component_type_id: i.component_type_id,
-                amount_paise: Math.round((i.amount_inr || 0) * 100)
+                amount_inr: i.amount_inr || 0
               }));
 
               const allItems = planIds.flatMap(planId =>
@@ -797,15 +681,21 @@ export default function FeePlans() {
   if (!selectedClassId) {
     return (
       <View style={styles.emptyContainer}>
-        <Users size={48} color={colors.text.tertiary} />
-        <Text style={styles.emptyText}>Select a class to view fee management</Text>
-        <Button 
-          mode="contained" 
+        <View style={styles.emptyIconContainer}>
+          <Users size={64} color={colors.primary[300]} />
+        </View>
+        <Text style={styles.emptyTitle}>Select a Class</Text>
+        <Text style={styles.emptyText}>
+          Choose a class to start managing student fees.{'\n'}
+          View plans and track fee collections.
+        </Text>
+        <TouchableOpacity
+          style={styles.emptyActionButton}
           onPress={() => setShowClassSelector(true)}
-          style={styles.selectClassButton}
         >
-          Select Class
-        </Button>
+          <Users size={20} color={colors.text.inverse} />
+          <Text style={styles.emptyActionText}>Select Class</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -852,6 +742,30 @@ export default function FeePlans() {
               </View>
             )}
 
+      {/* Summary Cards */}
+      {selectedClass && filteredStudents.length > 0 && (
+        <View style={styles.summaryCardsContainer}>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryCardLabel}>Total Fees</Text>
+            <Text style={styles.summaryCardValue}>
+              ₹{summaryTotalAssigned.toLocaleString('en-IN')}
+            </Text>
+          </View>
+          <View style={[styles.summaryCard, styles.summaryCardSuccess]}>
+            <Text style={styles.summaryCardLabel}>Collected</Text>
+            <Text style={[styles.summaryCardValue, styles.summaryCardValueSuccess]}>
+              ₹{(summaryTotalAssigned - summaryTotalPending).toLocaleString('en-IN')}
+            </Text>
+          </View>
+          <View style={[styles.summaryCard, styles.summaryCardPending]}>
+            <Text style={styles.summaryCardLabel}>Outstanding</Text>
+            <Text style={[styles.summaryCardValue, styles.summaryCardValuePending]}>
+              ₹{summaryTotalPending.toLocaleString('en-IN')}
+            </Text>
+          </View>
+        </View>
+      )}
+
       {/* Students List */}
       <ScrollView 
         style={styles.studentsList}
@@ -865,8 +779,26 @@ export default function FeePlans() {
             </View>
         ) : filteredStudents.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Users size={48} color={colors.text.tertiary} />
-            <Text style={styles.emptyText}>No students found</Text>
+            <View style={styles.emptyIconContainer}>
+              <Search size={64} color={colors.text.tertiary} />
+            </View>
+            <Text style={styles.emptyTitle}>No Students Found</Text>
+            <Text style={styles.emptyText}>
+              {searchQuery || filter !== 'all'
+                ? `No students match your current search or filters.${'\n'}Try adjusting your search query or filter settings.`
+                : `No students are enrolled in this class yet.${'\n'}Add students to start managing their fees.`}
+            </Text>
+            {(searchQuery || filter !== 'all') && (
+              <TouchableOpacity
+                style={styles.emptyActionButton}
+                onPress={() => {
+                  setSearchQuery('');
+                  setFilter('all');
+                }}
+              >
+                <Text style={styles.emptyActionText}>Clear Filters</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           <View style={styles.studentsList}>
@@ -878,10 +810,6 @@ export default function FeePlans() {
                     <Edit size={14} color={colors.primary[600]} />
                     <Text style={styles.bulkButtonText}>Edit ({selectedStudentIds.size})</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.bulkButton} onPress={handleBulkPayment}>
-                    <CreditCard size={14} color={colors.success[600]} />
-                    <Text style={styles.bulkButtonText}>Record ({selectedStudentIds.size})</Text>
-                  </TouchableOpacity>
                 </View>
                   </View>
             )}
@@ -890,12 +818,14 @@ export default function FeePlans() {
             <View style={styles.columnHeaders}>
               <View style={styles.studentColumn}>
                 <Text style={styles.studentColumnHeader}>Student</Text>
-          </View>
-              <View style={styles.amountsColumn}>
-                <Text style={styles.columnHeaderText}>Total Fee</Text>
+              </View>
+              <View style={styles.amountColumn}>
                 <Text style={styles.columnHeaderText}>Outstanding</Text>
-        </View>
-          </View>
+              </View>
+              <View style={styles.amountColumn}>
+                <Text style={styles.columnHeaderText}>Total Fee</Text>
+              </View>
+            </View>
 
             {/* Clean Student List */}
             {filteredStudents.map((student) => {
@@ -905,284 +835,77 @@ export default function FeePlans() {
               const percentage = totalDue > 0 ? Math.min(100, Math.round((totalPaid / totalDue) * 100)) : 0;
               const hasPlan = student.feeDetails?.plan !== null;
               const isSelected = selectedStudentIds.has(student.id);
+              const isFullyPaid = balance === 0 && totalDue > 0;
+              const isOverdue = balance > 0 && totalDue > 0;
 
   return (
           <TouchableOpacity
                   key={student.id} 
-                  style={[styles.studentRow, isSelected && styles.studentRowSelected]}
+                  style={[
+                    styles.studentRow, 
+                    isSelected && styles.studentRowSelected,
+                    isFullyPaid && styles.studentRowFullyPaid,
+                  ]}
                   onPress={() => toggleStudentSelection(student.id)}
+                  onLongPress={() => handleEditPlan(student)}
                 >
                   <View style={styles.studentMain}>
-                    <Text style={styles.studentName}>{student.full_name}</Text>
+                    <View style={styles.studentHeader}>
+                      <Text style={styles.studentName}>{student.full_name}</Text>
+                      {isSelected && (
+                        <View style={styles.selectedBadge}>
+                          <Check size={12} color={colors.surface.primary} />
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.studentCode}>{student.student_code}</Text>
-          </View>
+                    
+                    {/* Progress Bar */}
+                    {hasPlan && totalDue > 0 && (
+                      <View style={styles.progressContainer}>
+                        <View style={styles.progressBar}>
+                          <View 
+                            style={[
+                              styles.progressFill, 
+                              { width: `${percentage}%` },
+                              isFullyPaid && styles.progressFillComplete
+                            ]} 
+                          />
+                        </View>
+                        <Text style={styles.progressText}>
+                          {percentage}% paid
+                        </Text>
+                      </View>
+                    )}
+                    
+                    {!hasPlan && (
+                      <View style={styles.noPlanBadge}>
+                        <Text style={styles.noPlanBadgeText}>No fee plan</Text>
+                      </View>
+                    )}
+                  </View>
                   
-                  <View style={styles.studentAmounts}>
-                    {/* Actual fee (total assigned) */}
-                    <Text style={styles.amountText}>{formatAmount(totalDue)}</Text>
-                    {/* Outstanding/Due */}
-                    <Text style={styles.outstandingAmount}>
+                  {/* Outstanding Column */}
+                  <View style={styles.amountColumn}>
+                    <Text style={[
+                      styles.outstandingAmount,
+                      isFullyPaid && styles.outstandingAmountPaid,
+                      isOverdue && styles.outstandingAmountOverdue
+                    ]}>
                       {formatAmount(balance)}
-            </Text>
-          </View>
+                    </Text>
+                  </View>
+                  
+                  {/* Total Fee Column */}
+                  <View style={styles.amountColumn}>
+                    <Text style={styles.amountText}>{formatAmount(totalDue)}</Text>
+                  </View>
           </TouchableOpacity>
               );
             })}
           </View>
         )}
         </ScrollView>
-
-      {/* Payment Modal */}
-      <Portal>
-        {showPaymentModal && (
-          <PaperModal 
-            visible={showPaymentModal} 
-            onDismiss={() => setShowPaymentModal(false)}
-            contentContainerStyle={styles.modalContent}
-          >
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Collect Payment</Text>
-              <TouchableOpacity onPress={() => setShowPaymentModal(false)}>
-                <X size={24} color={colors.text.secondary} />
-          </TouchableOpacity>
-      </View>
-
-            <ScrollView style={styles.modalBody}>
-              <Text style={styles.studentInfoText}>
-                Recording payment for {selectedStudentName}
-            </Text>
-
-              {/* Step 1: Select Component */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Components</Text>
-                {(() => {
-                  const student = filteredStudents.find(s => s.id === selectedStudentId);
-                  const existingPlan = student?.feeDetails?.plan;
-                  
-                  if (!existingPlan?.items || existingPlan.items.length === 0) {
-                    return (
-                      <View style={styles.noComponentsContainer}>
-                        <Text style={styles.noComponentsText}>No fee components available</Text>
-          </View>
-                    );
-                  }
-                  // Selection-only list (multi-select)
-                  return (
-                    <View style={styles.componentsTable}>
-                      {existingPlan.items.map((item: any) => {
-                        const componentName = feeComponents?.find((c: any) => c.id === item.component_type_id)?.name || 'Component';
-                        const componentAmount = (item.amount_paise || 0) / 100;
-                        const isSelected = selectedPayments[item.component_type_id] !== undefined;
-                        return (
-                          <TouchableOpacity
-                            key={item.component_type_id}
-                            style={[styles.tableRowMinimal, isSelected && { backgroundColor: colors.primary[25] }]}
-                            onPress={() => {
-                              setSelectedPayments(prev => {
-                                const next = { ...prev } as Record<string, string>;
-                                if (next[item.component_type_id] !== undefined) {
-                                  delete next[item.component_type_id];
-                                } else {
-                                  next[item.component_type_id] = String(componentAmount);
-                                }
-                                return next;
-                              });
-                            }}
-                          >
-                            <View style={styles.checkbox}>
-                              {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                            </View>
-                            <View style={styles.compNameMeta}>
-                              <Text style={styles.compNameText} numberOfLines={1}>{componentName}</Text>
-                              <Text style={styles.compMetaText}>Outstanding: ₹{componentAmount.toLocaleString('en-IN')}</Text>
-                            </View>
-                            <Text style={styles.tableOutstandingAmount}>₹{componentAmount.toLocaleString('en-IN')}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  );
-                })()}
-      </View>
-
-              {/* Component Breakdown */}
-              {(() => {
-                const student = filteredStudents.find(s => s.id === selectedStudentId);
-                const existingPlan = student?.feeDetails?.plan;
-                if (!existingPlan?.items || existingPlan.items.length === 0) return null;
-                const planTotalPaise = existingPlan.items.reduce((sum: number, it: any) => sum + (it.amount_paise || 0), 0);
-                return (
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Component breakdown</Text>
-                    <View style={styles.breakdownCard}>
-                      {existingPlan.items.map((it: any) => {
-                        const name = feeComponents?.find((c: any) => c.id === it.component_type_id)?.name || 'Component';
-                        const amt = (it.amount_paise || 0);
-                        return (
-                          <View key={it.component_type_id} style={styles.breakdownRow}>
-                            <Text style={styles.breakdownName} numberOfLines={1}>{name}</Text>
-                            <Text style={styles.breakdownAmount}>{formatAmount(amt)}</Text>
-                          </View>
-                        );
-                      })}
-                      <View style={styles.breakdownDivider} />
-                      <View style={styles.breakdownRow}>
-                        <Text style={styles.breakdownTotalLabel}>Total</Text>
-                        <Text style={styles.breakdownTotalAmount}>{formatAmount(planTotalPaise)}</Text>
-                      </View>
-                    </View>
-                  </View>
-                );
-              })()}
-
-              {/* Step 2: Payment Details */}
-              {paymentStep === 'details' && (
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Payment Details</Text>
-                {/* Selected components with custom amounts */}
-                <View style={styles.componentsTable}>
-                  {Object.entries(selectedPayments).length === 0 ? (
-                    <View style={styles.noComponentsContainer}><Text style={styles.noComponentsText}>No components selected</Text></View>
-                  ) : (
-                    Object.entries(selectedPayments).map(([compId, amtStr]) => {
-                      const name = feeComponents?.find((c: any) => c.id === compId)?.name || 'Component';
-                      return (
-                        <View key={compId} style={styles.tableRowMinimal}>
-                          <View style={styles.compNameMeta}>
-                            <Text style={styles.compNameText} numberOfLines={1}>{name}</Text>
-                          </View>
-                          <View style={styles.amountInputWrapper}>
-                            <Text style={styles.currencySymbol}>₹</Text>
-                            <TextInput
-                              style={styles.amountInput}
-                              value={amtStr}
-                              onChangeText={(text) => {
-                                setSelectedPayments(prev => ({ ...prev, [compId]: text }));
-                              }}
-                              keyboardType="numeric"
-                              placeholder="0"
-                            />
-                          </View>
-                        </View>
-                      );
-                    })
-                  )}
-                </View>
-
-                {/* Total */}
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryText}>Total</Text>
-                  <Text style={styles.summaryAmount}>
-                    ₹{Object.values(selectedPayments).reduce((sum, v) => sum + (parseFloat(v) || 0), 0).toLocaleString('en-IN')}
-                  </Text>
-                </View>
-                
-                <View style={styles.paymentDetailsRow}>
-                  <Text style={styles.paymentLabel}>Payment Date *</Text>
-                  <TouchableOpacity
-                    style={styles.datePickerButton}
-                    onPress={() => setShowDatePicker(true)}
-                  >
-                    <Calendar size={16} color={colors.text.secondary} />
-                    <Text style={styles.datePickerText}>
-                      {format(paymentDate, 'MMM dd, yyyy')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                
-                <View style={styles.paymentDetailsRow}>
-                  <Text style={styles.paymentLabel}>Payment Method *</Text>
-                  <View style={styles.paymentMethodContainer}>
-                    {['Cash', 'Cheque', 'Online', 'Card'].map((method) => (
-                  <TouchableOpacity
-                        key={method}
-                        style={[
-                          styles.paymentMethodOption,
-                          paymentMethod === method.toLowerCase() && styles.paymentMethodOptionSelected
-                        ]}
-                        onPress={() => setPaymentMethod(method.toLowerCase())}
-                      >
-                        <Text style={[
-                          styles.paymentMethodText,
-                          paymentMethod === method.toLowerCase() && styles.paymentMethodTextSelected
-                        ]}>
-                          {method}
-                      </Text>
-                  </TouchableOpacity>
-                    ))}
-          </View>
-      </View>
-
-                <View style={styles.paymentDetailsRow}>
-                  <Text style={styles.paymentLabel}>Transaction ID</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Optional transaction ID"
-                    value={receiptNumber}
-                    onChangeText={setReceiptNumber}
-                  />
-          </View>
-                
-                <View style={styles.paymentDetailsRow}>
-                  <Text style={styles.paymentLabel}>Remarks</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Optional remarks"
-                    value={remarks}
-                    onChangeText={setRemarks}
-                    multiline
-                    numberOfLines={3}
-                  />
-                </View>
-              </View>
-              )}
-
-              {/* Selection Summary */}
-              {selectedComponentId && (
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryText}>
-                    Paying for: {selectedComponentName || 'Component'}
-                  </Text>
-                  {paymentAmount ? (
-                    <Text style={styles.summaryAmount}>₹{Number(paymentAmount || 0).toLocaleString('en-IN')}</Text>
-                  ) : null}
-                </View>
-              )}
-            </ScrollView>
-
-
-            {paymentStep === 'select' ? (
-              <View style={styles.modalActions}>
-                <Button onPress={() => setShowPaymentModal(false)}>Cancel</Button>
-                <Button
-                  mode="contained"
-                  onPress={() => setPaymentStep('details')}
-                  disabled={Object.keys(selectedPayments).length === 0}
-                >
-                  Continue
-                </Button>
-              </View>
-            ) : (
-              <>
-                {Object.keys(selectedPayments).length === 0 && (
-                  <Text style={styles.validationHint}>Select at least one component to continue</Text>
-                )}
-                <View style={styles.modalActions}>
-                  <Button onPress={() => setPaymentStep('select')}>Back</Button>
-                  <Button
-                    mode="contained"
-                    onPress={handleSubmitPayment}
-                    disabled={Object.values(selectedPayments).every(v => !v || Number(v) <= 0)}
-                  >
-                    Record Payment
-                  </Button>
-                </View>
-              </>
-            )}
-          </PaperModal>
-        )}
-      </Portal>
-
 
       {/* Class Plan Modal */}
       <Portal>
@@ -1191,6 +914,7 @@ export default function FeePlans() {
           onDismiss={() => {
             setShowClassPlanModal(false);
             setClassPlanItems([]);
+            setHasExistingClassPlan(false);
           }}
           contentContainerStyle={styles.modalContent}
         >
@@ -1199,6 +923,7 @@ export default function FeePlans() {
             <TouchableOpacity onPress={() => {
               setShowClassPlanModal(false);
               setClassPlanItems([]);
+              setHasExistingClassPlan(false);
             }}>
               <X size={24} color={colors.text.primary} />
               </TouchableOpacity>
@@ -1206,11 +931,33 @@ export default function FeePlans() {
 
           <Text style={styles.classPlanDescription}>
             Apply to all {students.length} students in {selectedClass?.grade} {selectedClass?.section}
-            </Text>
+          </Text>
+          
+          {/* Show if existing plan is loaded */}
+          {hasExistingClassPlan && (
+            <View style={styles.existingPlanBanner}>
+              <CheckCircle2 size={16} color={colors.success[600]} />
+              <Text style={styles.existingPlanText}>
+                Current class plan loaded. Editing will replace existing plan for all students.
+              </Text>
+            </View>
+          )}
+          
+          {/* Loading indicator */}
+          {loadingClassPlan && (
+            <View style={styles.loadingPlanBanner}>
+              <ActivityIndicator size="small" color={colors.primary[600]} />
+              <Text style={styles.loadingPlanText}>Loading existing class plan...</Text>
+            </View>
+          )}
 
           <ScrollView style={styles.modalBody}>
             {classPlanItems.length === 0 ? (
-              <Text style={styles.emptyText}>No components added</Text>
+              <View style={styles.modalEmptyState}>
+                <Settings2 size={48} color={colors.text.tertiary} />
+                <Text style={styles.modalEmptyText}>No components added</Text>
+                <Text style={styles.modalEmptySubtext}>Add fee components to create a class plan</Text>
+              </View>
             ) : (
               <>
                 {/* Total Summary */}
@@ -1364,7 +1111,11 @@ export default function FeePlans() {
           
           <View style={styles.classListContainer}>
             {classes.length === 0 ? (
-              <Text style={styles.emptyText}>No classes found</Text>
+              <View style={styles.modalEmptyState}>
+                <Users size={48} color={colors.text.tertiary} />
+                <Text style={styles.modalEmptyText}>No Classes Found</Text>
+                <Text style={styles.modalEmptySubtext}>Create classes first to manage fees</Text>
+              </View>
             ) : (
               <ScrollView>
                 {classes.map((classItem: any) => (
@@ -1420,76 +1171,162 @@ export default function FeePlans() {
 
           <ScrollView style={styles.modalBody}>
             {/* Total Summary */}
-            <View style={styles.totalSummary}>
-              <Text style={styles.totalLabel}>Total: ₹{planItems.reduce((sum, item) => sum + (item.amount_inr || 0), 0).toLocaleString('en-IN')}</Text>
+            <View style={styles.editTotalSummary}>
+              <View style={styles.editTotalRow}>
+                <Text style={styles.editTotalLabel}>Total Fee</Text>
+                <Text style={styles.editTotalAmount}>
+                  ₹{planItems.reduce((sum, item) => sum + (item.amount_inr || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Text>
+              </View>
+            </View>
+
+            {/* Components List */}
+            <View style={styles.editComponentsList}>
+              {planItems.map((item, index) => {
+                const selectedComponent = feeComponents?.find((c: any) => c.id === item.component_type_id);
+                const isEditing = editingComponentIndex === index;
+                const availableComponents = feeComponents?.filter((comp: any) => {
+                  // Filter out already selected components (except current one)
+                  const alreadySelected = planItems.some((it, i) => i !== index && it.component_type_id === comp.id);
+                  return !alreadySelected;
+                }) || [];
+
+                return (
+                  <View key={index} style={styles.editComponentCard}>
+                    {/* Component Selector */}
+                    <View style={styles.editComponentSelector}>
+                      <Text style={styles.editComponentLabel}>Component</Text>
+                      {isEditing && availableComponents.length > 0 ? (
+                        <ScrollView 
+                          horizontal 
+                          showsHorizontalScrollIndicator={false}
+                          style={styles.editComponentChips}
+                          contentContainerStyle={styles.editComponentChipsContent}
+                        >
+                          {availableComponents.map((comp: any) => (
+                            <TouchableOpacity
+                              key={comp.id}
+                              style={[
+                                styles.editComponentChip,
+                                item.component_type_id === comp.id && styles.editComponentChipSelected
+                              ]}
+                              onPress={() => {
+                                updatePlanItem(index, 'component_type_id', comp.id);
+                                setEditingComponentIndex(null);
+                              }}
+                            >
+                              <Text style={[
+                                styles.editComponentChipText,
+                                item.component_type_id === comp.id && styles.editComponentChipTextSelected
+                              ]}>
+                                {comp.name}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      ) : (
+                        <TouchableOpacity
+                          style={[
+                            styles.editComponentSelect,
+                            !item.component_type_id && styles.editComponentSelectEmpty
+                          ]}
+                          onPress={() => setEditingComponentIndex(index)}
+                        >
+                          <Text style={[
+                            styles.editComponentSelectText,
+                            !item.component_type_id && styles.editComponentSelectTextEmpty
+                          ]}>
+                            {selectedComponent?.name || 'Select component'}
+                          </Text>
+                          <ChevronDown size={18} color={item.component_type_id ? colors.text.primary : colors.text.tertiary} />
+                        </TouchableOpacity>
+                      )}
                     </View>
 
-            {/* Existing Components */}
-            {planItems.map((item, index) => (
-              <View key={index} style={styles.componentRow}>
-                <View style={styles.componentInfo}>
-                  <Text style={styles.planComponentName}>
-                    {item.component_type_id 
-                      ? (feeComponents?.find((c: any) => c.id === item.component_type_id)?.name || 'Unknown Component')
-                      : 'Select Component'
-                    }
-                      </Text>
-                  <Text style={styles.componentAmount}>
-                    ₹{(item.amount_inr || 0).toLocaleString('en-IN')}
-                      </Text>
+                    {/* Amount Input */}
+                    <View style={styles.editAmountContainer}>
+                      <Text style={styles.editAmountLabel}>Amount (₹)</Text>
+                      <View style={styles.editAmountInputWrapper}>
+                        <Text style={styles.editCurrencySymbol}>₹</Text>
+                        <TextInput
+                          style={styles.editAmountInput}
+                          value={item.amount_inr > 0 ? String(item.amount_inr) : ''}
+                          onChangeText={(text) => {
+                            const numValue = parseFloat(text) || 0;
+                            updatePlanItem(index, 'amount_inr', numValue);
+                          }}
+                          placeholder="0.00"
+                          keyboardType="decimal-pad"
+                          placeholderTextColor={colors.text.tertiary}
+                        />
+                      </View>
+                      {selectedComponent?.default_amount_inr && (
+                        <Text style={styles.editAmountHint}>
+                          Default: ₹{selectedComponent.default_amount_inr.toLocaleString('en-IN')}
+                        </Text>
+                      )}
                     </View>
-                
-                <View style={styles.componentActions}>
-                  <TouchableOpacity 
-                    style={styles.editButton}
-                    onPress={() => {
-                      if (item.component_type_id) {
-                        // Show component selector to change
-                        setShowComponentSelector(true);
-                        setEditingComponentIndex(index);
-                      } else {
-                        // Show component selector to select
-                        setShowComponentSelector(true);
-                        setEditingComponentIndex(index);
-                      }
-                    }}
-                  >
-                    <Text style={styles.editButtonText}>
-                      {item.component_type_id ? 'Change' : 'Select'}
-                    </Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => removePlanItem(index)}
-                    disabled={planItems.length <= 1}
-                  >
-                    <Trash2 size={16} color={planItems.length <= 1 ? colors.neutral[400] : colors.error[600]} />
-                  </TouchableOpacity>
+
+                    {/* Actions */}
+                    <View style={styles.editComponentCardActions}>
+                      {planItems.length > 1 && (
+                        <TouchableOpacity
+                          style={styles.editRemoveButton}
+                          onPress={() => removePlanItem(index)}
+                        >
+                          <Trash2 size={16} color={colors.error[600]} />
+                          <Text style={styles.editRemoveButtonText}>Remove</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
-                ))}
+                );
+              })}
+            </View>
+
+            {/* Empty State */}
+            {planItems.length === 0 && (
+              <View style={styles.editEmptyState}>
+                <Settings2 size={48} color={colors.text.tertiary} />
+                <Text style={styles.editEmptyText}>No components added</Text>
+                <Text style={styles.editEmptySubtext}>Add components to create a fee plan</Text>
+              </View>
+            )}
 
             </ScrollView>
 
-          <View style={styles.modalFooter}>
+          <View style={styles.editModalFooter}>
             <TouchableOpacity 
-              style={styles.addComponentButton}
+              style={styles.editAddButton}
               onPress={addPlanItem}
             >
               <Plus size={20} color={colors.primary[600]} />
-              <Text style={styles.addComponentText}>+ Add Component</Text>
+              <Text style={styles.editAddButtonText}>Add Component</Text>
             </TouchableOpacity>
+            
+            <View style={styles.editModalActions}>
+              <Button
+                onPress={() => {
+                  setShowEditPlanModal(false);
+                  setPlanItems([]);
+                  setEditingStudent(null);
+                  setEditingComponentIndex(null);
+                }}
+                style={styles.editCancelButton}
+              >
+                Cancel
+              </Button>
               <Button
                 mode="contained"
-              onPress={savePlan}
-              loading={savingPlan}
-              disabled={savingPlan || planItems.length === 0}
-              style={styles.modalButton}
+                onPress={savePlan}
+                loading={savingPlan}
+                disabled={savingPlan || planItems.length === 0 || planItems.some(item => !item.component_type_id)}
+                style={styles.editSaveButton}
               >
-              Save Plan
+                Save Plan
               </Button>
             </View>
+          </View>
         </PaperModal>
       </Portal>
 
@@ -1541,9 +1378,9 @@ export default function FeePlans() {
                 >
                   <View style={styles.componentOptionContent}>
                     <Text style={styles.componentOptionName}>{comp.name}</Text>
-                    {comp.default_amount_paise && (
+                    {comp.default_amount_inr && (
                       <Text style={styles.componentOptionAmount}>
-                        ₹{(comp.default_amount_paise / 100).toLocaleString('en-IN')}
+                        ₹{comp.default_amount_inr.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </Text>
                     )}
                   </View>
@@ -1559,19 +1396,6 @@ export default function FeePlans() {
         </PaperModal>
       </Portal>
 
-      {/* Date Picker Modal */}
-      <DatePickerModal
-        visible={showDatePicker}
-        onDismiss={() => setShowDatePicker(false)}
-        onConfirm={(date) => {
-          setPaymentDate(date);
-          setShowDatePicker(false);
-        }}
-        initialDate={paymentDate}
-        minimumDate={new Date(2020, 0, 1)}
-        maximumDate={new Date(2030, 11, 31)}
-        title="Select Payment Date"
-      />
     </View>
   );
 }
@@ -1585,16 +1409,69 @@ const styles = {
     flex: 1,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
-    padding: spacing.lg,
+    padding: spacing.xl * 2,
+    minHeight: 400,
+  },
+  emptyIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.primary[50],
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    marginBottom: spacing.lg,
+  },
+  emptyTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold as any,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
+    textAlign: 'center' as const,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: typography.fontSize.base,
     color: colors.text.secondary,
-    marginTop: spacing.md,
+    marginBottom: spacing.lg,
     textAlign: 'center' as const,
+    lineHeight: 24,
+    paddingHorizontal: spacing.lg,
+  },
+  emptyActionButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: spacing.sm,
+    backgroundColor: colors.primary[600],
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    ...shadows.sm,
+  },
+  emptyActionText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold as any,
+    color: colors.text.inverse,
   },
   selectClassButton: {
     marginTop: spacing.lg,
+  },
+  modalEmptyState: {
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
+  },
+  modalEmptyText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold as any,
+    color: colors.text.primary,
+    marginTop: spacing.md,
+    textAlign: 'center' as const,
+  },
+  modalEmptySubtext: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginTop: spacing.xs,
+    textAlign: 'center' as const,
   },
   topBar: {
     flexDirection: 'row' as const,
@@ -1759,14 +1636,6 @@ const styles = {
   dueAmount: {
     color: colors.error[600],
   },
-  progressContainer: {
-    marginTop: spacing.sm,
-  },
-  progressText: {
-    fontSize: 12,
-    color: colors.text.tertiary,
-    textAlign: 'center' as const,
-  },
   classPlanContainer: {
     padding: spacing.lg,
   },
@@ -1849,6 +1718,41 @@ const styles = {
     borderRadius: borderRadius.md,
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
+  },
+  existingPlanBanner: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: spacing.xs,
+    padding: spacing.md,
+    backgroundColor: colors.success[50],
+    borderRadius: borderRadius.md,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.success[200],
+  },
+  existingPlanText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.success[700],
+    fontWeight: typography.fontWeight.medium as any,
+    flex: 1,
+  },
+  loadingPlanBanner: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: spacing.xs,
+    padding: spacing.md,
+    backgroundColor: colors.primary[50],
+    borderRadius: borderRadius.md,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.primary[200],
+  },
+  loadingPlanText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.primary[700],
+    fontWeight: typography.fontWeight.medium as any,
   },
   modalBody: {
     minHeight: 150,
@@ -2444,11 +2348,11 @@ const styles = {
     flex: 1,
     marginRight: spacing.sm,
   },
-  amountsColumn: {
-    flexDirection: 'row' as const,
-    gap: spacing.sm,
-    marginRight: spacing.sm,
-    alignItems: 'center' as const,
+  amountColumn: {
+    alignItems: 'flex-end' as const,
+    justifyContent: 'center' as const,
+    minWidth: 100,
+    marginLeft: spacing.sm,
   },
   columnHeaderText: {
     fontSize: 13,
@@ -2487,9 +2391,26 @@ const styles = {
     shadowColor: colors.primary[200],
     shadowOpacity: 0.15,
   },
+  studentRowFullyPaid: {
+    backgroundColor: colors.success[25],
+    borderColor: colors.success[200],
+  },
   studentMain: {
     flex: 1,
     marginRight: spacing.sm,
+    justifyContent: 'center' as const,
+  },
+  studentHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: spacing.xs,
+  },
+  selectedBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.primary[600],
+    alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
   studentName: {
@@ -2507,28 +2428,78 @@ const styles = {
     fontWeight: '500' as const,
     letterSpacing: 0.2,
   },
-  studentAmounts: {
-    flexDirection: 'row' as const,
-    gap: spacing.sm,
-    marginRight: spacing.sm,
+  progressContainer: {
+    marginTop: spacing.xs,
+    gap: spacing.xs / 2,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: colors.neutral[200],
+    borderRadius: borderRadius.full,
+    overflow: 'hidden' as const,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.primary[500],
+    borderRadius: borderRadius.full,
+  },
+  progressFillComplete: {
+    backgroundColor: colors.success[500],
+  },
+  progressText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.secondary,
+    fontWeight: typography.fontWeight.medium as any,
+  },
+  noPlanBadge: {
+    marginTop: spacing.xs,
+    alignSelf: 'flex-start' as const,
+    backgroundColor: colors.warning[50],
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+  },
+  noPlanBadgeText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.warning[700],
+    fontWeight: typography.fontWeight.medium as any,
   },
   amountText: {
     fontSize: 14,
     fontWeight: '700' as const,
     color: colors.text.primary,
-    minWidth: 80,
     textAlign: 'right' as const,
-    lineHeight: 22,
+    lineHeight: 18,
     letterSpacing: 0.3,
   },
   outstandingAmount: {
     fontSize: 14,
     fontWeight: '700' as const,
     color: colors.error[600],
-    minWidth: 80,
     textAlign: 'right' as const,
-    lineHeight: 22,
+    lineHeight: 18,
     letterSpacing: 0.3,
+  },
+  outstandingAmountPaid: {
+    color: colors.success[700],
+  },
+  outstandingAmountOverdue: {
+    color: colors.error[700],
+  },
+  quickActionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.success[50],
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    marginTop: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.success[200],
+  },
+  quickActionButtonDisabled: {
+    backgroundColor: colors.neutral[100],
+    borderColor: colors.neutral[200],
   },
   studentStatus: {
     marginRight: spacing.xs,
@@ -2544,5 +2515,257 @@ const styles = {
     fontSize: 12,
     color: colors.text.tertiary,
     lineHeight: 16,
+  },
+  summaryCardsContainer: {
+    flexDirection: 'row' as const,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  summaryCard: {
+    flex: 1,
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    ...shadows.sm,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
+  summaryCardSuccess: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.success[500],
+    backgroundColor: colors.success[50],
+  },
+  summaryCardPending: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.error[500],
+    backgroundColor: colors.error[50],
+  },
+  summaryCardLabel: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium as any,
+    color: colors.text.secondary,
+    marginBottom: spacing.xs,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+  },
+  summaryCardValue: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold as any,
+    color: colors.text.primary,
+  },
+  summaryCardValueSuccess: {
+    color: colors.success[700],
+  },
+  summaryCardValuePending: {
+    color: colors.error[700],
+  },
+  // Edit Plan Modal Styles
+  editTotalSummary: {
+    backgroundColor: colors.primary[50],
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.primary[200],
+  },
+  editTotalRow: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+  },
+  editTotalLabel: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold as any,
+    color: colors.text.secondary,
+  },
+  editTotalAmount: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold as any,
+    color: colors.primary[700],
+  },
+  editComponentsList: {
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  editComponentCard: {
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    ...shadows.sm,
+  },
+  editComponentSelector: {
+    marginBottom: spacing.md,
+  },
+  editComponentLabel: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold as any,
+    color: colors.text.secondary,
+    marginBottom: spacing.xs,
+  },
+  editComponentSelect: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    backgroundColor: colors.background.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    minHeight: 48,
+  },
+  editComponentSelectEmpty: {
+    borderColor: colors.border.light,
+    backgroundColor: colors.background.primary,
+  },
+  editComponentSelectText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium as any,
+    color: colors.text.primary,
+    flex: 1,
+  },
+  editComponentSelectTextEmpty: {
+    color: colors.text.tertiary,
+    fontWeight: typography.fontWeight.normal as any,
+  },
+  editComponentChips: {
+    maxHeight: 100,
+  },
+  editComponentChipsContent: {
+    paddingVertical: spacing.xs,
+    gap: spacing.xs,
+  },
+  editComponentChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.background.secondary,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    marginRight: spacing.xs,
+  },
+  editComponentChipSelected: {
+    backgroundColor: colors.primary[600],
+    borderColor: colors.primary[600],
+  },
+  editComponentChipText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium as any,
+    color: colors.text.primary,
+  },
+  editComponentChipTextSelected: {
+    color: colors.surface.primary,
+    fontWeight: typography.fontWeight.semibold as any,
+  },
+  editAmountContainer: {
+    marginBottom: spacing.sm,
+  },
+  editAmountLabel: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold as any,
+    color: colors.text.secondary,
+    marginBottom: spacing.xs,
+  },
+  editAmountInputWrapper: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: colors.background.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    minHeight: 48,
+  },
+  editCurrencySymbol: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold as any,
+    color: colors.text.secondary,
+    marginRight: spacing.xs,
+  },
+  editAmountInput: {
+    flex: 1,
+    fontSize: typography.fontSize.base,
+    color: colors.text.primary,
+    paddingVertical: spacing.sm,
+  },
+  editAmountHint: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
+    marginTop: spacing.xs / 2,
+  },
+  editComponentCardActions: {
+    flexDirection: 'row' as const,
+    justifyContent: 'flex-end' as const,
+    alignItems: 'center' as const,
+    marginTop: spacing.xs,
+  },
+  editRemoveButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  editRemoveButtonText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium as any,
+    color: colors.error[600],
+  },
+  editModalFooter: {
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+    gap: spacing.md,
+  },
+  editAddButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: spacing.xs,
+    backgroundColor: colors.primary[50],
+    borderWidth: 1,
+    borderColor: colors.primary[200],
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+  },
+  editAddButtonText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold as any,
+    color: colors.primary[600],
+  },
+  editModalActions: {
+    flexDirection: 'row' as const,
+    justifyContent: 'flex-end' as const,
+    gap: spacing.sm,
+  },
+  editCancelButton: {
+    minWidth: 100,
+  },
+  editSaveButton: {
+    minWidth: 120,
+  },
+  editEmptyState: {
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingVertical: spacing.xl * 2,
+    paddingHorizontal: spacing.lg,
+  },
+  editEmptyText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold as any,
+    color: colors.text.primary,
+    marginTop: spacing.md,
+    textAlign: 'center' as const,
+  },
+  editEmptySubtext: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginTop: spacing.xs,
+    textAlign: 'center' as const,
   },
 };

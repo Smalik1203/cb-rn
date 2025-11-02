@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, TextInput as RNTextInput, Alert } from 'react-native';
 import { Text, Modal, Portal } from 'react-native-paper';
 import { UserPlus, Trash2, Edit, X, Search } from 'lucide-react-native';
@@ -8,6 +8,7 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { sanitizeEmail, sanitizePhone, sanitizeCode, sanitizeName, validatePassword } from '../../src/utils/sanitize';
 import { useAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin } from '../../src/hooks/useAdmins';
 import { ThreeStateView } from '../../src/components/common/ThreeStateView';
+import { Pagination } from '../../src/components/common/Pagination';
 
 export default function AddAdminScreen() {
   const { profile } = useAuth();
@@ -16,11 +17,21 @@ export default function AddAdminScreen() {
   // Queries
   const [adminPage, setAdminPage] = useState(1);
   const adminPageSize = 25;
-  const { data: admins = [], isLoading, error, refetch } = useAdmins(schoolCode, { page: adminPage, pageSize: adminPageSize });
+  const { data: adminsResponse, isLoading, error, refetch } = useAdmins(schoolCode, { page: adminPage, pageSize: adminPageSize });
   const [mode, setMode] = useState<'create' | 'list'>('create');
 
-  // Search & filter
+  // Extract data from pagination response
+  const admins = adminsResponse?.data || [];
+  const totalAdmins = adminsResponse?.total || 0;
+  const totalPages = Math.ceil(totalAdmins / adminPageSize);
+
+  // Reset to page 1 when search changes
   const [adminSearch, setAdminSearch] = useState('');
+  useEffect(() => {
+    setAdminPage(1);
+  }, [adminSearch]);
+
+  // Search & filter
   const norm = (s: string) => s.trim().toLowerCase();
   const filteredAdmins = useMemo(() => {
     if (!adminSearch.trim()) return admins;
@@ -309,7 +320,7 @@ export default function AddAdminScreen() {
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>Existing Admins</Text>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{admins.length}</Text>
+              <Text style={styles.badgeText}>{totalAdmins}</Text>
             </View>
           </View>
 
@@ -366,8 +377,15 @@ export default function AddAdminScreen() {
               ))}
             </View>
           </ThreeStateView>
-          {admins.length === adminPageSize && (
-            <Button variant="outline" title="Load more" onPress={() => setAdminPage((p) => p + 1)} style={{ marginTop: spacing.md }} />
+          
+          {!adminSearch && totalPages > 0 && (
+            <Pagination
+              currentPage={adminPage}
+              totalPages={totalPages}
+              totalItems={totalAdmins}
+              itemsPerPage={adminPageSize}
+              onPageChange={setAdminPage}
+            />
           )}
         </Card>
         )}

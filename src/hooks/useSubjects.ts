@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { log } from '../lib/logger';
+import { DB } from '../types/db.constants';
 
 type Subject = {
   id: string;
@@ -9,6 +10,13 @@ type Subject = {
   created_by: string;
   created_at: string;
 };
+
+export interface SubjectsPaginationResult {
+  data: Subject[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
 
 type CreateSubjectInput = {
   subject_name: string;
@@ -22,7 +30,7 @@ type UpdateSubjectInput = {
 };
 
 /**
- * Fetch all subjects for a school and provide mutation functions
+ * Fetch all subjects for a school and provide mutation functions with pagination
  */
 export function useSubjects(
   schoolCode: string | null | undefined,
@@ -34,19 +42,31 @@ export function useSubjects(
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  const query = useQuery({
+  const query = useQuery<SubjectsPaginationResult>({
     queryKey: ['subjects', schoolCode, page, pageSize],
     queryFn: async () => {
       if (!schoolCode) {
-        throw new Error('School code is required');
+        return { data: [], total: 0, page, pageSize };
       }
 
       log.info('Fetching subjects', { schoolCode });
 
+      // Get total count
+      const { count, error: countError } = await supabase
+        .from(DB.tables.subjects)
+        .select('*', { count: 'exact', head: true })
+        .eq(DB.columns.schoolCode, schoolCode);
+
+      if (countError) {
+        log.error('Failed to fetch subject count', countError);
+        throw countError;
+      }
+
+      // Fetch paginated data
       const { data, error } = await supabase
-        .from('subjects')
+        .from(DB.tables.subjects)
         .select('id, subject_name, school_code, created_by, created_at')
-        .eq('school_code', schoolCode)
+        .eq(DB.columns.schoolCode, schoolCode)
         .order('subject_name')
         .range(from, to);
 
@@ -55,7 +75,12 @@ export function useSubjects(
         throw error;
       }
 
-      return (data as Subject[]) || [];
+      return {
+        data: (data as Subject[]) || [],
+        total: count || 0,
+        page,
+        pageSize,
+      };
     },
     enabled: !!schoolCode,
     staleTime: 60_000, // 1 minute

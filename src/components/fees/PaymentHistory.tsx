@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Platform, Modal, Animated, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Platform, Modal, Animated, ScrollView, TextInput, Alert } from 'react-native';
 import { Portal, Modal as PaperModal, Button } from 'react-native-paper';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Searchbar } from 'react-native-paper';
 import { colors, spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
 import { supabase } from '../../lib/supabase';
@@ -9,14 +9,15 @@ import { useClassSelection } from '../../contexts/ClassSelectionContext';
 import { useAuth } from '../../contexts/AuthContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useStudents } from '../../hooks/useStudents';
-import { Wallet, CreditCard, Landmark, Smartphone, Circle, Search, Filter, Users, Calendar } from 'lucide-react-native';
+import { getFeeComponentTypes } from '../../data/queries';
+import { Wallet, CreditCard, Landmark, Smartphone, Circle, Search, Filter, Users, Calendar, CheckCircle2, Plus, X, ChevronRight, Info, AlertCircle } from 'lucide-react-native';
 
 type PaymentRecord = {
   id: string;
   student_id: string;
   plan_id: string | null;
   component_type_id: string;
-  amount_paise: number;
+  amount_inr: number;
   payment_date: string; // YYYY-MM-DD
   payment_method: string | null;
   transaction_id: string | null;
@@ -24,15 +25,16 @@ type PaymentRecord = {
   remarks: string | null;
   created_at: string | null;
   updated_at: string | null;
+  created_by: string;
+  recorded_by_name?: string | null; // Name of user who recorded the payment
   // joined
   student?: { id: string; full_name: string | null; student_code: string | null } | null;
   component?: { id: string; name: string } | null;
-  total_fee_paise?: number; // computed from plan items
+  total_fee_inr?: number; // computed from plan items
 };
 
-function formatAmount(paise: number): string {
-  const rupees = paise / 100;
-  return `₹${rupees.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+function formatAmount(amount: number): string {
+  return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function formatDateDisplay(isoOrYmd: string): string {
@@ -47,6 +49,7 @@ function formatDateDisplay(isoOrYmd: string): string {
 export default function PaymentHistory() {
   const { scope, selectedClass, setSelectedClass, classes } = useClassSelection();
   const { profile } = useAuth();
+  const queryClient = useQueryClient();
   const schoolCode = scope.school_code;
 
   const [startDate, setStartDate] = useState<Date | null>(() => {
@@ -60,16 +63,49 @@ export default function PaymentHistory() {
   const [showHistoryDatePicker, setShowHistoryDatePicker] = useState<'start' | 'end' | null>(null);
   const [tempPickerDate, setTempPickerDate] = useState<Date | null>(null);
   // Always using range; no toggle UI
-  const [activeTab, setActiveTab] = useState<'collected' | 'pending'>('collected');
+  const [activeTab, setActiveTab] = useState<'collected' | 'record'>('collected');
   const [showMethodModal, setShowMethodModal] = useState(false);
+  
+  // Payment recording form state
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<string>('cash');
+  const [receiptNumber, setReceiptNumber] = useState<string>('');
+  const [remarks, setRemarks] = useState<string>('');
+  const [paymentDate, setPaymentDate] = useState<Date>(new Date());
+  const [showRecordDatePicker, setShowRecordDatePicker] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showStudentSelector, setShowStudentSelector] = useState(false);
+  const [showComponentSelector, setShowComponentSelector] = useState(false);
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [componentSearchQuery, setComponentSearchQuery] = useState('');
+  const [selectedStudentForDetails, setSelectedStudentForDetails] = useState<{
+    student: any;
+    payments: PaymentRecord[];
+    totalPaid: number;
+  } | null>(null);
+  const [detailsModalVisible, setDetailsModalVisible] = useState(false);
 
-  const { data: students = [] } = useStudents(selectedClass?.id, schoolCode || undefined);
+  const { data: studentsResponse } = useStudents(selectedClass?.id, schoolCode || undefined);
+  const students = studentsResponse?.data || [];
+  
+  // Fetch fee components for recording payments
+  const { data: feeComponents = [] } = useQuery({
+    queryKey: ['feeComponents', schoolCode],
+    queryFn: () => getFeeComponentTypes(schoolCode!).then(result => result.data || []),
+    enabled: !!schoolCode && activeTab === 'record',
+  });
 
   // Animated sheet (match syllabus modal)
   const classSlideAnim = React.useRef(new Animated.Value(0)).current;
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
   const methodSlideAnim = React.useRef(new Animated.Value(0)).current;
   const methodOverlayOpacity = React.useRef(new Animated.Value(0)).current;
+  const studentSlideAnim = React.useRef(new Animated.Value(0)).current;
+  const studentOverlayOpacity = React.useRef(new Animated.Value(0)).current;
+  const componentSlideAnim = React.useRef(new Animated.Value(0)).current;
+  const componentOverlayOpacity = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (showClassDropdown) {
@@ -103,11 +139,43 @@ export default function PaymentHistory() {
     }
   }, [showMethodModal, methodSlideAnim, methodOverlayOpacity]);
 
-  // Plans and dues for Pending tab
+  useEffect(() => {
+    if (showStudentSelector) {
+      studentSlideAnim.setValue(0);
+      studentOverlayOpacity.setValue(0);
+      Animated.parallel([
+        Animated.timing(studentOverlayOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+        Animated.spring(studentSlideAnim, { toValue: 1, tension: 65, friction: 10, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(studentOverlayOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+        Animated.timing(studentSlideAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [showStudentSelector, studentSlideAnim, studentOverlayOpacity]);
+
+  useEffect(() => {
+    if (showComponentSelector) {
+      componentSlideAnim.setValue(0);
+      componentOverlayOpacity.setValue(0);
+      Animated.parallel([
+        Animated.timing(componentOverlayOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+        Animated.spring(componentSlideAnim, { toValue: 1, tension: 65, friction: 10, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(componentOverlayOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+        Animated.timing(componentSlideAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [showComponentSelector, componentSlideAnim, componentOverlayOpacity]);
+
+  // Plans for Record tab - to get plan_id when recording payment
   const studentIds = useMemo(() => students.map((s: any) => s.id), [students]);
   const { data: planByStudent } = useQuery<{ student_id: string; id: string }[]>({
     queryKey: ['fee_student_plans', schoolCode, selectedClass?.id || 'all', studentIds.join(',')],
-    enabled: activeTab === 'pending' && !!schoolCode && studentIds.length > 0,
+    enabled: activeTab === 'record' && !!schoolCode && studentIds.length > 0,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('fee_student_plans')
@@ -119,58 +187,143 @@ export default function PaymentHistory() {
     }
   });
 
-  const planIdsForClass = useMemo(() => Array.from(new Set((planByStudent || []).map(p => p.id))), [planByStudent]);
-
-  const { data: planItems } = useQuery<{ plan_id: string; amount_paise: number }[]>({
-    queryKey: ['fee_student_plan_items', planIdsForClass.join(',')],
-    enabled: activeTab === 'pending' && planIdsForClass.length > 0,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('fee_student_plan_items')
-        .select('plan_id, amount_paise')
-        .in('plan_id', planIdsForClass);
-      if (error) throw error;
-      return data as any;
-    }
-  });
-
-  const { data: planPayments } = useQuery<{ plan_id: string | null; amount_paise: number }[]>({
-    queryKey: ['fee_payments_totals', planIdsForClass.join(',')],
-    enabled: activeTab === 'pending' && planIdsForClass.length > 0,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('fee_payments')
-        .select('plan_id, amount_paise')
-        .eq('school_code', schoolCode)
-        .in('plan_id', planIdsForClass);
-      if (error) throw error;
-      return data as any;
-    }
-  });
-
-  const planTotalMapAll = useMemo(() => {
-    const m = new Map<string, number>();
-    (planItems || []).forEach(it => {
-      if (!it.plan_id) return;
-      m.set(it.plan_id, (m.get(it.plan_id) || 0) + (it.amount_paise || 0));
-    });
-    return m;
-  }, [planItems]);
-
-  const planPaidMapAll = useMemo(() => {
-    const m = new Map<string, number>();
-    (planPayments || []).forEach(p => {
-      if (!p.plan_id) return;
-      m.set(p.plan_id, (m.get(p.plan_id) || 0) + (p.amount_paise || 0));
-    });
-    return m;
-  }, [planPayments]);
-
+  // Student plan map for recording payments
   const studentPlanMap = useMemo(() => {
     const m = new Map<string, string>();
     (planByStudent || []).forEach(p => m.set(p.student_id, p.id));
     return m;
   }, [planByStudent]);
+
+  // Fetch component balances for all components (used for greying out paid components)
+  const selectedPlanIdForBalance = selectedStudentId ? studentPlanMap.get(selectedStudentId) : null;
+  const { data: componentBalances } = useQuery({
+    queryKey: ['componentBalances', selectedStudentId, selectedPlanIdForBalance, schoolCode],
+    enabled: !!selectedStudentId && !!schoolCode && activeTab === 'record',
+    queryFn: async () => {
+      if (!selectedPlanIdForBalance) {
+        return new Map<string, { due: number; paid: number; remaining: number }>();
+      }
+
+      // Get all plan items
+      const { data: planItems, error: itemsError } = await supabase
+        .from('fee_student_plan_items')
+        .select('amount_inr, quantity, component_type_id')
+        .eq('plan_id', selectedPlanIdForBalance);
+      
+      if (itemsError) throw itemsError;
+
+      // Get all existing payments
+      const { data: existingPayments, error: paymentsError } = await supabase
+        .from('fee_payments')
+        .select('amount_inr, component_type_id')
+        .eq('student_id', selectedStudentId)
+        .eq('school_code', schoolCode);
+      
+      if (paymentsError) throw paymentsError;
+
+      // Calculate balance for each component
+      const balances = new Map<string, { due: number; paid: number; remaining: number }>();
+      
+      (planItems || []).forEach((item: any) => {
+        const componentId = item.component_type_id;
+        if (!componentId) return;
+
+        const itemAmount = item.amount_inr || 0;
+        const itemQuantity = item.quantity || 1;
+        const due = itemAmount * itemQuantity;
+
+        const paid = (existingPayments || [])
+          .filter((p: any) => p.component_type_id === componentId)
+          .reduce((sum: number, p: any) => sum + (p.amount_inr || 0), 0);
+
+        const remaining = due - paid;
+
+        balances.set(componentId, { due, paid, remaining });
+      });
+
+      return balances;
+    },
+  });
+
+  // Fetch fee balance for selected student and component
+  const selectedPlanId = selectedStudentId ? studentPlanMap.get(selectedStudentId) : null;
+  const { data: feeBalance, isLoading: balanceLoading } = useQuery({
+    queryKey: ['feeBalance', selectedStudentId, selectedPlanId, selectedComponentId, schoolCode],
+    enabled: !!selectedStudentId && !!schoolCode && activeTab === 'record',
+    queryFn: async () => {
+      let componentDue = 0;
+      let componentPaid = 0;
+      let totalDue = 0;
+      let totalPaid = 0;
+      
+      if (selectedPlanId) {
+        // Get all plan items to calculate total
+        const { data: planItems, error: itemsError } = await supabase
+          .from('fee_student_plan_items')
+          .select('amount_inr, quantity, component_type_id')
+          .eq('plan_id', selectedPlanId);
+        
+        if (itemsError) throw itemsError;
+        
+        // Calculate total due from all plan items
+        totalDue = (planItems || []).reduce((sum: number, item: any) => {
+          const itemAmount = item.amount_inr || 0;
+          const itemQuantity = item.quantity || 1;
+          return sum + (itemAmount * itemQuantity);
+        }, 0);
+        
+        // Calculate component-specific due if component is selected
+        if (selectedComponentId) {
+          const componentItem = (planItems || []).find((item: any) => 
+            item.component_type_id === selectedComponentId
+          );
+          
+          if (componentItem) {
+            const itemAmount = componentItem.amount_inr || 0;
+            const itemQuantity = componentItem.quantity || 1;
+            componentDue = itemAmount * itemQuantity;
+          }
+        }
+      }
+      
+      // Get all existing payments
+      const { data: existingPayments, error: paymentsError } = await supabase
+        .from('fee_payments')
+        .select('amount_inr, component_type_id')
+        .eq('student_id', selectedStudentId)
+        .eq('school_code', schoolCode);
+      
+      if (paymentsError) throw paymentsError;
+      
+      // Calculate total paid
+      totalPaid = (existingPayments || []).reduce((sum: number, payment: any) => {
+        return sum + (payment.amount_inr || 0);
+      }, 0);
+      
+      // Calculate component-specific paid if component is selected
+      if (selectedComponentId) {
+        componentPaid = (existingPayments || [])
+          .filter((payment: any) => payment.component_type_id === selectedComponentId)
+          .reduce((sum: number, payment: any) => {
+            return sum + (payment.amount_inr || 0);
+          }, 0);
+      }
+      
+      const componentRemainingBalance = componentDue - componentPaid;
+      const totalRemainingBalance = totalDue - totalPaid;
+      
+      return {
+        totalDue,
+        totalPaid,
+        totalRemainingBalance,
+        componentDue,
+        componentPaid,
+        componentRemainingBalance,
+        hasPlan: !!selectedPlanId,
+        hasComponent: !!selectedComponentId && componentDue > 0,
+      };
+    },
+  });
 
   const {
     data: payments,
@@ -192,8 +345,8 @@ export default function PaymentHistory() {
         .from('fee_payments')
         .select(
           `
-          id, student_id, plan_id, component_type_id, amount_paise, payment_date, payment_method,
-          transaction_id, receipt_number, remarks, created_at, updated_at,
+          id, student_id, plan_id, component_type_id, amount_inr, payment_date, payment_method,
+          transaction_id, receipt_number, remarks, created_at, updated_at, created_by, recorded_by_name,
           student:student_id ( id, full_name, student_code, class_instance_id ),
           component:component_type_id ( id, name )
         `
@@ -230,20 +383,20 @@ export default function PaymentHistory() {
       // fetch plan items to compute totals
       const { data: items, error: itemsError } = await supabase
         .from('fee_student_plan_items')
-        .select('plan_id, amount_paise')
+        .select('plan_id, amount_inr')
         .in('plan_id', planIds);
       if (itemsError) throw itemsError;
 
       const planTotalMap = new Map<string, number>();
       for (const it of (items as any[])) {
         const pid = it.plan_id as string;
-        const amt = it.amount_paise as number;
+        const amt = it.amount_inr as number;
         planTotalMap.set(pid, (planTotalMap.get(pid) || 0) + (amt || 0));
       }
 
       return payments.map(p => ({
         ...p,
-        total_fee_paise: p.plan_id ? (planTotalMap.get(p.plan_id) || 0) : undefined,
+        total_fee_inr: p.plan_id ? (planTotalMap.get(p.plan_id) || 0) : undefined,
       }));
     },
   });
@@ -251,8 +404,90 @@ export default function PaymentHistory() {
   const empty = !isLoading && (payments?.length ?? 0) === 0;
 
   const totalCollected = useMemo(() => {
-    return (payments || []).reduce((sum, p) => sum + (p.amount_paise || 0), 0);
+    return (payments || []).reduce((sum, p) => sum + (p.amount_inr || 0), 0);
   }, [payments]);
+
+  // Group payments by student and calculate totals
+  const studentPaymentSummary = useMemo(() => {
+    const summary = new Map<string, {
+      student: any;
+      payments: PaymentRecord[];
+      totalPaid: number;
+      totalFee: number;
+      totalPending: number;
+    }>();
+
+    (payments || []).forEach((payment) => {
+      const studentId = payment.student_id;
+      if (!studentId) return;
+
+      if (!summary.has(studentId)) {
+        summary.set(studentId, {
+          student: payment.student,
+          payments: [],
+          totalPaid: 0,
+          totalFee: payment.total_fee_inr || 0,
+          totalPending: 0,
+        });
+      }
+
+      const studentSummary = summary.get(studentId)!;
+      studentSummary.payments.push(payment);
+      studentSummary.totalPaid += payment.amount_inr || 0;
+      // Use the highest total_fee_inr from any payment (they should all be the same for a student)
+      if (payment.total_fee_inr && payment.total_fee_inr > studentSummary.totalFee) {
+        studentSummary.totalFee = payment.total_fee_inr;
+      }
+    });
+
+    // Calculate pending for each student and sort payments by updated_at (oldest first)
+    summary.forEach((summary) => {
+      summary.totalPending = Math.max(0, summary.totalFee - summary.totalPaid);
+      // Sort payments by updated_at ascending (oldest first)
+      summary.payments.sort((a, b) => {
+        const dateA = a.updated_at ? new Date(a.updated_at).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
+        const dateB = b.updated_at ? new Date(b.updated_at).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
+        return dateA - dateB; // ascending order (oldest first)
+      });
+    });
+
+    // Filter by search text
+    let result = Array.from(summary.values());
+    if (searchText.trim().length > 0) {
+      const query = searchText.trim().toLowerCase();
+      result = result.filter(s => {
+        const name = (s.student?.full_name || '').toLowerCase();
+        const code = (s.student?.student_code || '').toLowerCase();
+        return name.includes(query) || code.includes(query);
+      });
+    }
+
+    // Filter by date range (any payment in the range)
+    if (startDate || endDate) {
+      result = result.filter(s => {
+        return s.payments.some(p => {
+          const paymentDate = new Date(p.payment_date);
+          if (startDate && paymentDate < new Date(startDate.toISOString().split('T')[0])) return false;
+          if (endDate && paymentDate > new Date(endDate.toISOString().split('T')[0])) return false;
+          return true;
+        });
+      });
+    }
+
+    // Filter by method
+    if (methodFilter) {
+      result = result.filter(s => {
+        return s.payments.some(p => p.payment_method === methodFilter);
+      });
+    }
+
+    return result.sort((a, b) => {
+      // Sort by student name
+      const nameA = (a.student?.full_name || '').toLowerCase();
+      const nameB = (b.student?.full_name || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+  }, [payments, searchText, startDate, endDate, methodFilter]);
 
   const filtered = useMemo(() => {
     const list = payments || [];
@@ -275,33 +510,223 @@ export default function PaymentHistory() {
     });
   }, [payments, startDate, endDate, methodFilter, searchText]);
 
-  // Pending list (no payment in current filter)
-  const pendingStudents = useMemo(() => {
-    if (!students || students.length === 0) return [] as { id: string; full_name: string; student_code: string }[];
-    const paidIds = new Set((filtered || []).map(p => p.student_id));
-    return students
-      .filter((s: any) => !paidIds.has(s.id))
-      .map((s: any) => ({ id: s.id, full_name: s.full_name, student_code: s.student_code }));
-  }, [students, filtered]);
+  // Format collected by - show who recorded the payment
+  const formatCollectedBy = (payment: PaymentRecord) => {
+    if (payment.recorded_by_name && payment.recorded_by_name.trim().length > 0) {
+      return payment.recorded_by_name;
+    }
+    // Show "No Data" when recorded_by_name is null or empty
+    return 'No Data';
+  };
 
   const headlineDateText = startDate ? (
     endDate ? `${formatDateDisplay(startDate.toISOString())} – ${formatDateDisplay(endDate.toISOString())}` : formatDateDisplay(startDate.toISOString())
   ) : 'All time';
 
-  const pendingDueTotal = useMemo(() => {
-    return pendingStudents.reduce((sum, s) => {
-      const planId = studentPlanMap.get(s.id);
-      if (!planId) return sum;
-      const total = planTotalMapAll.get(planId) || 0;
-      const paid = planPaidMapAll.get(planId) || 0;
-      const due = Math.max(total - paid, 0);
-      return sum + due;
-    }, 0);
-  }, [pendingStudents, studentPlanMap, planTotalMapAll, planPaidMapAll]);
-
   const formatMethod = (m?: string | null) => {
     if (!m) return '—';
     return m.charAt(0).toUpperCase() + m.slice(1).toLowerCase();
+  };
+
+  const openPaymentDetails = (studentSummary: { student: any; payments: PaymentRecord[]; totalPaid: number }) => {
+    setSelectedStudentForDetails(studentSummary);
+    setDetailsModalVisible(true);
+  };
+
+  const closePaymentDetails = () => {
+    setDetailsModalVisible(false);
+    setSelectedStudentForDetails(null);
+  };
+
+  // Handle payment submission
+  const handleSubmitPayment = async () => {
+    if (!selectedStudentId) {
+      Alert.alert('Error', 'Please select a student');
+      return;
+    }
+    
+    if (!selectedComponentId) {
+      Alert.alert('Error', 'Please select a fee component');
+      return;
+    }
+    
+    const amount = parseFloat(paymentAmount);
+    if (!amount || amount <= 0) {
+      Alert.alert('Error', 'Please enter a valid payment amount');
+      return;
+    }
+    
+    const planId = studentPlanMap.get(selectedStudentId) || null;
+    
+    setIsSubmitting(true);
+    try {
+      // Calculate component-specific due and paid amounts
+      let componentDue = 0;
+      let componentPaid = 0;
+      let totalDue = 0;
+      
+      if (planId) {
+        // Get plan items with component info
+        const { data: planItems, error: itemsError } = await supabase
+          .from('fee_student_plan_items')
+          .select('amount_inr, quantity, component_type_id')
+          .eq('plan_id', planId);
+        
+        if (itemsError) {
+          console.error('Error fetching plan items:', itemsError);
+          Alert.alert('Error', 'Failed to fetch fee plan details');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // Calculate total due from all plan items
+        totalDue = (planItems || []).reduce((sum: number, item: any) => {
+          const itemAmount = item.amount_inr || 0;
+          const itemQuantity = item.quantity || 1;
+          return sum + (itemAmount * itemQuantity);
+        }, 0);
+        
+        // Calculate component-specific due if component is selected
+        if (selectedComponentId) {
+          const componentItem = (planItems || []).find((item: any) => 
+            item.component_type_id === selectedComponentId
+          );
+          
+          if (componentItem) {
+            const itemAmount = componentItem.amount_inr || 0;
+            const itemQuantity = componentItem.quantity || 1;
+            componentDue = itemAmount * itemQuantity;
+          }
+        }
+      }
+      
+      // Calculate total and component-specific already paid
+      const { data: existingPayments, error: paymentsError } = await supabase
+        .from('fee_payments')
+        .select('amount_inr, component_type_id')
+        .eq('student_id', selectedStudentId)
+        .eq('school_code', schoolCode);
+      
+      if (paymentsError) {
+        console.error('Error fetching existing payments:', paymentsError);
+        Alert.alert('Error', 'Failed to fetch payment history');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      const totalPaid = (existingPayments || []).reduce((sum: number, payment: any) => {
+        return sum + (payment.amount_inr || 0);
+      }, 0);
+      
+      // Calculate component-specific paid if component is selected
+      if (selectedComponentId) {
+        componentPaid = (existingPayments || [])
+          .filter((payment: any) => payment.component_type_id === selectedComponentId)
+          .reduce((sum: number, payment: any) => {
+            return sum + (payment.amount_inr || 0);
+          }, 0);
+      }
+      
+      // Calculate remaining balances
+      const componentRemainingBalance = componentDue - componentPaid;
+      const totalRemainingBalance = totalDue - totalPaid;
+      
+      // Validate payment amount - use component-specific limit if component is selected
+      const maxAmount = selectedComponentId && componentDue > 0 
+        ? componentRemainingBalance 
+        : totalRemainingBalance;
+      
+      // Reject payment if: already fully paid/overpaid (maxAmount <= 0) OR exceeds remaining balance (amount > maxAmount)
+      if (totalDue > 0 && (maxAmount <= 0 || amount > maxAmount)) {
+        const componentName = selectedComponentId 
+          ? feeComponents.find((c: any) => c.id === selectedComponentId)?.name || 'component'
+          : 'total';
+        
+        let errorMessage: string;
+        if (maxAmount <= 0) {
+          // Already fully paid or overpaid
+          errorMessage = `All fees are already paid for ${componentName}. Cannot accept additional payments.`;
+          if (selectedComponentId && componentDue > 0) {
+            errorMessage += `\n\nComponent Fee: ₹${componentDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nComponent Paid: ₹${componentPaid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            if (componentRemainingBalance < 0) {
+              errorMessage += `\nOverpaid by: ₹${Math.abs(componentRemainingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+          } else {
+            errorMessage += `\n\nTotal Fee: ₹${totalDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nAlready Paid: ₹${totalPaid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            if (totalRemainingBalance < 0) {
+              errorMessage += `\nOverpaid by: ₹${Math.abs(totalRemainingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+          }
+        } else {
+          // Exceeds remaining balance
+          errorMessage = `The payment amount (₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) exceeds the remaining balance for ${componentName} (₹${maxAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).`;
+          if (selectedComponentId && componentDue > 0) {
+            errorMessage += `\n\nComponent Fee: ₹${componentDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nComponent Paid: ₹${componentPaid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nComponent Remaining: ₹${componentRemainingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          } else {
+            errorMessage += `\n\nTotal Fee: ₹${totalDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nAlready Paid: ₹${totalPaid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nRemaining: ₹${totalRemainingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          }
+        }
+        
+        Alert.alert(
+          'Payment Not Allowed',
+          errorMessage
+        );
+        setIsSubmitting(false);
+        return;
+      }
+      
+      const { error } = await supabase
+        .from('fee_payments')
+        .insert({
+          school_code: schoolCode,
+          student_id: selectedStudentId,
+          plan_id: planId,
+          component_type_id: selectedComponentId,
+          amount_inr: amount,
+          payment_method: paymentMethod,
+          payment_date: paymentDate.toISOString().split('T')[0],
+          transaction_id: receiptNumber || null,
+          receipt_number: receiptNumber || null,
+          remarks: remarks || null,
+          created_by: profile?.auth_id,
+          recorded_by_name: profile?.full_name || null,
+        });
+      
+      if (error) {
+        console.error('Payment error:', error);
+        Alert.alert('Error', error.message || 'Failed to record payment');
+        return;
+      }
+      
+      Alert.alert('Success', 'Payment recorded successfully!', [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Reset form
+            setSelectedStudentId(null);
+            setSelectedComponentId(null);
+            setPaymentAmount('');
+            setPaymentMethod('cash');
+            setReceiptNumber('');
+            setRemarks('');
+            setPaymentDate(new Date());
+            
+            // Refresh payments and fee balance
+            refetch();
+            queryClient.invalidateQueries({ queryKey: ['feeBalance', selectedStudentId] });
+            queryClient.invalidateQueries({ queryKey: ['componentBalances', selectedStudentId] });
+            
+            // Switch to collected tab to see the new payment
+            setActiveTab('collected');
+          }
+        }
+      ]);
+    } catch (error: any) {
+      console.error('Payment submission error:', error);
+      Alert.alert('Error', error.message || 'Failed to record payment');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -362,117 +787,400 @@ export default function PaymentHistory() {
         </View>
       </View>
 
-      {/* Toggle: Collected | Pending */}
+      {/* Toggle: Collected | Record Fee */}
       <View style={styles.toggleRow}>
         <TouchableOpacity onPress={() => setActiveTab('collected')} style={[styles.toggleBtn, activeTab==='collected' && styles.toggleBtnActive]}> 
           <Text style={[styles.toggleText, activeTab==='collected' && styles.toggleTextActive]}>Collected</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => setActiveTab('pending')} style={[styles.toggleBtn, activeTab==='pending' && styles.toggleBtnActive]}> 
-          <Text style={[styles.toggleText, activeTab==='pending' && styles.toggleTextActive]}>Pending</Text>
+        <TouchableOpacity onPress={() => setActiveTab('record')} style={[styles.toggleBtn, activeTab==='record' && styles.toggleBtnActive]}> 
+          <Text style={[styles.toggleText, activeTab==='record' && styles.toggleTextActive]}>Record Fee</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Search bar with filter icon */}
-      <View style={styles.searchSection}>
-        <View style={styles.searchBarContainer}>
-          <Searchbar
-            placeholder="Search payments..."
-            onChangeText={setSearchText}
-            value={searchText}
-            style={styles.searchBar}
-            iconColor={colors.primary[600]}
-          />
-          <TouchableOpacity 
-            style={styles.filterIconButton}
-            onPress={() => setShowMethodModal(true)}
-          >
-            <Filter size={20} color={colors.primary[600]} />
-          </TouchableOpacity>
+      {/* Search bar with filter icon - only show for Collected tab */}
+      {activeTab === 'collected' && (
+        <View style={styles.searchSection}>
+          <View style={styles.searchBarContainer}>
+            <Searchbar
+              placeholder="Search payments..."
+              onChangeText={setSearchText}
+              value={searchText}
+              style={styles.searchBar}
+              iconColor={colors.primary[600]}
+            />
+            <TouchableOpacity 
+              style={styles.filterIconButton}
+              onPress={() => setShowMethodModal(true)}
+            >
+              <Filter size={20} color={colors.primary[600]} />
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-
-      {/* Headline summary moved below filters */}
-      <View style={[styles.headlineCard, activeTab==='pending' && styles.headlineCardPending]}>
-        <View style={styles.headlineEdge} />
-        <View style={styles.headlineContentCenter}>
-          <Text style={styles.headlineAmount}>{activeTab==='pending' ? formatAmount(pendingDueTotal) : formatAmount(totalCollected)}</Text>
-        </View>
-      </View>
-      
-
-      {activeTab==='collected' && (
-      <View style={styles.tableHeader}>
-        <View style={styles.colStudent}><Text style={[styles.th, styles.alignLeft]}>Student</Text></View>
-        <View style={styles.colComponent}><Text style={[styles.th, styles.alignLeft]}>Component</Text></View>
-        <View style={styles.colAmount}><Text style={[styles.th, styles.alignRight]}>Amount</Text></View>
-        <View style={styles.colMethod}><Text style={[styles.th, styles.alignCenter]}>Method</Text></View>
-      </View>
       )}
 
+      {/* Headline summary moved below filters - only show for Collected tab */}
+      {activeTab === 'collected' && (
+        <View style={styles.headlineCard}>
+          <View style={styles.headlineEdge} />
+          <View style={styles.headlineContentCenter}>
+            <Text style={styles.headlineAmount}>{formatAmount(totalCollected)}</Text>
+          </View>
+        </View>
+      )}
+      
+
       {activeTab==='collected' ? (
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item, index }) => (
-          <View style={[styles.row, index % 2 === 1 && styles.rowAlt]}>
-            <View style={styles.colStudent}>
-              <Text style={[styles.td, styles.alignLeft]} numberOfLines={2} ellipsizeMode="tail">
-                {item.student?.full_name || '—'}
+      <>
+        <FlatList
+          data={studentPaymentSummary}
+          keyExtractor={(item) => item.student?.id || Math.random().toString()}
+          renderItem={({ item }) => {
+            return (
+              <View style={styles.studentPaymentCard}>
+                {/* Main Card Content */}
+                <TouchableOpacity
+                  style={styles.studentPaymentCardHeader}
+                  onPress={() => openPaymentDetails(item)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.studentPaymentCardInfo}>
+                    <View style={styles.studentPaymentCardNameRow}>
+                      <Text style={styles.studentPaymentCardName}>
+                        {item.student?.full_name || 'Unknown'}
+                      </Text>
+                      <ChevronRight 
+                        size={18} 
+                        color={colors.text.secondary}
+                        style={styles.expandIcon}
+                      />
+                    </View>
+                    {item.student?.student_code && (
+                      <Text style={styles.studentPaymentCardCode}>
+                        {item.student.student_code}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={styles.studentPaymentCardAmounts}>
+                    <View style={styles.amountRow}>
+                      <Text style={styles.amountLabel}>Paid:</Text>
+                      <Text style={styles.amountPaidText}>{formatAmount(item.totalPaid)}</Text>
+                    </View>
+                    <View style={styles.amountRow}>
+                      <Text style={styles.amountLabel}>Pending:</Text>
+                      <Text style={[
+                        styles.amountPendingText,
+                        item.totalPending > 0 && styles.amountPendingTextDanger
+                      ]}>
+                        {formatAmount(item.totalPending)}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            );
+          }}
+          ListEmptyComponent={empty ? (
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIconContainer}>
+                <CreditCard size={64} color={colors.primary[300]} />
+              </View>
+              <Text style={styles.emptyTitle}>No Payments Found</Text>
+              <Text style={styles.emptyText}>
+                No payments match your current filters.
               </Text>
-              {item.student?.student_code ? (
-                <Text style={styles.tdMeta}>{item.student.student_code}</Text>
+            </View>
+          ) : null}
+          refreshControl={
+            <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
+          }
+          contentContainerStyle={studentPaymentSummary.length > 0 ? { paddingBottom: spacing.xl } : { flex: 1 }}
+        />
+      </>
+      ) : (
+        <ScrollView style={styles.recordScrollView} contentContainerStyle={styles.recordFormContainer}>
+          {/* Student Selector */}
+          <View style={styles.recordFormGroup}>
+            <Text style={styles.recordLabel}>Student *</Text>
+            <TouchableOpacity
+              style={[styles.recordSelect, !selectedStudentId && styles.recordSelectEmpty]}
+              onPress={() => setShowStudentSelector(true)}
+            >
+              <Text style={[styles.recordSelectText, !selectedStudentId && styles.recordSelectTextEmpty]}>
+                {selectedStudentId 
+                  ? students.find((s: any) => s.id === selectedStudentId)?.full_name || 'Select student'
+                  : 'Select student'}
+              </Text>
+              <Users size={20} color={selectedStudentId ? colors.text.primary : colors.text.tertiary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Fee Balance Card - Show when student is selected */}
+          {selectedStudentId && feeBalance && (
+            <View style={styles.feeBalanceCard}>
+              <View style={styles.feeBalanceHeader}>
+                <Info size={18} color={colors.primary[600]} />
+                <Text style={styles.feeBalanceTitle}>Fee Balance</Text>
+              </View>
+              {balanceLoading ? (
+                <Text style={styles.feeBalanceLoading}>Loading...</Text>
+              ) : feeBalance.hasPlan ? (
+                <>
+                  <View style={styles.feeBalanceRow}>
+                    <Text style={styles.feeBalanceLabel}>Total Fee:</Text>
+                    <Text style={styles.feeBalanceValue}>
+                      {formatAmount(feeBalance.totalDue)}
+                    </Text>
+                  </View>
+                  <View style={styles.feeBalanceRow}>
+                    <Text style={styles.feeBalanceLabel}>Already Paid:</Text>
+                    <Text style={[styles.feeBalanceValue, styles.feeBalancePaid]}>
+                      {formatAmount(feeBalance.totalPaid)}
+                    </Text>
+                  </View>
+                  <View style={[styles.feeBalanceRow, styles.feeBalanceRowLast]}>
+                    <Text style={styles.feeBalanceLabel}>Remaining Balance:</Text>
+                    <Text style={[
+                      styles.feeBalanceValue,
+                      feeBalance.totalRemainingBalance > 0 ? styles.feeBalanceRemaining : styles.feeBalanceComplete
+                    ]}>
+                      {formatAmount(feeBalance.totalRemainingBalance)}
+                    </Text>
+                  </View>
+                  {/* Component-specific balance when component is selected */}
+                  {selectedComponentId && feeBalance.hasComponent && (
+                    <>
+                      <View style={styles.feeBalanceDivider} />
+                      <Text style={styles.feeBalanceComponentTitle}>
+                        {feeComponents.find((c: any) => c.id === selectedComponentId)?.name || 'Selected Component'}
+                      </Text>
+                      <View style={styles.feeBalanceRow}>
+                        <Text style={styles.feeBalanceLabel}>Component Fee:</Text>
+                        <Text style={styles.feeBalanceValue}>
+                          {formatAmount(feeBalance.componentDue)}
+                        </Text>
+                      </View>
+                      <View style={styles.feeBalanceRow}>
+                        <Text style={styles.feeBalanceLabel}>Component Paid:</Text>
+                        <Text style={[styles.feeBalanceValue, styles.feeBalancePaid]}>
+                          {formatAmount(feeBalance.componentPaid)}
+                        </Text>
+                      </View>
+                      <View style={[styles.feeBalanceRow, styles.feeBalanceRowLast]}>
+                        <Text style={styles.feeBalanceLabel}>Remaining:</Text>
+                        <Text style={[
+                          styles.feeBalanceValue,
+                          feeBalance.componentRemainingBalance > 0 ? styles.feeBalanceRemaining : styles.feeBalanceComplete
+                        ]}>
+                          {formatAmount(feeBalance.componentRemainingBalance)}
+                        </Text>
+                      </View>
+                    </>
+                  )}
+                  {feeBalance.totalRemainingBalance <= 0 && (
+                    <View style={styles.feeBalanceWarning}>
+                      <CheckCircle2 size={16} color={colors.success[600]} />
+                      <Text style={styles.feeBalanceWarningText}>
+                        All fees are paid for this student
+                      </Text>
+                    </View>
+                  )}
+                </>
+              ) : (
+                <View style={styles.feeBalanceNoPlan}>
+                  <AlertCircle size={16} color={colors.warning[600]} />
+                  <Text style={styles.feeBalanceNoPlanText}>
+                    No fee plan assigned to this student
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Component Selector */}
+          <View style={styles.recordFormGroup}>
+            <Text style={styles.recordLabel}>Fee Component *</Text>
+            <TouchableOpacity
+              style={[styles.recordSelect, !selectedComponentId && styles.recordSelectEmpty]}
+              onPress={() => setShowComponentSelector(true)}
+            >
+              <Text style={[styles.recordSelectText, !selectedComponentId && styles.recordSelectTextEmpty]}>
+                {selectedComponentId 
+                  ? feeComponents.find((c: any) => c.id === selectedComponentId)?.name || 'Select component'
+                  : 'Select component'}
+              </Text>
+              <Circle size={20} color={selectedComponentId ? colors.text.primary : colors.text.tertiary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Amount */}
+          <View style={styles.recordFormGroup}>
+            <View style={styles.recordLabelRow}>
+              <Text style={styles.recordLabel}>Amount (₹) *</Text>
+              {selectedComponentId && feeBalance?.hasComponent && feeBalance.componentRemainingBalance > 0 ? (
+                <Text style={styles.recordMaxAmount}>
+                  Max: {formatAmount(feeBalance.componentRemainingBalance)}
+                </Text>
+              ) : feeBalance?.hasPlan && feeBalance.totalRemainingBalance > 0 ? (
+                <Text style={styles.recordMaxAmount}>
+                  Max: {formatAmount(feeBalance.totalRemainingBalance)}
+                </Text>
               ) : null}
             </View>
-            <View style={styles.colComponent}>
-              <Text style={[styles.td, styles.alignLeft]} numberOfLines={2} ellipsizeMode="tail">
-                {item.component?.name || '—'}
+            <View style={[
+              styles.recordAmountInputWrapper,
+              paymentAmount && (() => {
+                const amount = parseFloat(paymentAmount) || 0;
+                // Use component-specific limit if component is selected, otherwise use total
+                const maxAmount = selectedComponentId && feeBalance?.hasComponent 
+                  ? feeBalance.componentRemainingBalance 
+                  : feeBalance?.totalRemainingBalance || 0;
+                
+                // Show error if: already fully paid/overpaid (maxAmount <= 0) OR exceeds remaining balance (amount > maxAmount)
+                if (feeBalance?.hasPlan && (maxAmount <= 0 || amount > maxAmount)) {
+                  return styles.recordAmountInputError;
+                }
+                return null;
+              })()
+            ]}>
+              <Text style={styles.recordCurrencySymbol}>₹</Text>
+              <TextInput
+                style={styles.recordAmountInput}
+                value={paymentAmount}
+                onChangeText={setPaymentAmount}
+                placeholder="0.00"
+                keyboardType="decimal-pad"
+                placeholderTextColor={colors.text.tertiary}
+              />
+            </View>
+            {paymentAmount && (() => {
+              const amount = parseFloat(paymentAmount) || 0;
+              // Use component-specific limit if component is selected, otherwise use total
+              const maxAmount = selectedComponentId && feeBalance?.hasComponent 
+                ? feeBalance.componentRemainingBalance 
+                : feeBalance?.totalRemainingBalance || 0;
+              
+              if (feeBalance?.hasPlan) {
+                if (maxAmount <= 0) {
+                  // Already fully paid or overpaid
+                  return (
+                    <View style={styles.recordAmountError}>
+                      <AlertCircle size={14} color={colors.error[600]} />
+                      <Text style={styles.recordAmountErrorText}>
+                        {selectedComponentId && feeBalance?.hasComponent
+                          ? 'All fees for this component are already paid. Cannot accept additional payments.'
+                          : 'All fees are already paid. Cannot accept additional payments.'}
+                      </Text>
+                    </View>
+                  );
+                } else if (amount > maxAmount) {
+                  // Exceeds remaining balance
+                  return (
+                    <View style={styles.recordAmountError}>
+                      <AlertCircle size={14} color={colors.error[600]} />
+                      <Text style={styles.recordAmountErrorText}>
+                        {selectedComponentId && feeBalance?.hasComponent
+                          ? `Amount exceeds remaining balance for this component by ${formatAmount(amount - maxAmount)}`
+                          : `Amount exceeds remaining balance by ${formatAmount(amount - maxAmount)}`}
+                      </Text>
+                    </View>
+                  );
+                } else if (amount > 0 && amount <= maxAmount) {
+                  // Valid payment amount
+                  const remainingAfter = maxAmount - amount;
+                  return (
+                    <View style={styles.recordAmountHint}>
+                      <Text style={styles.recordAmountHintText}>
+                        {selectedComponentId && feeBalance?.hasComponent
+                          ? remainingAfter > 0 
+                            ? `After payment: ${formatAmount(remainingAfter)} remaining for this component`
+                            : 'Payment will complete this component'
+                          : remainingAfter > 0 
+                            ? `After payment: ${formatAmount(remainingAfter)} remaining`
+                            : 'Payment will complete all fees'}
+                      </Text>
+                    </View>
+                  );
+                }
+              }
+              return null;
+            })()}
+          </View>
+
+          {/* Payment Date */}
+          <View style={styles.recordFormGroup}>
+            <Text style={styles.recordLabel}>Payment Date *</Text>
+            <TouchableOpacity
+              style={styles.recordSelect}
+              onPress={() => setShowRecordDatePicker(true)}
+            >
+              <Calendar size={20} color={colors.text.primary} />
+              <Text style={styles.recordSelectText}>
+                {paymentDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
               </Text>
-            </View>
-            <View style={styles.colAmount}>
-              <Text style={[styles.td, styles.alignRight]}>{formatAmount(item.amount_paise)}</Text>
-            </View>
-            <View style={styles.colMethod}>
-              <Text style={[styles.td, styles.alignCenter]}>{formatMethod(item.payment_method)}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Payment Method */}
+          <View style={styles.recordFormGroup}>
+            <Text style={styles.recordLabel}>Payment Method *</Text>
+            <View style={styles.recordMethodContainer}>
+              {['cash', 'cheque', 'online', 'card'].map((method) => (
+                <TouchableOpacity
+                  key={method}
+                  style={[
+                    styles.recordMethodOption,
+                    paymentMethod === method && styles.recordMethodOptionSelected
+                  ]}
+                  onPress={() => setPaymentMethod(method)}
+                >
+                  <Text style={[
+                    styles.recordMethodText,
+                    paymentMethod === method && styles.recordMethodTextSelected
+                  ]}>
+                    {method.charAt(0).toUpperCase() + method.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
-        )}
-        ListEmptyComponent={empty ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No payments found. Try changing the date or method.</Text>
+
+          {/* Transaction ID */}
+          <View style={styles.recordFormGroup}>
+            <Text style={styles.recordLabel}>Transaction/Receipt ID</Text>
+            <TextInput
+              style={styles.recordTextInput}
+              value={receiptNumber}
+              onChangeText={setReceiptNumber}
+              placeholder="Optional"
+              placeholderTextColor={colors.text.tertiary}
+            />
           </View>
-        ) : null}
-        refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
-        }
-        contentContainerStyle={payments && payments.length > 0 ? undefined : { flex: 1 }}
-      />
-      ) : (
-        <FlatList
-          data={pendingStudents}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item, index }) => (
-            <View style={[styles.row, index % 2 === 1 && styles.rowAlt]}>
-              <View style={styles.colStudent}><Text style={[styles.td, styles.alignLeft]} numberOfLines={1} ellipsizeMode="tail">{item.full_name}</Text></View>
-              <View style={styles.colAmount}><Text style={[styles.td, styles.alignRight]}>
-                {(() => {
-                  const pid = studentPlanMap.get(item.id);
-                  if (!pid) return '—';
-                  const total = planTotalMapAll.get(pid) || 0;
-                  const paid = planPaidMapAll.get(pid) || 0;
-                  const due = Math.max(total - paid, 0);
-                  return formatAmount(due);
-                })()}
-              </Text></View>
-            </View>
-          )}
-          ListEmptyComponent={(
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>Great! No pending payments for this selection.</Text>
-            </View>
-          )}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
-          contentContainerStyle={pendingStudents.length > 0 ? undefined : { flex: 1 }}
-        />
+
+          {/* Remarks */}
+          <View style={styles.recordFormGroup}>
+            <Text style={styles.recordLabel}>Remarks</Text>
+            <TextInput
+              style={[styles.recordTextInput, styles.recordTextArea]}
+              value={remarks}
+              onChangeText={setRemarks}
+              placeholder="Optional remarks"
+              multiline
+              numberOfLines={3}
+              placeholderTextColor={colors.text.tertiary}
+            />
+          </View>
+
+          {/* Submit Button */}
+          <Button
+            mode="contained"
+            onPress={handleSubmitPayment}
+            loading={isSubmitting}
+            disabled={isSubmitting || !selectedStudentId || !selectedComponentId || !paymentAmount}
+            style={styles.recordSubmitButton}
+          >
+            Record Payment
+          </Button>
+        </ScrollView>
       )}
 
       {/* Class Selector Modal - Animated Bottom Sheet (match syllabus) */}
@@ -645,6 +1353,383 @@ export default function PaymentHistory() {
           </PaperModal>
         </Portal>
       )}
+
+      {/* Record Date Picker */}
+      {showRecordDatePicker && Platform.OS === 'android' && (
+        <DateTimePicker
+          value={paymentDate}
+          mode="date"
+          display="default"
+          onChange={(event, selectedDate) => {
+            setShowRecordDatePicker(false);
+            if (selectedDate) {
+              setPaymentDate(selectedDate);
+            }
+          }}
+          minimumDate={new Date(2020, 0, 1)}
+          maximumDate={new Date(2030, 11, 31)}
+        />
+      )}
+
+      {showRecordDatePicker && Platform.OS === 'ios' && (
+        <Portal>
+          <PaperModal
+            visible={showRecordDatePicker}
+            onDismiss={() => setShowRecordDatePicker(false)}
+            contentContainerStyle={styles.datePickerModal}
+          >
+            <View style={styles.datePickerContainer}>
+              <Text style={styles.datePickerTitle}>Select Payment Date</Text>
+              <DateTimePicker
+                value={paymentDate}
+                mode="date"
+                display="spinner"
+                onChange={(event, selectedDate) => {
+                  if (selectedDate) {
+                    setPaymentDate(selectedDate);
+                  }
+                }}
+                minimumDate={new Date(2020, 0, 1)}
+                maximumDate={new Date(2030, 11, 31)}
+              />
+              <View style={styles.datePickerActions}>
+                <Button
+                  mode="outlined"
+                  onPress={() => setShowRecordDatePicker(false)}
+                  style={styles.datePickerButton}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  mode="contained"
+                  onPress={() => setShowRecordDatePicker(false)}
+                  style={styles.datePickerButton}
+                >
+                  Done
+                </Button>
+              </View>
+            </View>
+          </PaperModal>
+        </Portal>
+      )}
+
+      {/* Student Selector Modal */}
+      <Modal
+        visible={showStudentSelector}
+        transparent
+        animationType="none"
+        onRequestClose={() => {
+          setShowStudentSelector(false);
+          setStudentSearchQuery('');
+        }}
+      >
+        <Animated.View style={[styles.modalOverlay, { opacity: studentOverlayOpacity }]}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill as any}
+            activeOpacity={1}
+            onPress={() => {
+              setShowStudentSelector(false);
+              setStudentSearchQuery('');
+            }}
+          />
+          <Animated.View
+            style={[
+              styles.bottomSheet,
+              {
+                transform: [
+                  {
+                    translateY: studentSlideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [500, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Select Student</Text>
+            
+            {/* Search Input */}
+            <View style={styles.sheetSearchContainer}>
+              <View style={styles.sheetSearchInputWrapper}>
+                <Search size={18} color={colors.text.secondary} />
+                <TextInput
+                  style={styles.sheetSearchInput}
+                  placeholder="Search students..."
+                  value={studentSearchQuery}
+                  onChangeText={setStudentSearchQuery}
+                  placeholderTextColor={colors.text.tertiary}
+                />
+                {studentSearchQuery.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setStudentSearchQuery('')}
+                    style={styles.sheetSearchClear}
+                  >
+                    <X size={16} color={colors.text.secondary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            <ScrollView style={styles.sheetContent}>
+              {(() => {
+                // Filter students based on search
+                const filteredStudents = students.filter((s: any) => {
+                  if (!studentSearchQuery.trim()) return true;
+                  const query = studentSearchQuery.toLowerCase();
+                  const name = (s.full_name || '').toLowerCase();
+                  const code = (s.student_code || '').toLowerCase();
+                  return name.includes(query) || code.includes(query);
+                });
+
+                if (filteredStudents.length === 0) {
+                  return (
+                    <View style={[styles.sheetEmptyState, { minHeight: 200, justifyContent: 'center' }]}>
+                      <Text style={styles.sheetEmptyText}>
+                        {students.length === 0 
+                          ? 'No students available' 
+                          : `No students match "${studentSearchQuery}"`}
+                      </Text>
+                    </View>
+                  );
+                }
+
+                return filteredStudents.map((s: any) => (
+                  <TouchableOpacity
+                    key={s.id}
+                    style={[styles.sheetItem, selectedStudentId === s.id && styles.sheetItemActive]}
+                    onPress={() => {
+                      setSelectedStudentId(s.id);
+                      setShowStudentSelector(false);
+                      setStudentSearchQuery(''); // Clear search when selecting
+                    }}
+                  >
+                    <Text style={[styles.sheetItemText, selectedStudentId === s.id && styles.sheetItemTextActive]}>
+                      {s.full_name} {s.student_code ? `(${s.student_code})` : ''}
+                    </Text>
+                    {selectedStudentId === s.id && <Text style={styles.checkmark}>✓</Text>}
+                  </TouchableOpacity>
+                ));
+              })()}
+            </ScrollView>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
+
+      {/* Payment Details Modal */}
+      <Modal
+        visible={detailsModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closePaymentDetails}
+      >
+        <View style={styles.detailsModalOverlay}>
+          <TouchableOpacity
+            style={styles.detailsModalBackdrop}
+            activeOpacity={1}
+            onPress={closePaymentDetails}
+          />
+          <View style={styles.detailsModalContent}>
+            <View style={styles.detailsModalHeader}>
+              <View style={styles.detailsModalHeaderInfo}>
+                <Text style={styles.detailsModalTitle}>
+                  {selectedStudentForDetails?.student?.full_name || 'Unknown'}
+                </Text>
+                {selectedStudentForDetails?.student?.student_code && (
+                  <Text style={styles.detailsModalSubtitle}>
+                    {selectedStudentForDetails.student.student_code}
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity
+                onPress={closePaymentDetails}
+                style={styles.detailsModalCloseButton}
+              >
+                <X size={24} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView 
+              style={styles.detailsModalBody}
+              contentContainerStyle={styles.detailsModalContentContainer}
+            >
+              {!selectedStudentForDetails || selectedStudentForDetails.payments.length === 0 ? (
+                <View style={styles.detailsModalEmpty}>
+                  <Text style={styles.detailsModalEmptyText}>No payment details</Text>
+                </View>
+              ) : (
+                <View style={styles.paymentDetailsContainer}>
+                  <View style={styles.paymentDetailsList}>
+                    {selectedStudentForDetails.payments.map((payment, index) => (
+                      <View key={payment.id}>
+                        <View style={styles.studentPaymentDetailRow}>
+                          <Text style={styles.studentPaymentDetailIndex}>
+                            #{index + 1}
+                          </Text>
+                          <Text style={styles.studentPaymentDetailAmount}>
+                            {formatAmount(payment.amount_inr)}
+                          </Text>
+                          <View style={styles.studentPaymentDetailBadge}>
+                            <Text style={styles.studentPaymentDetailBadgeText}>
+                              {formatMethod(payment.payment_method)}
+                            </Text>
+                          </View>
+                          <Text style={styles.studentPaymentDetailText}>
+                            {formatDateDisplay(payment.payment_date)}
+                          </Text>
+                          <Text style={styles.studentPaymentDetailText}>
+                            {formatCollectedBy(payment)}
+                          </Text>
+                          {payment.receipt_number && (
+                            <Text style={styles.studentPaymentDetailText}>
+                              {payment.receipt_number}
+                            </Text>
+                          )}
+                        </View>
+                        {index < selectedStudentForDetails.payments.length - 1 && (
+                          <View style={styles.paymentDivider} />
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                  
+                  {/* Total Paid - Compact */}
+                  <View style={styles.paymentTotalRow}>
+                    <Text style={styles.paymentTotalLabel}>TOTAL PAID</Text>
+                    <Text style={styles.paymentTotalAmount}>
+                      {formatAmount(selectedStudentForDetails.totalPaid)}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Component Selector Modal */}
+      <Modal
+        visible={showComponentSelector}
+        transparent
+        animationType="none"
+        onRequestClose={() => {
+          setShowComponentSelector(false);
+          setComponentSearchQuery('');
+        }}
+      >
+        <Animated.View style={[styles.modalOverlay, { opacity: componentOverlayOpacity }]}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill as any}
+            activeOpacity={1}
+            onPress={() => {
+              setShowComponentSelector(false);
+              setComponentSearchQuery('');
+            }}
+          />
+          <Animated.View
+            style={[
+              styles.bottomSheet,
+              {
+                transform: [
+                  {
+                    translateY: componentSlideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [500, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Select Fee Component</Text>
+            
+            {/* Search Input */}
+            <View style={styles.sheetSearchContainer}>
+              <View style={styles.sheetSearchInputWrapper}>
+                <Search size={18} color={colors.text.secondary} />
+                <TextInput
+                  style={styles.sheetSearchInput}
+                  placeholder="Search components..."
+                  value={componentSearchQuery}
+                  onChangeText={setComponentSearchQuery}
+                  placeholderTextColor={colors.text.tertiary}
+                />
+                {componentSearchQuery.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setComponentSearchQuery('')}
+                    style={styles.sheetSearchClear}
+                  >
+                    <X size={16} color={colors.text.secondary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            <ScrollView style={styles.sheetContent}>
+              {(() => {
+                // Filter components based on search
+                const filteredComponents = feeComponents.filter((c: any) => {
+                  if (!componentSearchQuery.trim()) return true;
+                  const query = componentSearchQuery.toLowerCase();
+                  const name = (c.name || '').toLowerCase();
+                  return name.includes(query);
+                });
+
+                if (filteredComponents.length === 0) {
+                  return (
+                    <View style={[styles.sheetEmptyState, { minHeight: 200, justifyContent: 'center' }]}>
+                      <Text style={styles.sheetEmptyText}>
+                        {feeComponents.length === 0 
+                          ? 'No fee components available' 
+                          : `No components match "${componentSearchQuery}"`}
+                      </Text>
+                    </View>
+                  );
+                }
+
+                return filteredComponents.map((c: any) => {
+                  // Check if component is fully paid
+                  const componentBalance = componentBalances?.get(c.id);
+                  const isPaid = componentBalance && componentBalance.remaining <= 0 && componentBalance.due > 0;
+
+                  return (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={[
+                        styles.sheetItem,
+                        selectedComponentId === c.id && styles.sheetItemActive,
+                        isPaid && styles.sheetItemPaid
+                      ]}
+                      onPress={() => {
+                        if (!isPaid) {
+                          setSelectedComponentId(c.id);
+                          setShowComponentSelector(false);
+                          setComponentSearchQuery(''); // Clear search when selecting
+                        }
+                      }}
+                      disabled={isPaid}
+                    >
+                      <Text style={[
+                        styles.sheetItemText,
+                        selectedComponentId === c.id && styles.sheetItemTextActive,
+                        isPaid && styles.sheetItemTextPaid
+                      ]}>
+                        {c.name}
+                      </Text>
+                      {selectedComponentId === c.id && <Text style={styles.checkmark}>✓</Text>}
+                      {isPaid && (
+                        <Text style={styles.sheetItemPaidBadge}>Paid</Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                });
+              })()}
+            </ScrollView>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
     </View>
   );
 }
@@ -670,9 +1755,6 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  headlineCardPending: {
-    backgroundColor: colors.error[50],
   },
   headlineEdge: {
     width: 4,
@@ -946,6 +2028,8 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: spacing.xl,
     maxHeight: '70%',
+    minHeight: 400,
+    height: '70%',
   },
   sheetHandle: {
     width: 36,
@@ -964,7 +2048,42 @@ const styles = StyleSheet.create({
   },
   sheetContent: {
     paddingHorizontal: spacing.lg,
-    maxHeight: 400,
+    flex: 1,
+    minHeight: 300,
+  },
+  sheetSearchContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  sheetSearchInputWrapper: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: colors.background.secondary,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+  },
+  sheetSearchInput: {
+    flex: 1,
+    fontSize: typography.fontSize.base,
+    color: colors.text.primary,
+    padding: 0,
+  },
+  sheetSearchClear: {
+    padding: spacing.xs,
+  },
+  sheetEmptyState: {
+    paddingVertical: spacing.xl,
+    alignItems: 'center' as const,
+  },
+  sheetEmptyText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.tertiary,
+    textAlign: 'center' as const,
   },
   sheetItem: {
     flexDirection: 'row',
@@ -979,6 +2098,10 @@ const styles = StyleSheet.create({
   sheetItemActive: {
     backgroundColor: '#EEF2FF',
   },
+  sheetItemPaid: {
+    backgroundColor: colors.neutral[50],
+    opacity: 0.6,
+  },
   sheetItemText: {
     fontSize: typography.fontSize.base,
     color: colors.text.primary,
@@ -988,10 +2111,249 @@ const styles = StyleSheet.create({
   sheetItemTextActive: {
     color: colors.primary[600],
   },
+  sheetItemTextPaid: {
+    color: colors.text.tertiary,
+  },
+  sheetItemPaidBadge: {
+    fontSize: typography.fontSize.xs,
+    color: colors.success[600],
+    fontWeight: '600',
+    backgroundColor: colors.success[50],
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    marginLeft: spacing.xs,
+  },
   checkmark: {
     fontSize: typography.fontSize.lg,
     color: colors.primary[600],
     fontWeight: '700',
+  },
+  studentPaymentCard: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.lg,
+    ...shadows.sm,
+    overflow: 'hidden',
+  },
+  studentPaymentCardHeader: {
+    padding: spacing.lg,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  studentPaymentCardInfo: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  studentPaymentCardNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  studentPaymentCardName: {
+    fontSize: typography.fontSize.base,
+    fontWeight: '600',
+    color: colors.text.primary,
+    flex: 1,
+  },
+  studentPaymentCardCode: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.tertiary,
+    marginTop: spacing.xs,
+  },
+  studentPaymentCardAmounts: {
+    alignItems: 'flex-end',
+  },
+  amountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  amountLabel: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+  },
+  amountPaidText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: '600',
+    color: colors.success[600],
+  },
+  amountPendingText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: '600',
+    color: colors.text.secondary,
+  },
+  amountPendingTextDanger: {
+    color: colors.error[600],
+  },
+  expandIcon: {
+    marginLeft: spacing.xs,
+  },
+  detailsModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailsModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  detailsModalContent: {
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.xl,
+    width: '95%',
+    maxHeight: '90%',
+    ...shadows.lg,
+  },
+  detailsModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  detailsModalHeaderInfo: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  detailsModalTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  detailsModalSubtitle: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.tertiary,
+  },
+  detailsModalCloseButton: {
+    padding: spacing.xs,
+  },
+  detailsModalBody: {
+    maxHeight: 600,
+  },
+  detailsModalContentContainer: {
+    padding: spacing.lg,
+  },
+  detailsModalEmpty: {
+    paddingVertical: spacing.xl,
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  detailsModalEmptyText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.tertiary,
+  },
+  studentPaymentDetails: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+    backgroundColor: colors.background.secondary,
+    paddingVertical: spacing.lg,
+  },
+  studentPaymentDetailsScroll: {
+    flexGrow: 0,
+  },
+  studentPaymentDetailsContent: {
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
+  },
+  studentPaymentDetailsEmpty: {
+    paddingVertical: spacing.xl,
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  studentPaymentDetailsEmptyText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.tertiary,
+  },
+  paymentDetailsContainer: {
+    width: '100%',
+  },
+  paymentDetailsList: {
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    ...shadows.sm,
+    overflow: 'hidden',
+  },
+  studentPaymentDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    width: '100%',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  studentPaymentDetailIndex: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: '600',
+    color: colors.text.tertiary,
+    backgroundColor: colors.background.secondary,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    flexShrink: 0,
+  },
+  studentPaymentDetailAmount: {
+    fontSize: typography.fontSize.base,
+    fontWeight: '700',
+    color: colors.success[600],
+    flexShrink: 0,
+  },
+  studentPaymentDetailBadge: {
+    backgroundColor: colors.primary[600],
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    flexShrink: 0,
+  },
+  studentPaymentDetailBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: '600',
+    color: colors.surface.primary,
+    textTransform: 'uppercase' as const,
+  },
+  studentPaymentDetailText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.primary,
+    fontWeight: '400',
+    flexShrink: 0,
+  },
+  paymentDivider: {
+    height: 1,
+    backgroundColor: colors.border.light,
+    marginHorizontal: spacing.md,
+  },
+  paymentTotalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.md,
+    backgroundColor: colors.success[50],
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.success[200],
+  },
+  paymentTotalLabel: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: '600',
+    color: colors.text.secondary,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+  },
+  paymentTotalAmount: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: '700',
+    color: colors.success[600],
   },
   datePickerModal: {
     backgroundColor: colors.surface.primary,
@@ -1025,6 +2387,38 @@ const styles = StyleSheet.create({
   alignLeft: { textAlign: 'left' as const },
   alignRight: { textAlign: 'right' as const },
   alignCenter: { textAlign: 'center' as const },
+  tableRow: {
+    flexDirection: 'row' as const,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+    backgroundColor: colors.surface.primary,
+  },
+  tableRowAlt: {
+    backgroundColor: colors.background.secondary,
+  },
+  colName: {
+    flex: 2,
+    paddingRight: spacing.sm,
+    minWidth: 100,
+  },
+  colAmount: {
+    flex: 1.2,
+    paddingRight: spacing.sm,
+    minWidth: 90,
+    alignItems: 'flex-end' as const,
+  },
+  colDate: {
+    flex: 1.3,
+    paddingRight: spacing.sm,
+    minWidth: 90,
+  },
+  colCollectedBy: {
+    flex: 1.3,
+    paddingRight: spacing.sm,
+    minWidth: 90,
+  },
   row: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.xs,
@@ -1050,25 +2444,362 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
     fontWeight: '400',
   },
+  amountText: {
+    fontWeight: '600' as const,
+    color: colors.success[600],
+  },
   colStudent: { flex: 2.5, minWidth: 100, paddingRight: spacing.xs },
   colComponent: { flex: 1.8, minWidth: 90, paddingRight: spacing.xs },
-  colAmount: { flex: 1, minWidth: 90, paddingRight: spacing.xs, justifyContent: 'center', alignItems: 'center' },
   colMethod: { flex: 0.8, minWidth: 60, justifyContent: 'center', alignItems: 'center' },
   emptyState: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.xl,
+    paddingVertical: spacing.xl * 3,
+    paddingHorizontal: spacing.xl,
+    minHeight: 400,
+  },
+  emptyIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.primary[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xl,
+  },
+  emptyTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold as any,
+    color: colors.text.primary,
+    marginBottom: spacing.md,
+    textAlign: 'center',
   },
   emptyText: {
     fontSize: typography.fontSize.base,
     color: colors.text.secondary,
+    textAlign: 'center',
+    lineHeight: 26,
+    paddingHorizontal: spacing.xl,
+    maxWidth: 320,
   },
   sectionDivider: {
     height: 1,
     backgroundColor: colors.border.DEFAULT,
     marginHorizontal: spacing.lg,
     marginBottom: spacing.sm,
+  },
+  // Record Fee Form Styles
+  recordScrollView: {
+    flex: 1,
+  },
+  recordFormContainer: {
+    padding: spacing.lg,
+    gap: spacing.md,
+    paddingBottom: spacing.xl * 2,
+  },
+  recordFormGroup: {
+    marginBottom: spacing.md,
+  },
+  recordLabel: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold as any,
+    color: colors.text.secondary,
+    marginBottom: spacing.xs,
+  },
+  recordSelect: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    backgroundColor: colors.surface.primary,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    minHeight: 48,
+  },
+  recordSelectEmpty: {
+    borderColor: colors.border.light,
+    backgroundColor: colors.background.primary,
+  },
+  recordSelectText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium as any,
+    color: colors.text.primary,
+    flex: 1,
+  },
+  recordSelectTextEmpty: {
+    color: colors.text.tertiary,
+    fontWeight: typography.fontWeight.normal as any,
+  },
+  recordAmountInputWrapper: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: colors.surface.primary,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    minHeight: 48,
+  },
+  recordCurrencySymbol: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold as any,
+    color: colors.text.secondary,
+    marginRight: spacing.xs,
+  },
+  recordAmountInput: {
+    flex: 1,
+    fontSize: typography.fontSize.base,
+    color: colors.text.primary,
+    paddingVertical: spacing.sm,
+  },
+  recordMethodContainer: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: spacing.sm,
+  },
+  recordMethodOption: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.background.secondary,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    minWidth: 80,
+  },
+  recordMethodOptionSelected: {
+    backgroundColor: colors.primary[100],
+    borderColor: colors.primary[600],
+  },
+  recordMethodText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium as any,
+    color: colors.text.primary,
+    textAlign: 'center' as const,
+  },
+  recordMethodTextSelected: {
+    color: colors.primary[700],
+    fontWeight: typography.fontWeight.semibold as any,
+  },
+  recordTextInput: {
+    backgroundColor: colors.surface.primary,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    fontSize: typography.fontSize.base,
+    color: colors.text.primary,
+    minHeight: 48,
+  },
+  recordTextArea: {
+    minHeight: 100,
+    textAlignVertical: 'top' as const,
+  },
+  recordSubmitButton: {
+    marginTop: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  // Fee Balance Card Styles
+  feeBalanceCard: {
+    backgroundColor: colors.primary[50],
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.primary[200],
+    ...shadows.sm,
+  },
+  feeBalanceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  feeBalanceTitle: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.bold as any,
+    color: colors.primary[700],
+  },
+  feeBalanceLoading: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    fontStyle: 'italic',
+  },
+  feeBalanceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+  },
+  feeBalanceRowLast: {
+    borderTopWidth: 1,
+    borderTopColor: colors.primary[200],
+    marginTop: spacing.xs,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+  },
+  feeBalanceLabel: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    fontWeight: typography.fontWeight.medium as any,
+  },
+  feeBalanceValue: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.bold as any,
+    color: colors.text.primary,
+  },
+  feeBalancePaid: {
+    color: colors.success[600],
+  },
+  feeBalanceRemaining: {
+    color: colors.error[600],
+  },
+  feeBalanceComplete: {
+    color: colors.success[600],
+  },
+  feeBalanceWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.success[200],
+  },
+  feeBalanceWarningText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.success[700],
+    fontWeight: typography.fontWeight.medium as any,
+  },
+  feeBalanceNoPlan: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
+  feeBalanceNoPlanText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.warning[700],
+    fontWeight: typography.fontWeight.medium as any,
+  },
+  feeBalanceDivider: {
+    height: 1,
+    backgroundColor: colors.primary[200],
+    marginVertical: spacing.sm,
+  },
+  feeBalanceComponentTitle: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold as any,
+    color: colors.primary[700],
+    marginBottom: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  // Record Form Enhanced Styles
+  recordLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  recordMaxAmount: {
+    fontSize: typography.fontSize.xs,
+    color: colors.primary[600],
+    fontWeight: typography.fontWeight.semibold as any,
+  },
+  recordAmountInputError: {
+    borderColor: colors.error[400],
+    backgroundColor: colors.error[50],
+    borderWidth: 2,
+  },
+  recordAmountError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.xs,
+  },
+  recordAmountErrorText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.error[600],
+    fontWeight: typography.fontWeight.medium as any,
+  },
+  recordAmountHint: {
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.xs,
+  },
+  recordAmountHintText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.success[600],
+    fontWeight: typography.fontWeight.medium as any,
+  },
+  paymentActions: {
+    flexDirection: 'row' as const,
+    gap: spacing.xs,
+    marginLeft: spacing.sm,
+  },
+  paymentActionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primary[50],
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    borderWidth: 1,
+    borderColor: colors.primary[200],
+  },
+  paymentActionDelete: {
+    backgroundColor: colors.error[50],
+    borderColor: colors.error[200],
+  },
+  editPaymentModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  editPaymentModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  editPaymentModalContent: {
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.xl,
+    width: '95%',
+    maxHeight: '90%',
+    ...shadows.lg,
+  },
+  editPaymentModalHeader: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    padding: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  editPaymentModalTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold as any,
+    color: colors.text.primary,
+  },
+  editPaymentModalCloseButton: {
+    padding: spacing.xs,
+  },
+  editPaymentModalBody: {
+    maxHeight: 500,
+    padding: spacing.lg,
+  },
+  editPaymentModalFooter: {
+    flexDirection: 'row' as const,
+    justifyContent: 'flex-end' as const,
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+  },
+  editPaymentSaveButton: {
+    minWidth: 120,
   },
 });
 

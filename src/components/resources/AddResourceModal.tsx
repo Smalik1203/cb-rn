@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Modal as RNModal, Animated } from 'react-native';
-import { Text, Button, Portal, Modal, TextInput, SegmentedButtons } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Modal as RNModal, Animated, ActivityIndicator } from 'react-native';
+import { Text, Button, Portal, Modal, TextInput, SegmentedButtons, ProgressBar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Upload, X, FileText, Video, HelpCircle } from 'lucide-react-native';
+import { Upload, X, FileText, Video, HelpCircle, Loader2 } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 // no need for expo-file-system here; we fetch the file URI directly to Blob
 import { colors, typography, spacing, borderRadius } from '../../../lib/design-system';
@@ -19,9 +19,8 @@ interface AddResourceModalProps {
 }
 
 const STORAGE_BUCKET = 'Lms';
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
-// Modern file picker with validation
+// Modern file picker without size restrictions
 const pickFile = async () => {
   try {
     const result = await DocumentPicker.getDocumentAsync({
@@ -32,12 +31,6 @@ const pickFile = async () => {
     if (result.canceled || !result.assets?.[0]) return null;
     
     const file = result.assets[0];
-    
-    // Validate file size
-    if (file.size && file.size > MAX_FILE_SIZE) {
-      throw new Error(`File size must be less than ${MAX_FILE_SIZE / (1024 * 1024)}MB`);
-    }
-    
     return file;
   } catch (error) {
     console.error('Error picking file:', error);
@@ -45,27 +38,34 @@ const pickFile = async () => {
   }
 };
 
-// Modern file upload using FormData (works reliably in React Native)
+// Modern file upload using ArrayBuffer (works reliably in React Native)
 const uploadToSupabase = async (file: any, pathPrefix: string): Promise<string> => {
   const fileExt = file.name.split('.').pop();
   const fileName = `${Date.now()}.${fileExt}`;
   const filePath = `${pathPrefix}/${fileName}`;
 
   try {
-    console.log('Uploading file to Supabase Storage:', file.name, file.mimeType);
+    console.log('Uploading file to Supabase Storage:', file.name, file.mimeType, 'Size:', file.size);
     
-    // Create FormData with the file
-    const formData = new FormData();
-    formData.append('file', {
-      uri: file.uri,
-      type: file.mimeType || 'application/octet-stream',
-      name: file.name,
-    } as any);
+    // Get file as ArrayBuffer for React Native compatibility
+    console.log('Fetching file from URI:', file.uri);
+    const fileResponse = await fetch(file.uri);
+    
+    if (!fileResponse.ok) {
+      throw new Error(`Failed to read file: ${fileResponse.status} ${fileResponse.statusText}`);
+    }
+    
+    const fileArrayBuffer = await fileResponse.arrayBuffer();
+    console.log('File ArrayBuffer created, size:', fileArrayBuffer.byteLength);
+    
+    if (fileArrayBuffer.byteLength === 0) {
+      throw new Error('File appears to be empty');
+    }
 
-    // Upload using Supabase Storage with FormData
+    // Upload using Supabase Storage with ArrayBuffer (React Native compatible)
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from(STORAGE_BUCKET)
-      .upload(filePath, formData, {
+      .upload(filePath, fileArrayBuffer, {
         contentType: file.mimeType || 'application/octet-stream',
         upsert: false, // Do not overwrite existing files
       });
@@ -96,7 +96,8 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
 }) => {
   const { profile } = useAuth();
   const { data: classes = [] } = useClasses(profile?.school_code);
-  const { data: subjects = [] } = useSubjects(profile?.school_code);
+  const { data: subjectsResult } = useSubjects(profile?.school_code);
+  const subjects = subjectsResult?.data || [];
   
   const [formData, setFormData] = useState({
     title: '',
@@ -110,6 +111,8 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
   const [useFileUpload, setUseFileUpload] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadingStatus, setUploadingStatus] = useState('');
   const [showClassDropdown, setShowClassDropdown] = useState(false);
   const [showSubjectDropdown, setShowSubjectDropdown] = useState(false);
 
@@ -137,6 +140,8 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
       }
       setUseFileUpload(false);
       setSelectedFile(null);
+      setUploadProgress(0);
+      setUploadingStatus('');
     }
   }, [visible, editingResource]);
 
@@ -157,7 +162,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
     }
   };
 
-  // Modern file upload using helper function
+  // Modern file upload using helper function with progress tracking
   const uploadFileToStorage = async (file: any): Promise<string> => {
     if (!profile?.school_code) {
       throw new Error('School code not found');
@@ -167,8 +172,41 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
       throw new Error('Please select both class and subject before uploading');
     }
 
-    const pathPrefix = `${profile.school_code}/${formData.class_instance_id}/${formData.subject_id}`;
-    return await uploadToSupabase(file, pathPrefix);
+    // Reset progress
+    setUploadProgress(0);
+    setUploadingStatus('Preparing upload...');
+    
+    // Simulate progress since Supabase doesn't expose upload progress
+    const progressInterval = setInterval(() => {
+      setUploadProgress((prev) => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return prev;
+        }
+        return prev + Math.random() * 10;
+      });
+    }, 300);
+
+    try {
+      const pathPrefix = `${profile.school_code}/${formData.class_instance_id}/${formData.subject_id}`;
+      setUploadingStatus('Uploading to cloud storage...');
+      const url = await uploadToSupabase(file, pathPrefix);
+      
+      // Complete progress
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      setUploadingStatus('Upload complete!');
+      
+      // Small delay to show completion
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      return url;
+    } catch (error) {
+      clearInterval(progressInterval);
+      setUploadProgress(0);
+      setUploadingStatus('');
+      throw error;
+    }
   };
 
   const handleSubmit = async () => {
@@ -330,11 +368,6 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
                     label: 'PDF',
                     icon: 'file-pdf-box',
                   },
-                  {
-                    value: 'quiz',
-                    label: 'Quiz',
-                    icon: 'help-circle',
-                  },
                 ]}
                 style={styles.segmentedButtons}
               />
@@ -397,7 +430,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
                 <TextInput
                   value={formData.content_url}
                   onChangeText={(text) => handleInputChange('content_url', text)}
-                  placeholder="Enter URL to video, PDF, or quiz content"
+                  placeholder="Enter URL to video or PDF content"
                   style={styles.input}
                   mode="outlined"
                 />
@@ -405,15 +438,35 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
             ) : (
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Upload File *</Text>
-                <TouchableOpacity style={styles.fileUploadButton} onPress={handleFilePick}>
+                <TouchableOpacity 
+                  style={styles.fileUploadButton} 
+                  onPress={handleFilePick}
+                  disabled={uploading}
+                >
                   <Upload size={20} color={colors.primary[600]} />
                   <Text style={styles.fileUploadText}>
                     {selectedFile ? selectedFile.name : 'Choose File'}
                   </Text>
                 </TouchableOpacity>
                 <Text style={styles.fileUploadHint}>
-                  Supported: Videos (mp4, etc.), PDFs. Max size: 10MB. File will be stored in Supabase Storage.
+                  Supported: Videos (mp4, etc.), PDFs. Will be stored in Supabase Storage.
                 </Text>
+                
+                {/* Upload Progress Indicator */}
+                {uploading && (
+                  <View style={styles.uploadProgressContainer}>
+                    <View style={styles.uploadProgressHeader}>
+                      <Loader2 size={16} color={colors.primary[600]} style={{ animationDuration: '1s' }} />
+                      <Text style={styles.uploadStatusText}>{uploadingStatus}</Text>
+                      <Text style={styles.uploadProgressText}>{Math.round(uploadProgress)}%</Text>
+                    </View>
+                    <ProgressBar 
+                      progress={uploadProgress / 100} 
+                      color={colors.primary[600]} 
+                      style={styles.progressBar}
+                    />
+                  </View>
+                )}
               </View>
             )}
 
@@ -599,6 +652,36 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.xs,
     color: colors.text.secondary,
     marginTop: spacing.xs,
+  },
+  uploadProgressContainer: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.primary[50],
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primary[200],
+  },
+  uploadProgressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  uploadStatusText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.primary,
+    flex: 1,
+    fontWeight: typography.fontWeight.medium,
+  },
+  uploadProgressText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.primary[700],
+    fontWeight: typography.fontWeight.bold,
+  },
+  progressBar: {
+    height: 6,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.primary[100],
   },
   actions: {
     flexDirection: 'row',

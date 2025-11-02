@@ -643,7 +643,7 @@ export type Database = {
           code: string
           created_at: string
           created_by: string
-          default_amount_paise: number | null
+          default_amount_inr: number | null
           id: string
           is_optional: boolean
           is_recurring: boolean
@@ -656,7 +656,7 @@ export type Database = {
           code: string
           created_at?: string
           created_by?: string
-          default_amount_paise?: number | null
+          default_amount_inr?: number | null
           id?: string
           is_optional?: boolean
           is_recurring?: boolean
@@ -669,7 +669,7 @@ export type Database = {
           code?: string
           created_at?: string
           created_by?: string
-          default_amount_paise?: number | null
+          default_amount_inr?: number | null
           id?: string
           is_optional?: boolean
           is_recurring?: boolean
@@ -704,7 +704,7 @@ export type Database = {
       }
       fee_payments: {
         Row: {
-          amount_paise: number
+          amount_inr: number
           component_type_id: string
           created_at: string | null
           created_by: string
@@ -720,7 +720,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          amount_paise: number
+          amount_inr: number
           component_type_id: string
           created_at?: string | null
           created_by: string
@@ -736,7 +736,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          amount_paise?: number
+          amount_inr?: number
           component_type_id?: string
           created_at?: string | null
           created_by?: string
@@ -819,7 +819,7 @@ export type Database = {
       }
       fee_student_plan_items: {
         Row: {
-          amount_paise: number
+          amount_inr: number
           component_type_id: string
           created_at: string
           id: string
@@ -828,7 +828,7 @@ export type Database = {
           quantity: number
         }
         Insert: {
-          amount_paise: number
+          amount_inr: number
           component_type_id: string
           created_at?: string
           id?: string
@@ -837,7 +837,7 @@ export type Database = {
           quantity?: number
         }
         Update: {
-          amount_paise?: number
+          amount_inr?: number
           component_type_id?: string
           created_at?: string
           id?: string
@@ -2827,13 +2827,13 @@ export type Database = {
       fee_collection_summary: {
         Row: {
           class_instance_id: string | null
-          collected_amount_paise: number | null
+          collected_amount_inr: number | null
           collection_percentage: number | null
           component_name: string | null
           component_type_id: string | null
           grade: number | null
-          outstanding_amount_paise: number | null
-          plan_amount_paise: number | null
+          outstanding_amount_inr: number | null
+          plan_amount_inr: number | null
           plan_id: string | null
           section: string | null
           student_code: string | null
@@ -2853,14 +2853,14 @@ export type Database = {
       student_fee_summary: {
         Row: {
           class_instance_id: string | null
-          collected_amount_paise: number | null
+          collected_amount_inr: number | null
           collection_percentage: number | null
           component_code: string | null
           component_name: string | null
           component_type_id: string | null
           grade: number | null
-          outstanding_amount_paise: number | null
-          plan_amount_paise: number | null
+          outstanding_amount_inr: number | null
+          plan_amount_inr: number | null
           plan_id: string | null
           section: string | null
           student_code: string | null
@@ -2899,7 +2899,7 @@ export type Database = {
     Functions: {
       add_payment_for_assignment: {
         Args: {
-          p_amount_paise: number
+          p_amount_inr: number
           p_assignment_id: string
           p_method: string
           p_paid_at: string
@@ -2909,7 +2909,7 @@ export type Database = {
       }
       add_payment_for_plan: {
         Args: {
-          p_amount_paise: number
+          p_amount_inr: number
           p_method: string
           p_paid_at: string
           p_plan_id: string

@@ -48,10 +48,11 @@ export function OfflineMarksUploadScreen() {
   const classInstanceId = params.classInstanceId as string;
 
   const { data: existingMarks = [], isLoading: marksLoading } = useTestMarks(testId);
-  const { data: students = [], isLoading: studentsLoading } = useStudents(
+  const { data: studentsResponse, isLoading: studentsLoading } = useStudents(
     classInstanceId,
     profile?.school_code
   );
+  const students = studentsResponse?.data || [];
   const createBulkMarks = useCreateBulkMarks();
 
   const [marks, setMarks] = useState<Record<string, { marks: string; remarks: string }>>({});

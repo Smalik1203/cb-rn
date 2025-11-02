@@ -1,14 +1,15 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, Alert, TouchableOpacity, Modal, Dimensions, Animated } from 'react-native';
-import { Card, List, ActivityIndicator, Button, Text, IconButton, TextInput } from 'react-native-paper';
+import { Card, List, ActivityIndicator, Button, Text, IconButton, TextInput, Portal } from 'react-native-paper';
 import Svg, { Circle } from 'react-native-svg';
-import { BookOpen, FileText } from 'lucide-react-native';
+import { BookOpen, FileText, X, ChevronDown } from 'lucide-react-native';
 import StudentSyllabusTab from './syllabus-student';
 import { colors, spacing, borderRadius, typography } from '../../lib/design-system';
 import { EmptyState } from '../../src/components/ui';
 // removed import/export UI
 import { useAuth } from '../../src/contexts/AuthContext';
 import { computeProgress, fetchClassesForSchool, fetchProgress, fetchSubjectsForSchool, fetchSyllabusTree, ensureSyllabusId, addChapter, updateChapter, deleteChapter, addTopic, updateTopic, deleteTopic, type SyllabusTree } from '../../src/services/syllabus';
+import { AddChapterTopicModal } from '../../src/components/syllabus';
 
 function useInitialData() {
     const { profile } = useAuth();
@@ -54,8 +55,6 @@ function TeacherSyllabusScreen() {
     const [showAddForm, setShowAddForm] = useState(false);
     const [addMode, setAddMode] = useState<'chapter' | 'topic'>('chapter');
     const [targetChapterId, setTargetChapterId] = useState<string | null>(null);
-    const [formTitle, setFormTitle] = useState('');
-    const [formDescription, setFormDescription] = useState('');
 
     const loadDetails = useCallback(async () => {
         if (!selectedSubjectId || !selectedClassId) return;
@@ -120,18 +119,12 @@ function TeacherSyllabusScreen() {
         );
     };
 
-    const onAddChapter = async () => {
-        try {
-            setBusy(true);
-            const sid = await ensureSyllabusId(selectedClassId, selectedSubjectId);
-            await addChapter(sid, { title: formTitle.trim(), description: formDescription.trim() || '' });
-            await loadDetails();
-            setShowAddForm(false);
-        } catch (e: any) {
-            Alert.alert('Add Chapter Failed', e?.message || '');
-        } finally {
-            setBusy(false);
-        }
+    const onAddChapter = async (title: string, description: string) => {
+        setBusy(true);
+        const sid = await ensureSyllabusId(selectedClassId, selectedSubjectId);
+        await addChapter(sid, { title, description: description || '' });
+        await loadDetails();
+        setBusy(false);
     };
 
     const onUpdateChapter = async (chapterId: string, next: { title?: string; description?: string }) => {
@@ -155,15 +148,14 @@ function TeacherSyllabusScreen() {
         ]);
     };
 
-    const onAddTopic = async (chapterId: string) => {
-        try {
-            setBusy(true);
-            await addTopic(chapterId, { title: formTitle.trim(), description: formDescription.trim() || '' });
-            await loadDetails();
-            setShowAddForm(false);
-        } catch (e: any) {
-            Alert.alert('Add Topic Failed', e?.message || '');
-        } finally { setBusy(false); }
+    const onAddTopic = async (title: string, description: string) => {
+        if (!targetChapterId) {
+            throw new Error('No chapter selected');
+        }
+        setBusy(true);
+        await addTopic(targetChapterId, { title, description: description || '' });
+        await loadDetails();
+        setBusy(false);
     };
 
     const onUpdateTopic = async (topicId: string, next: { title?: string; description?: string }) => {
@@ -233,19 +225,23 @@ function TeacherSyllabusScreen() {
                     <TouchableOpacity style={styles.filterItem} onPress={() => setShowClassDropdown(true)}>
                         <View style={styles.filterIcon}><BookOpen size={16} color={colors.text.inverse} /></View>
                         <View style={styles.filterContent}>
+                            <Text style={styles.filterLabel}>Class</Text>
                             <Text style={styles.filterValue}>
-                                {selectedClassId ? `${classes.find(c => c.id === selectedClassId)?.grade}-${classes.find(c => c.id === selectedClassId)?.section}` : 'Class'}
+                                {selectedClassId ? `${classes.find(c => c.id === selectedClassId)?.grade}-${classes.find(c => c.id === selectedClassId)?.section}` : 'Select'}
                             </Text>
                         </View>
+                        <ChevronDown size={14} color={colors.text.secondary} style={{ marginLeft: spacing.xs, flexShrink: 0 }} />
                     </TouchableOpacity>
                     <View style={styles.filterDivider} />
                     <TouchableOpacity style={styles.filterItem} onPress={() => setShowSubjectDropdown(true)}>
                         <View style={styles.filterIcon}><FileText size={16} color={colors.text.inverse} /></View>
                         <View style={styles.filterContent}>
+                            <Text style={styles.filterLabel}>Subject</Text>
                             <Text style={styles.filterValue}>
-                                {selectedSubjectId ? (subjects.find(s => s.id === selectedSubjectId)?.subject_name || 'Subject') : 'Subject'}
+                                {selectedSubjectId ? (subjects.find(s => s.id === selectedSubjectId)?.subject_name || 'Subject') : 'Select'}
                             </Text>
                         </View>
+                        <ChevronDown size={14} color={colors.text.secondary} style={{ marginLeft: spacing.xs, flexShrink: 0 }} />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -289,7 +285,7 @@ function TeacherSyllabusScreen() {
                         title="No syllabus yet"
                         message={`Tap '+ Add Chapter' to start building your syllabus for ${selectedSubjectName}.`}
                         actionLabel="Add Chapter"
-                        onAction={onAddChapter}
+                        onAction={() => { setAddMode('chapter'); setShowAddForm(true); }}
                         icon={<BookOpen size={64} color={colors.neutral[300]} />}
                         variant="card"
                     />
@@ -373,16 +369,15 @@ function TeacherSyllabusScreen() {
                             {expandedChapterId === node.chapter.id && (
                                 <View style={styles.expandedContent}>
                                     <View style={styles.topicHeader}>
-                                        <Text style={styles.topicHeaderTitle}>Topics</Text>
-                                        <IconButton
-                                            icon="plus"
-                                            onPress={() => { setAddMode('topic'); setTargetChapterId(node.chapter.id); setFormTitle(''); setFormDescription(''); setShowAddForm(true); }}
-                                            accessibilityLabel="Add Topic"
-                                            size={22}
-                                            iconColor={colors.text.inverse}
-                                            containerColor={colors.primary[600]}
-                                            style={styles.addTopicFab}
-                                        />
+                                        <View style={styles.topicHeaderWithButton}>
+                                            <Text style={styles.topicHeaderTitle}>Topics</Text>
+                                            <TouchableOpacity
+                                                onPress={() => { setAddMode('topic'); setTargetChapterId(node.chapter.id); setShowAddForm(true); }}
+                                                style={styles.addTopicButton}
+                                            >
+                                                <Text style={styles.addTopicButtonText}>Add Topic</Text>
+                                            </TouchableOpacity>
+                                        </View>
                                     </View>
                                     {node.topics.map(t => (
                                         <List.Item
@@ -423,7 +418,7 @@ function TeacherSyllabusScreen() {
             <View style={styles.fabContainer}>
                 <TouchableOpacity
                     style={styles.fab}
-                    onPress={() => { setAddMode('chapter'); setTargetChapterId(null); setFormTitle(''); setFormDescription(''); setShowAddForm(true); }}
+                    onPress={() => { setAddMode('chapter'); setTargetChapterId(null); setShowAddForm(true); }}
                     disabled={busy}
                 >
                     <List.Icon icon="plus" color="white" />
@@ -431,88 +426,146 @@ function TeacherSyllabusScreen() {
             </View>
             
             {/* Topic Edit Modal */}
-            <Modal visible={!!editingTopic} transparent animationType="fade" onRequestClose={() => setEditingTopic(null)}>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.sheet}>
-                        <Text style={styles.sheetTitle}>Edit Topic</Text>
+            <Portal>
+                <Modal visible={!!editingTopic} onDismiss={() => setEditingTopic(null)}>
+                    <View style={styles.modalContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalHeaderTitle}>Edit Topic</Text>
+                            <TouchableOpacity onPress={() => setEditingTopic(null)} style={styles.modalCloseButton}>
+                                <X size={24} color={colors.text.secondary} />
+                            </TouchableOpacity>
+                        </View>
                         {editingTopic && (
                             <>
-                                <Text style={styles.inputLabel}>Title</Text>
-                                <TextInput mode="outlined" value={editingTopic.title} onChangeText={(v) => setEditingTopic({ ...editingTopic, title: v })} style={styles.input} dense />
-                                <Text style={[styles.inputLabel, { marginTop: 8 }]}>Description</Text>
-                                <TextInput mode="outlined" value={editingTopic.description || ''} onChangeText={(v) => setEditingTopic({ ...editingTopic, description: v })} style={styles.input} dense multiline />
-                                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
-                                    <Button onPress={() => setEditingTopic(null)}>Cancel</Button>
-                                    <Button mode="contained" onPress={async () => {
-                                        try {
-                                            if (!editingTopic) return;
-                                            await onUpdateTopic(editingTopic.id, { title: editingTopic.title, description: editingTopic.description || '' });
-                                            setEditingTopic(null);
-                                            await loadDetails();
-                                        } catch (e: any) {
-                                            Alert.alert('Save Failed', e?.message || '');
-                                        }
-                                    }}>Save</Button>
+                                <ScrollView style={styles.modalScrollView}>
+                                    <View style={styles.modalForm}>
+                                        <View style={styles.modalInputGroup}>
+                                            <Text style={styles.modalInputLabel}>Title *</Text>
+                                            <TextInput 
+                                                mode="outlined" 
+                                                value={editingTopic.title} 
+                                                onChangeText={(v) => setEditingTopic({ ...editingTopic, title: v })} 
+                                                placeholder="Enter topic title"
+                                                style={styles.modalInput} 
+                                            />
+                                        </View>
+                                        <View style={styles.modalInputGroup}>
+                                            <Text style={styles.modalInputLabel}>Description</Text>
+                                            <TextInput 
+                                                mode="outlined" 
+                                                value={editingTopic.description || ''} 
+                                                onChangeText={(v) => setEditingTopic({ ...editingTopic, description: v })} 
+                                                placeholder="Enter topic description (optional)"
+                                                style={styles.modalInput} 
+                                                multiline 
+                                                numberOfLines={3}
+                                            />
+                                        </View>
+                                    </View>
+                                </ScrollView>
+                                <View style={styles.modalActions}>
+                                    <Button 
+                                        mode="outlined" 
+                                        onPress={() => setEditingTopic(null)}
+                                        style={styles.modalCancelButton}
+                                        textColor="#374151"
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button 
+                                        mode="contained" 
+                                        onPress={async () => {
+                                            try {
+                                                if (!editingTopic) return;
+                                                await onUpdateTopic(editingTopic.id, { title: editingTopic.title, description: editingTopic.description || '' });
+                                                setEditingTopic(null);
+                                                await loadDetails();
+                                            } catch (e: any) {
+                                                Alert.alert('Save Failed', e?.message || '');
+                                            }
+                                        }}
+                                        style={styles.modalSubmitButton}
+                                    >
+                                        Save
+                                    </Button>
                                 </View>
                             </>
                         )}
                     </View>
-                </View>
-            </Modal>
+                </Modal>
+            </Portal>
 
             {/* Add Chapter/Topic Modal */}
-            <Modal visible={showAddForm} transparent animationType="fade" onRequestClose={() => setShowAddForm(false)}>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.sheet}>
-                        <Text style={styles.sheetTitle}>{addMode === 'chapter' ? 'Add Chapter' : 'Add Topic'}</Text>
-                        <Text style={styles.inputLabel}>Title</Text>
-                        <TextInput mode="outlined" value={formTitle} onChangeText={setFormTitle} style={styles.input} dense />
-                        <Text style={[styles.inputLabel, { marginTop: 8 }]}>Description</Text>
-                        <TextInput mode="outlined" value={formDescription} onChangeText={setFormDescription} style={styles.input} dense multiline />
-                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
-                            <Button onPress={() => setShowAddForm(false)}>Cancel</Button>
-                            <Button mode="contained" disabled={!formTitle.trim() || busy} onPress={async () => {
-                                if (!formTitle.trim()) return;
-                                if (addMode === 'chapter') { await onAddChapter(); }
-                                else if (addMode === 'topic' && targetChapterId) { await onAddTopic(targetChapterId); }
-                            }}>Create</Button>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
+            <AddChapterTopicModal
+                visible={showAddForm}
+                onDismiss={() => setShowAddForm(false)}
+                mode={addMode}
+                busy={busy}
+                onSubmit={async (title, description) => {
+                    if (addMode === 'chapter') {
+                        await onAddChapter(title, description);
+                    } else {
+                        await onAddTopic(title, description);
+                    }
+                }}
+            />
             {/* Chapter Edit Modal */}
-            <Modal visible={!!editingChapter} transparent animationType="fade" onRequestClose={() => setEditingChapter(null)}>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.sheet}>
-                        <Text style={styles.sheetTitle}>Edit Chapter</Text>
+            <Portal>
+                <Modal visible={!!editingChapter} onDismiss={() => setEditingChapter(null)}>
+                    <View style={styles.modalContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalHeaderTitle}>Edit Chapter</Text>
+                            <TouchableOpacity onPress={() => setEditingChapter(null)} style={styles.modalCloseButton}>
+                                <X size={24} color={colors.text.secondary} />
+                            </TouchableOpacity>
+                        </View>
                         {editingChapter && (
                             <>
-                                <Text style={styles.inputLabel}>Title</Text>
-                                <TextInput
-                                    mode="outlined"
-                                    value={editingChapter.title}
-                                    onChangeText={(v) => setEditingChapter({ ...editingChapter, title: v })}
-                                    style={styles.input}
-                                    dense
-                                />
-                                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
-                                    <Button onPress={() => setEditingChapter(null)}>Cancel</Button>
-                                    <Button mode="contained" onPress={async () => {
-                                        try {
-                                            if (!editingChapter) return;
-                                            await onUpdateChapter(editingChapter.id, { title: editingChapter.title });
-                                            setEditingChapter(null);
-                                            await loadDetails();
-                                        } catch (e: any) {
-                                            Alert.alert('Save Failed', e?.message || '');
-                                        }
-                                    }}>Save</Button>
+                                <ScrollView style={styles.modalScrollView}>
+                                    <View style={styles.modalForm}>
+                                        <View style={styles.modalInputGroup}>
+                                            <Text style={styles.modalInputLabel}>Title *</Text>
+                                            <TextInput
+                                                mode="outlined"
+                                                value={editingChapter.title}
+                                                onChangeText={(v) => setEditingChapter({ ...editingChapter, title: v })}
+                                                placeholder="Enter chapter title"
+                                                style={styles.modalInput}
+                                            />
+                                        </View>
+                                    </View>
+                                </ScrollView>
+                                <View style={styles.modalActions}>
+                                    <Button 
+                                        mode="outlined" 
+                                        onPress={() => setEditingChapter(null)}
+                                        style={styles.modalCancelButton}
+                                        textColor="#374151"
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button 
+                                        mode="contained" 
+                                        onPress={async () => {
+                                            try {
+                                                if (!editingChapter) return;
+                                                await onUpdateChapter(editingChapter.id, { title: editingChapter.title });
+                                                setEditingChapter(null);
+                                                await loadDetails();
+                                            } catch (e: any) {
+                                                Alert.alert('Save Failed', e?.message || '');
+                                            }
+                                        }}
+                                        style={styles.modalSubmitButton}
+                                    >
+                                        Save
+                                    </Button>
                                 </View>
                             </>
                         )}
                     </View>
-                </View>
-            </Modal>
+                </Modal>
+            </Portal>
             {/* Class Selector Modal - Animated Bottom Sheet (matching resources) */}
             <Modal
                 visible={showClassDropdown}
@@ -631,26 +684,26 @@ export default function SyllabusTab() {
 const styles = StyleSheet.create({
     container: { flex: 1 },
     center: { padding: 24, alignItems: 'center', justifyContent: 'center' },
-    filterSection: { paddingHorizontal: spacing.lg, paddingTop: 12, paddingBottom: spacing.md },
+    filterSection: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg },
     filterRow: {
         backgroundColor: colors.surface.primary,
-        borderRadius: borderRadius.xl || 16,
+        borderRadius: borderRadius.lg,
         padding: spacing.md,
+        paddingHorizontal: spacing.sm,
         flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: colors.primary[200] || '#93c5fd',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.08,
-        shadowRadius: 3,
         elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
     },
-    filterItem: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-    filterIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary[600], alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm },
-    filterContent: { flex: 1 },
+    filterItem: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 },
+    filterIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary[600], alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm, flexShrink: 0 },
+    filterContent: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
+    filterLabel: { fontSize: typography.fontSize.xs, fontWeight: typography.fontWeight.medium, color: colors.text.secondary, marginBottom: spacing.xs },
     filterValue: { fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold, color: colors.text.primary },
-    filterDivider: { width: 1, height: 40, backgroundColor: colors.border.DEFAULT, marginHorizontal: spacing.sm },
+    filterDivider: { width: 1, height: 40, backgroundColor: colors.border.DEFAULT, marginHorizontal: spacing.sm, flexShrink: 0 },
     summaryCard: { margin: 12 },
     progressIndicatorsContainer: {
         flexDirection: 'row',
@@ -816,9 +869,19 @@ const styles = StyleSheet.create({
     inputLabel: { fontSize: typography.fontSize.xs, color: colors.text.secondary },
     input: { marginBottom: 4 },
     expandedContent: { padding: spacing.md },
-    topicHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
+    topicHeader: { marginBottom: spacing.sm },
+    topicHeaderWithButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     topicHeaderTitle: { fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: colors.text.primary },
-    addTopicButton: { borderRadius: 20 },
+    addTopicButton: { 
+        paddingVertical: spacing.xs, 
+        paddingHorizontal: spacing.md,
+        borderRadius: borderRadius.md,
+    },
+    addTopicButtonText: { 
+        fontSize: typography.fontSize.sm, 
+        fontWeight: typography.fontWeight.semibold, 
+        color: colors.primary[600],
+    },
     addTopicButtonContent: { height: 36 },
     deleteButton: { borderRadius: 20 },
     addTopicFab: { borderRadius: 18, marginRight: -4 },
@@ -896,6 +959,67 @@ const styles = StyleSheet.create({
         elevation: 3,
     },
     largeEmptyCardFill: { flex: 1 },
+    // Modern Modal Styles
+    modalContainer: {
+        backgroundColor: colors.surface.primary,
+        borderRadius: borderRadius.lg,
+        margin: spacing.md,
+        maxHeight: '90%',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.lg,
+        paddingBottom: spacing.md,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border.light,
+    },
+    modalHeaderTitle: {
+        fontSize: typography.fontSize.xl,
+        fontWeight: typography.fontWeight.bold,
+        color: colors.text.primary,
+    },
+    modalCloseButton: {
+        padding: spacing.xs,
+    },
+    modalScrollView: {
+        maxHeight: 300,
+    },
+    modalForm: {
+        padding: spacing.lg,
+    },
+    modalInputGroup: {
+        marginBottom: spacing.md,
+    },
+    modalInputLabel: {
+        fontSize: typography.fontSize.sm,
+        fontWeight: typography.fontWeight.medium,
+        color: colors.text.primary,
+        marginBottom: spacing.sm,
+    },
+    modalInput: {
+        backgroundColor: colors.surface.primary,
+    },
+    modalActions: {
+        flexDirection: 'row',
+        gap: spacing.md,
+        padding: spacing.lg,
+        borderTopWidth: 1,
+        borderTopColor: colors.border.light,
+    },
+    modalCancelButton: {
+        flex: 1,
+    },
+    modalSubmitButton: {
+        flex: 1,
+    },
 });
 
 

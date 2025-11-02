@@ -2,25 +2,67 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listStudents } from '../data/queries';
 import { supabase } from '../lib/supabase';
 import { log } from '../lib/logger';
+import { DB } from '../types/db.constants';
+
+export interface StudentsPaginationResult {
+  data: any[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
 
 export function useStudents(
   classInstanceId?: string,
   schoolCode?: string,
   options?: { page?: number; pageSize?: number }
 ) {
+  const usePagination = options !== undefined;
   const page = options?.page ?? 1;
   const pageSize = options?.pageSize ?? 25;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
-  return useQuery({
-    queryKey: ['students', classInstanceId, schoolCode, page, pageSize],
+  
+  return useQuery<StudentsPaginationResult>({
+    queryKey: usePagination 
+      ? ['students', classInstanceId, schoolCode, page, pageSize]
+      : ['students', classInstanceId, schoolCode, 'all'],
     queryFn: async () => {
       if (!classInstanceId || !schoolCode) {
-        return [];
+        return { data: [], total: 0, page: 1, pageSize: usePagination ? pageSize : 0 };
       }
+      
+      if (!usePagination) {
+        // Fetch all students without pagination
+        const result = await listStudents(classInstanceId, schoolCode);
+        if (result.error) throw result.error;
+        
+        return {
+          data: result.data || [],
+          total: result.data?.length || 0,
+          page: 1,
+          pageSize: 0, // 0 means all
+        };
+      }
+      
+      // Get total count for pagination
+      const { count, error: countError } = await supabase
+        .from(DB.tables.student)
+        .select('*', { count: 'exact', head: true })
+        .eq(DB.columns.classInstanceId, classInstanceId)
+        .eq(DB.columns.schoolCode, schoolCode);
+      
+      if (countError) throw countError;
+      
+      // Get paginated data
       const result = await listStudents(classInstanceId, schoolCode, { from, to });
       if (result.error) throw result.error;
-      return result.data || [];
+      
+      return {
+        data: result.data || [],
+        total: count || 0,
+        page,
+        pageSize,
+      };
     },
     enabled: !!classInstanceId && !!schoolCode,
     staleTime: 5 * 60 * 1000, // 5 minutes

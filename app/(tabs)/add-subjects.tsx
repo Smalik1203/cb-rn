@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Alert, TextInput as RNTextInput } from 'react-native';
 import { Text, Portal, Modal } from 'react-native-paper';
 import { BookOpen, Edit, Trash2, X, Plus, Search } from 'lucide-react-native';
@@ -7,6 +7,7 @@ import { Card, Button, Input, EmptyState, Badge } from '../../src/components/ui'
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useSubjects } from '../../src/hooks/useSubjects';
 import { ThreeStateView } from '../../src/components/common/ThreeStateView';
+import { Pagination } from '../../src/components/common/Pagination';
 
 export default function AddSubjectsScreen() {
   const { profile } = useAuth();
@@ -15,12 +16,22 @@ export default function AddSubjectsScreen() {
   // Query
   const [subjectPage, setSubjectPage] = useState(1);
   const subjectPageSize = 50;
-  const { data: subjects = [], isLoading, error, refetch, createSubject, updateSubject, deleteSubject } = useSubjects(schoolCode, { page: subjectPage, pageSize: subjectPageSize });
+  const { data: subjectsResponse, isLoading, error, refetch, createSubject, updateSubject, deleteSubject } = useSubjects(schoolCode, { page: subjectPage, pageSize: subjectPageSize });
+
+  // Extract data from pagination response
+  const subjects = subjectsResponse?.data || [];
+  const totalSubjects = subjectsResponse?.total || 0;
+  const totalPages = Math.ceil(totalSubjects / subjectPageSize);
+
+  // Reset to page 1 when search changes
+  const [searchQuery, setSearchQuery] = useState('');
+  useEffect(() => {
+    setSubjectPage(1);
+  }, [searchQuery]);
 
   // Form state
   const [subjectNames, setSubjectNames] = useState<string[]>([]);
   const [currentInput, setCurrentInput] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
 
   // Edit modal state
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -248,7 +259,7 @@ export default function AddSubjectsScreen() {
         <Card style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>All Subjects</Text>
-            <Badge variant="success">{subjects.length}</Badge>
+            <Badge variant="success">{totalSubjects}</Badge>
           </View>
 
           {/* Search */}
@@ -295,8 +306,14 @@ export default function AddSubjectsScreen() {
               ))}
             </View>
           </ThreeStateView>
-          {filteredSubjects.length === subjectPageSize && (
-            <Button title="Load more" onPress={() => setSubjectPage((p) => p + 1)} style={{ marginTop: spacing.md }} />
+          {!searchQuery && totalPages > 0 && (
+            <Pagination
+              currentPage={subjectPage}
+              totalPages={totalPages}
+              totalItems={totalSubjects}
+              itemsPerPage={subjectPageSize}
+              onPageChange={setSubjectPage}
+            />
           )}
         </Card>
       </ScrollView>

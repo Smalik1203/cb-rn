@@ -47,7 +47,7 @@ export async function verifyDataFetch() {
   // 4. fee_payments
   const { data: feePayments, error: feeError } = await supabase
     .from(DB.tables.feePayments)
-    .select('id, amount_paise, payment_date, student_id, school_code')
+    .select('id, amount_inr, payment_date, student_id, school_code')
     .limit(3);
   
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, ScrollView, Alert, TouchableOpacity, StyleSheet, Modal, TextInput as RNTextInput } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -7,6 +7,7 @@ import { useClassInstances } from '../../src/hooks/useClassInstances';
 import { colors, spacing, borderRadius, shadows } from '../../lib/design-system';
 import { ChevronDown, X, Search, CheckCircle2 } from 'lucide-react-native';
 import { ThreeStateView } from '../../src/components/common/ThreeStateView';
+import { Pagination } from '../../src/components/common/Pagination';
 import { sanitizeEmail, sanitizePhone, sanitizeCode, sanitizeName, validatePassword } from '../../src/utils/sanitize';
 
 export default function AddStudentScreen() {
@@ -28,11 +29,21 @@ export default function AddStudentScreen() {
   // Existing students
   const [page, setPage] = useState(1);
   const pageSize = 25;
-  const { data: students = [], isLoading: loadingStudents, error: studentsError, refetch: refetchStudents } = useStudents(
+  const { data: studentsResponse, isLoading: loadingStudents, error: studentsError, refetch: refetchStudents } = useStudents(
     classInstanceId,
     schoolCode || undefined,
     { page, pageSize }
   );
+
+  // Extract data from pagination response
+  const students = studentsResponse?.data || [];
+  const totalStudents = studentsResponse?.total || 0;
+  const totalPages = Math.ceil(totalStudents / pageSize);
+
+  // Reset to page 1 when class changes
+  useEffect(() => {
+    setPage(1);
+  }, [classInstanceId]);
 
   const [studentSearch, setStudentSearch] = useState('');
   const normalized = (s: string) => s.trim().toLowerCase();
@@ -45,6 +56,11 @@ export default function AddStudentScreen() {
       normalized(s.email || '').includes(q)
     );
   }, [students, studentSearch]);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setPage(1);
+  }, [studentSearch]);
 
   const selectedClass = classInstances.find((c: any) => c.id === classInstanceId);
   const selectedClassLabel = selectedClass
@@ -218,7 +234,7 @@ export default function AddStudentScreen() {
                 </TouchableOpacity>
                 <View style={styles.listHeaderRow}>
                   <Text style={styles.listTitle}>Students</Text>
-                  <View style={styles.countPill}><Text style={styles.countPillText}>{students.length}</Text></View>
+                  <View style={styles.countPill}><Text style={styles.countPillText}>{totalStudents}</Text></View>
                 </View>
               </>
             )}
@@ -259,16 +275,28 @@ export default function AddStudentScreen() {
                   </View>
                 </View>
               ) : (
-                <View style={styles.studentList}>
-                  {filteredStudents.map((s: any) => (
-                    <View key={s.id} style={styles.studentRow}>
-                      <View style={styles.studentInfo}>
-                        <Text style={styles.studentName}>{s.full_name || 'Unnamed'}</Text>
-                        <Text style={styles.studentMeta}>{s.student_code}</Text>
+                <>
+                  <View style={styles.studentList}>
+                    {filteredStudents.map((s: any) => (
+                      <View key={s.id} style={styles.studentRow}>
+                        <View style={styles.studentInfo}>
+                          <Text style={styles.studentName}>{s.full_name || 'Unnamed'}</Text>
+                          <Text style={styles.studentMeta}>{s.student_code}</Text>
+                        </View>
                       </View>
-                    </View>
-                  ))}
-                </View>
+                    ))}
+                  </View>
+                  
+                  {!studentSearch && totalPages > 0 && (
+                    <Pagination
+                      currentPage={page}
+                      totalPages={totalPages}
+                      totalItems={totalStudents}
+                      itemsPerPage={pageSize}
+                      onPageChange={setPage}
+                    />
+                  )}
+                </>
               )
             )}
           </View>

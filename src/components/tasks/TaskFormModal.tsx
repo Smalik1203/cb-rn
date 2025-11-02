@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { Modal, Portal, Text, TextInput, Button, ActivityIndicator, IconButton } from 'react-native-paper';
-import { Calendar, X, Upload, FileText, Check } from 'lucide-react-native';
+import { Modal, Portal, Text, TextInput, Button, ActivityIndicator, IconButton, ProgressBar } from 'react-native-paper';
+import { Calendar, X, Upload, FileText, Check, Loader2 } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { colors, spacing, typography, borderRadius } from '../../../lib/design-system';
 import { useClasses } from '../../hooks/useClasses';
@@ -48,12 +48,15 @@ export function TaskFormModal({
   const [showDueDatePicker, setShowDueDatePicker] = useState(false);
   const [attachments, setAttachments] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadingStatus, setUploadingStatus] = useState('');
   const [showClassModal, setShowClassModal] = useState(false);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [showPriorityModal, setShowPriorityModal] = useState(false);
 
   const { data: classes } = useClasses(schoolCode);
-  const { data: subjects } = useSubjects(schoolCode);
+  const { data: subjectsResult } = useSubjects(schoolCode);
+  const subjects = subjectsResult?.data || [];
 
   // Filter subjects by selected class (optional - you can remove this if subjects aren't class-specific)
   const filteredSubjects = subjects;
@@ -85,6 +88,8 @@ export function TaskFormModal({
     setAssignedDate(new Date());
     setDueDate(new Date(Date.now() + 86400000));
     setAttachments([]);
+    setUploadProgress(0);
+    setUploadingStatus('');
   };
 
   const handlePickDocument = async () => {
@@ -102,12 +107,6 @@ export function TaskFormModal({
 
       if (!result.canceled && result.assets && result.assets[0]) {
         const file = result.assets[0];
-        
-        // Validate file size (max 10MB)
-        if (file.size && file.size > 10 * 1024 * 1024) {
-          alert('File size must be less than 10MB');
-          return;
-        }
 
         setAttachments([...attachments, {
           uri: file.uri,
@@ -137,11 +136,34 @@ export function TaskFormModal({
 
       console.log('Uploading to path:', filePath);
 
+      // Simulate progress since Supabase doesn't expose upload progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return prev;
+          }
+          return prev + Math.random() * 10;
+        });
+      }, 300);
+
+      try {
+        setUploadingStatus(`Uploading ${file.name}...`);
+
       // Get file as ArrayBuffer for React Native compatibility
       console.log('Fetching file from URI:', file.uri);
       const fileResponse = await fetch(file.uri);
+        
+        if (!fileResponse.ok) {
+          throw new Error(`Failed to read file: ${fileResponse.status} ${fileResponse.statusText}`);
+        }
+        
       const fileArrayBuffer = await fileResponse.arrayBuffer();
       console.log('File ArrayBuffer created, size:', fileArrayBuffer.byteLength);
+        
+        if (fileArrayBuffer.byteLength === 0) {
+          throw new Error('File appears to be empty');
+        }
 
       // Use Supabase SDK to upload with ArrayBuffer (React Native compatible)
       const { data, error } = await supabase.storage
@@ -158,6 +180,14 @@ export function TaskFormModal({
 
       console.log('File uploaded successfully:', data);
 
+        // Complete progress
+        clearInterval(progressInterval);
+        setUploadProgress(100);
+        setUploadingStatus('Upload complete!');
+        
+        // Small delay to show completion
+        await new Promise(resolve => setTimeout(resolve, 300));
+
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('task-attachments')
@@ -172,6 +202,12 @@ export function TaskFormModal({
         url: publicUrl,
         path: filePath,
       };
+      } catch (error) {
+        clearInterval(progressInterval);
+        setUploadProgress(0);
+        setUploadingStatus('');
+        throw error;
+      }
     } catch (error) {
       console.error('Error uploading file:', error);
       throw error;
@@ -273,9 +309,13 @@ export function TaskFormModal({
       }
 
       resetForm();
+      setUploadProgress(0);
+      setUploadingStatus('');
       onDismiss();
     } catch (error) {
       console.error('Failed to submit task:', error);
+      setUploadProgress(0);
+      setUploadingStatus('');
       alert('Failed to save task. Please try again.');
     } finally {
       setSubmitting(false);
@@ -461,8 +501,24 @@ export function TaskFormModal({
               Upload
             </Button>
             <Text style={styles.helperText}>
-              Max 10MB per file. Supported: Images, PDF, DOC, DOCX, TXT
+              Supported: Images, PDF, DOC, DOCX, TXT
             </Text>
+            
+            {/* Upload Progress Indicator */}
+            {submitting && uploadingStatus && (
+              <View style={styles.uploadProgressContainer}>
+                <View style={styles.uploadProgressHeader}>
+                  <Loader2 size={16} color={colors.primary[600]} style={{ animationDuration: '1s' }} />
+                  <Text style={styles.uploadStatusText}>{uploadingStatus}</Text>
+                  <Text style={styles.uploadProgressText}>{Math.round(uploadProgress)}%</Text>
+                </View>
+                <ProgressBar 
+                  progress={uploadProgress / 100} 
+                  color={colors.primary[600]} 
+                  style={styles.progressBar}
+                />
+              </View>
+            )}
             
             {attachments.length > 0 && (
               <View style={styles.attachmentsList}>
@@ -805,6 +861,36 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.xs,
     color: colors.text.secondary,
     marginTop: spacing.xs,
+  },
+  uploadProgressContainer: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.primary[50],
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primary[200],
+  },
+  uploadProgressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  uploadStatusText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.primary,
+    flex: 1,
+    fontWeight: typography.fontWeight.medium,
+  },
+  uploadProgressText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.primary[700],
+    fontWeight: typography.fontWeight.bold,
+  },
+  progressBar: {
+    height: 6,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.primary[100],
   },
   selectionModal: {
     backgroundColor: colors.surface.primary,

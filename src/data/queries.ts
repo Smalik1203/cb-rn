@@ -484,12 +484,12 @@ export async function getStudentFees(
     let totalDue = 0;
     if (planData && !planError && (planData as any)?.items) {
       totalDue = (planData as any).items.reduce((sum: number, item: any) => {
-        return sum + (item.amount_paise * item.quantity);
+        return sum + (item.amount_inr * item.quantity);
       }, 0);
     }
     
     const totalPaid = (paymentsData || []).reduce((sum: number, payment: any) => {
-      return sum + payment.amount_paise;
+      return sum + payment.amount_inr;
     }, 0);
     
     const balance = totalDue - totalPaid;
@@ -564,12 +564,12 @@ export async function getClassStudentsFees(
       let totalDue = 0;
       if (studentPlan && (studentPlan as any)?.items) {
         totalDue = (studentPlan as any).items.reduce((sum: number, item: any) => {
-          return sum + (item.amount_paise * item.quantity);
+          return sum + (item.amount_inr * item.quantity);
         }, 0);
       }
       
       const totalPaid = studentPayments.reduce((sum: number, payment: any) => {
-        return sum + payment.amount_paise;
+        return sum + payment.amount_inr;
       }, 0);
       
       const balance = totalDue - totalPaid;

@@ -19,12 +19,13 @@ export default function ResourcesScreen() {
   const queryClient = useQueryClient();
   const { data: resources, isLoading, error } = useAllResources(profile?.school_code || undefined);
   const { data: classes = [] } = useClasses(profile?.school_code);
-  const { data: subjects = [] } = useSubjects(profile?.school_code);
+  const { data: subjectsResult } = useSubjects(profile?.school_code);
+  const subjects = subjectsResult?.data || [];
   const [selectedResource, setSelectedResource] = useState<LearningResource | null>(null);
   const [viewerType, setViewerType] = useState<'video' | 'pdf' | null>(null);
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
-  const [selectedTab, setSelectedTab] = useState<'all' | 'lectures' | 'study_materials' | 'practice_tests'>('all');
+  const [selectedTab, setSelectedTab] = useState<'all' | 'lectures' | 'study_materials'>('all');
   const [showClassDropdown, setShowClassDropdown] = useState(false);
   const [showSubjectDropdown, setShowSubjectDropdown] = useState(false);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
@@ -314,8 +315,6 @@ export default function ResourcesScreen() {
         return resource.resource_type.toLowerCase() === 'video';
       case 'study_materials':
         return ['pdf', 'document'].includes(resource.resource_type.toLowerCase());
-      case 'practice_tests':
-        return resource.resource_type.toLowerCase() === 'quiz';
       default:
         return true;
     }
@@ -358,16 +357,6 @@ export default function ResourcesScreen() {
 
   if (error) {
     return <ErrorView message={error.message} />;
-  }
-
-  if (!resources || resources.length === 0) {
-    return (
-      <EmptyState
-        title="No Resources"
-        message="No learning resources available yet"
-        icon={<BookOpen size={64} color={colors.neutral[300]} />}
-      />
-    );
   }
 
   return (
@@ -427,8 +416,7 @@ export default function ResourcesScreen() {
                 <Text style={styles.filterValue}>
                   {selectedTab === 'all' ? 'Type' : 
                    selectedTab === 'lectures' ? 'Lectures' : 
-                   selectedTab === 'study_materials' ? 'Study Materials' : 
-                   'Practice Tests'}
+                   'Study Materials'}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -441,8 +429,22 @@ export default function ResourcesScreen() {
           <Text style={styles.sectionCount}>{filteredResources.length} items</Text>
         </View>
 
-        {/* Resources List */}
-        <View style={styles.resourcesContent}>
+        {/* Empty State or Resources List */}
+        {filteredResources.length === 0 ? (
+          <View style={styles.emptyCardContainer}>
+            <View style={styles.largeEmptyCard}>
+              <EmptyState
+                title="No Resources"
+                message="Get started by adding your first learning resource"
+                icon={<BookOpen size={64} color={colors.neutral[300]} />}
+                actionLabel="Create Resource"
+                onAction={handleAddResource}
+                variant="card"
+              />
+            </View>
+          </View>
+        ) : (
+          <View style={styles.resourcesContent}>
         {filteredResources.map((resource) => {
           const className = getClassDisplay(resource.class_instance_id, classes) || 'Class';
           const formattedDate = formatResourceDate(resource.created_at);
@@ -515,13 +517,16 @@ export default function ResourcesScreen() {
             </Card>
           );
         })}
-        </View>
+          </View>
+        )}
       </ScrollView>
 
-      {/* Floating Add Button */}
-      <TouchableOpacity onPress={handleAddResource} style={styles.floatingButton}>
-        <Plus size={24} color={colors.text.inverse} />
-              </TouchableOpacity>
+      {/* Floating Add Button - Only show when there are resources */}
+      {filteredResources.length > 0 && (
+        <TouchableOpacity onPress={handleAddResource} style={styles.floatingButton}>
+          <Plus size={24} color={colors.text.inverse} />
+        </TouchableOpacity>
+      )}
 
       {/* Type Dropdown Modal - Bottom Sheet */}
       <Modal
@@ -590,18 +595,6 @@ export default function ResourcesScreen() {
                   Study Materials
                 </Text>
                 {selectedTab === 'study_materials' && <Text style={styles.checkmark}>✓</Text>}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.sheetItem, selectedTab === 'practice_tests' && styles.sheetItemActive]}
-                onPress={() => {
-                  setSelectedTab('practice_tests');
-                  setShowTypeDropdown(false);
-                }}
-              >
-                <Text style={[styles.sheetItemText, selectedTab === 'practice_tests' && styles.sheetItemTextActive]}>
-                  Practice Tests
-                </Text>
-                {selectedTab === 'practice_tests' && <Text style={styles.checkmark}>✓</Text>}
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -1056,5 +1049,31 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.lg,
     color: colors.primary[600],
     fontWeight: typography.fontWeight.bold,
+  },
+  emptyFill: { 
+    flex: 1, 
+    backgroundColor: '#F8F9FB' 
+  },
+  emptyCardContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  largeEmptyCard: {
+    marginHorizontal: 0,
+    marginTop: 0,
+    marginBottom: 0,
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    minHeight: 280,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
 });

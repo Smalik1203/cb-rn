@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { log } from '../lib/logger';
+import { DB } from '../types/db.constants';
 
 type Admin = {
   id: string;
@@ -13,6 +14,13 @@ type Admin = {
   school_name: string;
   created_at: string;
 };
+
+export interface AdminsPaginationResult {
+  data: Admin[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
 
 type CreateAdminInput = {
   full_name: string;
@@ -30,7 +38,7 @@ type UpdateAdminInput = {
 };
 
 /**
- * Fetch all admins for a specific school
+ * Fetch all admins for a specific school with pagination
  */
 export function useAdmins(
   schoolCode: string | null | undefined,
@@ -40,43 +48,80 @@ export function useAdmins(
   const pageSize = options?.pageSize ?? 25;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
-  return useQuery({
+  
+  return useQuery<AdminsPaginationResult>({
     queryKey: ['admins', schoolCode, page, pageSize],
     queryFn: async () => {
       if (!schoolCode) {
-        throw new Error('School code is required');
+        return { data: [], total: 0, page, pageSize };
       }
 
       log.info('Fetching admins', { schoolCode });
 
-      // Try admin table first
-      const { data: adminData, error: adminError } = await supabase
-        .from('admin')
-        .select('id, full_name, email, phone, role, admin_code, school_code, school_name, created_at')
-        .eq('school_code', schoolCode)
-        .eq('role', 'admin')
-        .order('created_at', { ascending: false })
-        .range(from, to);
+      // Get total count - try admin table first
+      const { count: adminCount, error: adminCountError } = await supabase
+        .from(DB.tables.admin)
+        .select('*', { count: 'exact', head: true })
+        .eq(DB.columns.schoolCode, schoolCode)
+        .eq('role', 'admin');
 
-      if (!adminError && adminData) {
-        return adminData.map((admin: any) => ({
-          id: admin.id,
-          full_name: admin.full_name,
-          email: admin.email,
-          phone: String(admin.phone || ''),
-          role: admin.role,
-          admin_code: admin.admin_code || '',
-          school_code: admin.school_code,
-          school_name: admin.school_name || '',
-          created_at: admin.created_at,
-        })) as Admin[];
+      let totalCount = 0;
+      let useAdminTable = false;
+
+      if (!adminCountError && adminCount !== null) {
+        totalCount = adminCount;
+        useAdminTable = true;
+      } else {
+        // Fallback to users table for count
+        const { count: usersCount, error: usersCountError } = await supabase
+          .from(DB.tables.users)
+          .select('*', { count: 'exact', head: true })
+          .eq(DB.columns.schoolCode, schoolCode)
+          .eq('role', 'admin');
+
+        if (usersCountError) {
+          log.error('Failed to fetch admin count', usersCountError);
+          throw usersCountError;
+        }
+
+        totalCount = usersCount || 0;
+      }
+
+      // Fetch paginated data
+      if (useAdminTable) {
+        const { data: adminData, error: adminError } = await supabase
+          .from(DB.tables.admin)
+          .select('id, full_name, email, phone, role, admin_code, school_code, school_name, created_at')
+          .eq(DB.columns.schoolCode, schoolCode)
+          .eq('role', 'admin')
+          .order('created_at', { ascending: false })
+          .range(from, to);
+
+        if (!adminError && adminData) {
+          return {
+            data: adminData.map((admin: any) => ({
+              id: admin.id,
+              full_name: admin.full_name,
+              email: admin.email,
+              phone: String(admin.phone || ''),
+              role: admin.role,
+              admin_code: admin.admin_code || '',
+              school_code: admin.school_code,
+              school_name: admin.school_name || '',
+              created_at: admin.created_at,
+            })) as Admin[],
+            total: totalCount,
+            page,
+            pageSize,
+          };
+        }
       }
 
       // Fallback to users table
       const { data: usersData, error: usersError } = await supabase
-        .from('users')
+        .from(DB.tables.users)
         .select('id, full_name, email, phone, role, admin_code, school_code, school_name, created_at')
-        .eq('school_code', schoolCode)
+        .eq(DB.columns.schoolCode, schoolCode)
         .eq('role', 'admin')
         .order('created_at', { ascending: false })
         .range(from, to);
@@ -86,18 +131,22 @@ export function useAdmins(
         throw usersError;
       }
 
-      if (!usersData) return [];
-      return usersData.map((admin: any) => ({
-        id: admin.id,
-        full_name: admin.full_name,
-        email: admin.email,
-        phone: String(admin.phone || ''),
-        role: admin.role,
-        admin_code: admin.admin_code || '',
-        school_code: admin.school_code,
-        school_name: admin.school_name || '',
-        created_at: admin.created_at,
-      })) as Admin[];
+      return {
+        data: (usersData || []).map((admin: any) => ({
+          id: admin.id,
+          full_name: admin.full_name,
+          email: admin.email,
+          phone: String(admin.phone || ''),
+          role: admin.role,
+          admin_code: admin.admin_code || '',
+          school_code: admin.school_code,
+          school_name: admin.school_name || '',
+          created_at: admin.created_at,
+        })) as Admin[],
+        total: totalCount,
+        page,
+        pageSize,
+      };
     },
     enabled: !!schoolCode,
     staleTime: 30_000, // 30 seconds

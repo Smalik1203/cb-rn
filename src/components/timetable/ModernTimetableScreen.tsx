@@ -1,13 +1,14 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert, RefreshControl, Animated, Vibration, Modal as RNModal } from 'react-native';
 import { Text, Card, Button, Chip, Portal, Modal, TextInput, SegmentedButtons, Snackbar } from 'react-native-paper';
-import { Calendar, Clock, ChevronLeft, ChevronRight, Plus, Edit, Trash2, CheckCircle, Circle, Settings, Users, BookOpen, MapPin, Filter, RotateCcw, User, MoreVertical, Coffee, ListTodo } from 'lucide-react-native';
+import { Calendar, Clock, ChevronLeft, ChevronRight, Plus, Edit, Trash2, CheckCircle, Circle, Settings, Users, BookOpen, MapPin, Filter, RotateCcw, User, MoreVertical, Coffee, ListTodo, X } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUnifiedTimetable } from '../../hooks/useUnifiedTimetable';
 import { useSyllabusLoader } from '../../hooks/useSyllabusLoader';
 import { useClasses } from '../../hooks/useClasses';
 import { useSubjects } from '../../hooks/useSubjects';
 import { useAdmins } from '../../hooks/useAdmins';
+import { DatePickerModal } from '../common/DatePickerModal';
 import { colors, typography, spacing, borderRadius, shadows } from '../../../lib/design-system';
 import dayjs from 'dayjs';
 import { router } from 'expo-router';
@@ -333,8 +334,10 @@ export function ModernTimetableScreen() {
 
   const dateStr = dayjs(selectedDate).format('YYYY-MM-DD');
   const { data: classes } = useClasses(profile?.school_code);
-  const { data: subjects } = useSubjects(profile?.school_code);
-  const { data: adminsList } = useAdmins(profile?.school_code);
+  const { data: subjectsResult } = useSubjects(profile?.school_code);
+  const subjects = subjectsResult?.data || [];
+  const { data: adminsResult } = useAdmins(profile?.school_code);
+  const adminsList = adminsResult?.data || [];
   const { slots, displayPeriodNumber, loading, error, refetch, createSlot, updateSlot, deleteSlot, quickGenerate, markSlotTaught, unmarkSlotTaught, updateSlotStatus, taughtSlotIds } = useUnifiedTimetable(
     selectedClassId,
     dateStr,
@@ -898,7 +901,9 @@ export function ModernTimetableScreen() {
             <View style={styles.filterContent}>
               <Text style={styles.filterLabel}>Class</Text>
               <Text style={styles.filterValue}>
-                {selectedClassId ? `${selectedClass?.grade || ''} ${selectedClass?.section || ''}`.trim() : 'Select Class'}
+                {selectedClassId && selectedClass
+                  ? `${selectedClass.grade || ''} ${selectedClass.section || ''}`.trim() || 'No Class'
+                  : 'Select Class'}
               </Text>
             </View>
           </TouchableOpacity>
@@ -1032,61 +1037,15 @@ export function ModernTimetableScreen() {
       </RNModal>
 
       {/* Date Picker Modal */}
-      <Portal>
-        <Modal
-          visible={showDatePicker}
-          onDismiss={() => setShowDatePicker(false)}
-          contentContainerStyle={styles.modalContainer}
-        >
-          <Text style={styles.modalTitle}>Select Date</Text>
-          
-          <View style={styles.dateNavigation}>
-            <TouchableOpacity 
-              onPress={goToPreviousDay} 
-              style={styles.dateNavButton}
-              activeOpacity={0.7}
-            >
-              <ChevronLeft size={24} color={colors.text.primary} />
-            </TouchableOpacity>
-            
-            <View style={styles.dateDisplay}>
-              <Text style={styles.dateText}>
-                {dayjs(selectedDate).format('MMM D, YYYY')}
-              </Text>
-            </View>
-            
-            <TouchableOpacity 
-              onPress={goToNextDay} 
-              style={styles.dateNavButton}
-              activeOpacity={0.7}
-            >
-              <ChevronRight size={24} color={colors.text.primary} />
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity 
-            onPress={() => {
-              goToToday();
-              setShowDatePicker(false);
-            }} 
-            style={styles.todayButton}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.todayButtonText}>Go to Today</Text>
-          </TouchableOpacity>
-
-          <Button 
-            mode="outlined" 
-            onPress={() => setShowDatePicker(false)} 
-            style={styles.modalCloseButton}
-            buttonColor="#ffffff"
-            textColor="#374151"
-            labelStyle={styles.buttonLabel}
-          >
-            Done
-          </Button>
-        </Modal>
-      </Portal>
+      <DatePickerModal
+        visible={showDatePicker}
+        initialDate={selectedDate}
+        onDismiss={() => setShowDatePicker(false)}
+        onConfirm={(date) => {
+          setSelectedDate(date);
+          setShowDatePicker(false);
+        }}
+      />
 
       {/* Add/Edit Modal */}
       <Portal>
@@ -1604,60 +1563,68 @@ export function ModernTimetableScreen() {
         <Modal
           visible={showActionsModal}
           onDismiss={() => setShowActionsModal(false)}
-          contentContainerStyle={styles.actionsModal}
         >
-          <Text style={styles.actionsTitle}>Quick Actions</Text>
-          <View style={styles.actionsList}>
-            <TouchableOpacity
-              style={styles.actionRow}
-              onPress={() => {
-                setShowActionsModal(false);
-                resetForm();
-                setSlotForm(prev => ({ ...prev, slot_type: 'period' }));
-                closeAllDropdowns();
-                setShowAddModal(true);
-              }}
-              activeOpacity={0.8}
-            >
-              <Plus size={18} color="#4F46E5" />
-              <Text style={styles.actionText}>Add Period</Text>
-            </TouchableOpacity>
+          <View style={styles.actionsModalContainer}>
+            <View style={styles.actionsModalHeader}>
+              <Text style={styles.actionsModalTitle}>Quick Actions</Text>
+              <TouchableOpacity onPress={() => setShowActionsModal(false)} style={styles.actionsModalCloseButton}>
+                <X size={24} color={colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.actionsList}>
+              <TouchableOpacity
+                style={styles.actionRow}
+                onPress={() => {
+                  setShowActionsModal(false);
+                  resetForm();
+                  setSlotForm(prev => ({ ...prev, slot_type: 'period' }));
+                  closeAllDropdowns();
+                  setShowAddModal(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <Plus size={18} color="#4F46E5" />
+                <Text style={styles.actionText}>Add Period</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.actionRow}
-              onPress={() => {
-                setShowActionsModal(false);
-                resetForm();
-                setSlotForm(prev => ({ ...prev, slot_type: 'break' }));
-                closeAllDropdowns();
-                setShowAddModal(true);
-              }}
-              activeOpacity={0.8}
-            >
-              <Coffee size={18} color="#a16207" />
-              <Text style={styles.actionText}>Add Break</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionRow}
+                onPress={() => {
+                  setShowActionsModal(false);
+                  resetForm();
+                  setSlotForm(prev => ({ ...prev, slot_type: 'break' }));
+                  closeAllDropdowns();
+                  setShowAddModal(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <Coffee size={18} color="#a16207" />
+                <Text style={styles.actionText}>Add Break</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.actionRow}
-              onPress={() => {
-                setShowActionsModal(false);
-                setShowQuickGenerateModal(true);
-              }}
-              activeOpacity={0.8}
-            >
-              <Settings size={18} color="#f59e0b" />
-              <Text style={styles.actionText}>Quick Generate</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionRow}
+                onPress={() => {
+                  setShowActionsModal(false);
+                  setShowQuickGenerateModal(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <Settings size={18} color="#f59e0b" />
+                <Text style={styles.actionText}>Quick Generate</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.actionsModalActions}>
+              <Button
+                mode="outlined"
+                onPress={() => setShowActionsModal(false)}
+                style={styles.actionsModalCancelButton}
+                textColor="#374151"
+              >
+                Close
+              </Button>
+            </View>
           </View>
-          <Button
-            mode="outlined"
-            onPress={() => setShowActionsModal(false)}
-            style={styles.modalCloseButton}
-            textColor="#374151"
-          >
-            Close
-          </Button>
         </Modal>
       </Portal>
     </View>
@@ -1873,16 +1840,53 @@ const styles = StyleSheet.create({
     padding: 16,
     ...shadows.lg,
   },
-  actionsTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 8,
-    textAlign: 'center',
+  // Centered Quick Actions Modal Styles (matching syllabus)
+  actionsModalContainer: {
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.lg,
+    maxWidth: 480,
+    width: '90%',
+    maxHeight: '80%',
+    alignSelf: 'center',
+    marginTop: 'auto',
+    marginBottom: 'auto',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  actionsModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  actionsModalTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+  },
+  actionsModalCloseButton: {
+    padding: spacing.xs,
   },
   actionsList: {
-    paddingVertical: 4,
-    marginBottom: 8,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  actionsModalActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+  },
+  actionsModalCancelButton: {
+    flex: 1,
   },
   // Bottom sheet styles (task management style)
   bsOverlay: {

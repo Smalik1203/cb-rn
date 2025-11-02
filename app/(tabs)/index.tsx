@@ -49,13 +49,22 @@ export default function DashboardScreen() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await Promise.all([
-        refetchStats(),
-        refetchActivity(),
-        refetchEvents(),
-        isStudent && refetchFee(),
-        isStudent && refetchTask(),
-      ].filter(Boolean));
+      // Only refetch if we have the required data
+      const promises = [];
+      
+      if (profile?.auth_id && profile?.class_instance_id) {
+        promises.push(refetchStats(), refetchActivity());
+      }
+      
+      if (profile?.school_code) {
+        promises.push(refetchEvents());
+      }
+      
+      if (isStudent && profile?.auth_id) {
+        promises.push(refetchFee(), refetchTask());
+      }
+      
+      await Promise.all(promises);
     } catch (err) {
       log.error('Refresh error:', err);
     } finally {

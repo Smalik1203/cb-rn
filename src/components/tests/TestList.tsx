@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Search, Filter, X } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Search, X } from 'lucide-react-native';
 import { TestCard } from './TestCard';
 import { StudentTestCard } from './StudentTestCard';
 import { TestWithDetails, TestAttempt } from '../../types/test.types';
@@ -32,55 +32,79 @@ export function TestList({
   studentAttempts = [],
 }: TestListProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterMode, setFilterMode] = useState<'all' | 'online' | 'offline'>('all');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive' | 'completed'>('all');
-  const [showFilters, setShowFilters] = useState(false);
 
   // Filter and search tests
   const filteredTests = useMemo(() => {
     return tests.filter((test) => {
-      // Search filter
+      // Search filter only
       const matchesSearch =
         searchQuery === '' ||
         test.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         test.subject_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         test.class_name?.toLowerCase().includes(searchQuery.toLowerCase());
 
-      // Mode filter
-      const matchesMode = filterMode === 'all' || test.test_mode === filterMode;
-
-      // Status filter
-      const matchesStatus = filterStatus === 'all' || test.status === filterStatus;
-
-      return matchesSearch && matchesMode && matchesStatus;
+      return matchesSearch;
     });
-  }, [tests, searchQuery, filterMode, filterStatus]);
+  }, [tests, searchQuery]);
+
+  // Separate tests by mode
+  const onlineTests = useMemo(() => 
+    filteredTests.filter(test => test.test_mode === 'online'),
+    [filteredTests]
+  );
+  const offlineTests = useMemo(() => 
+    filteredTests.filter(test => test.test_mode === 'offline'),
+    [filteredTests]
+  );
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <Text style={styles.emptyStateTitle}>No Tests Found</Text>
       <Text style={styles.emptyStateText}>
-        {searchQuery || filterMode !== 'all' || filterStatus !== 'all'
-          ? 'Try adjusting your filters'
+        {searchQuery
+          ? 'Try adjusting your search'
           : 'Create your first test to get started'}
       </Text>
     </View>
   );
 
-  const renderFilterChip = (
-    label: string,
-    active: boolean,
-    onPress: () => void
-  ) => (
-    <TouchableOpacity
-      style={[styles.filterChip, active && styles.filterChipActive]}
-      onPress={onPress}
-    >
-      <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
+  const renderTestCard = (item: any) => {
+    if (isStudentView) {
+      const attempt = studentAttempts.find((a) => a.test_id === item.id);
+      return <StudentTestCard test={item} attempt={attempt} />;
+    }
+
+    return (
+      <TestCard
+        test={item}
+        onPress={() => onTestPress?.(item)}
+        onEdit={() => onTestEdit?.(item)}
+        onDelete={() => onTestDelete?.(item)}
+        onManageQuestions={() => onManageQuestions?.(item)}
+        onUploadMarks={() => onUploadMarks?.(item)}
+        showActions={showActions}
+      />
+    );
+  };
+
+  const renderSection = (title: string, tests: any[], mode: 'online' | 'offline') => {
+    if (tests.length === 0) return null;
+
+    return (
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <View style={[styles.sectionHeaderDot, { backgroundColor: mode === 'online' ? colors.primary[600] : colors.secondary[600] }]} />
+          <Text style={styles.sectionTitle}>{title}</Text>
+          <Text style={styles.sectionCount}>({tests.length})</Text>
+        </View>
+        {tests.map((item) => (
+          <View key={item.id}>
+            {renderTestCard(item)}
+          </View>
+        ))}
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -99,54 +123,6 @@ export function TestList({
             <X size={20} color={colors.text.secondary} />
           </TouchableOpacity>
         ) : null}
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setShowFilters(!showFilters)}
-        >
-          <Filter size={20} color={colors.primary[600]} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Filters */}
-      {showFilters && (
-        <View style={styles.filtersContainer}>
-          <View style={styles.filterRow}>
-            <Text style={styles.filterLabel}>Mode:</Text>
-            <View style={styles.filterChips}>
-              {renderFilterChip('All', filterMode === 'all', () => setFilterMode('all'))}
-              {renderFilterChip('Online', filterMode === 'online', () => setFilterMode('online'))}
-              {renderFilterChip('Offline', filterMode === 'offline', () => setFilterMode('offline'))}
-            </View>
-          </View>
-
-          <View style={styles.filterRow}>
-            <Text style={styles.filterLabel}>Status:</Text>
-            <View style={styles.filterChips}>
-              {renderFilterChip('All', filterStatus === 'all', () => setFilterStatus('all'))}
-              {renderFilterChip('Active', filterStatus === 'active', () => setFilterStatus('active'))}
-              {renderFilterChip('Completed', filterStatus === 'completed', () => setFilterStatus('completed'))}
-            </View>
-          </View>
-
-          {(filterMode !== 'all' || filterStatus !== 'all') && (
-            <TouchableOpacity
-              style={styles.clearFiltersButton}
-              onPress={() => {
-                setFilterMode('all');
-                setFilterStatus('all');
-              }}
-            >
-              <Text style={styles.clearFiltersText}>Clear Filters</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-
-      {/* Results Count */}
-      <View style={styles.resultsHeader}>
-        <Text style={styles.resultsCount}>
-          {filteredTests.length} {filteredTests.length === 1 ? 'test' : 'tests'}
-        </Text>
       </View>
 
       {/* Test List */}
@@ -156,32 +132,20 @@ export function TestList({
           <Text style={styles.loadingText}>Loading tests...</Text>
         </View>
       ) : (
-        <FlatList
-          data={filteredTests}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => {
-            if (isStudentView) {
-              // Find the student's attempt for this test
-              const attempt = studentAttempts.find((a) => a.test_id === item.id);
-              return <StudentTestCard test={item} attempt={attempt} />;
-            }
-
-            return (
-              <TestCard
-                test={item}
-                onPress={() => onTestPress?.(item)}
-                onEdit={() => onTestEdit?.(item)}
-                onDelete={() => onTestDelete?.(item)}
-                onManageQuestions={() => onManageQuestions?.(item)}
-                onUploadMarks={() => onUploadMarks?.(item)}
-                showActions={showActions}
-              />
-            );
-          }}
-          ListEmptyComponent={renderEmptyState}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
+        <>
+          {onlineTests.length === 0 && offlineTests.length === 0 ? (
+            renderEmptyState()
+          ) : (
+            <ScrollView 
+              style={styles.scrollView}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.listContent}
+            >
+              {renderSection('Online Tests', onlineTests, 'online')}
+              {renderSection('Offline Tests', offlineTests, 'offline')}
+            </ScrollView>
+          )}
+        </>
       )}
     </View>
   );
@@ -189,6 +153,9 @@ export function TestList({
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  scrollView: {
     flex: 1,
   },
   searchContainer: {
@@ -210,68 +177,6 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.base,
     color: colors.text.primary,
     padding: 0,
-  },
-  filterButton: {
-    marginLeft: spacing.sm,
-    padding: spacing.xs,
-  },
-  filtersContainer: {
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-  },
-  filterRow: {
-    marginBottom: spacing.md,
-  },
-  filterLabel: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    marginBottom: spacing.sm,
-  },
-  filterChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  filterChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.surface.secondary,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-  },
-  filterChipActive: {
-    backgroundColor: colors.primary[600],
-    borderColor: colors.primary[600],
-  },
-  filterChipText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.secondary,
-  },
-  filterChipTextActive: {
-    color: colors.text.inverse,
-  },
-  clearFiltersButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: spacing.sm,
-  },
-  clearFiltersText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.primary[600],
-  },
-  resultsHeader: {
-    marginBottom: spacing.md,
-  },
-  resultsCount: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
   },
   listContent: {
     paddingBottom: spacing.xl,
@@ -301,5 +206,31 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.base,
     color: colors.text.secondary,
     textAlign: 'center',
+  },
+  section: {
+    marginBottom: spacing.xl,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.xs,
+  },
+  sectionHeaderDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: spacing.sm,
+  },
+  sectionTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+  },
+  sectionCount: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.secondary,
+    marginLeft: spacing.xs,
   },
 });

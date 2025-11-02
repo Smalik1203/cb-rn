@@ -16,7 +16,6 @@ import {
   NotebookText, 
   UserCheck, 
   UsersRound, 
-  Wrench, 
   LineChart, 
   CreditCard, 
   LogOut, 
@@ -152,16 +151,6 @@ const MENU: MenuItem[] = [
     roles: ['admin', 'superadmin', 'cb_admin'], 
     section: 'Academic',
     description: 'Manage fee components',
-    parent: 'fees'
-  },
-  { 
-    key: 'fees_manage', 
-    label: 'Manage Fee', 
-    icon: Wrench, 
-    route: '/(tabs)/fees?tab=plans', 
-    roles: ['admin', 'superadmin', 'cb_admin'], 
-    section: 'Academic',
-    description: 'Assign plans and record payments',
     parent: 'fees'
   },
   { 
