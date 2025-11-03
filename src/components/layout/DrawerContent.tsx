@@ -36,6 +36,7 @@ import {
 import { colors, spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
 import { useAuth } from '../../contexts/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useClass } from '../../hooks/useClasses';
 
 type MenuItem = {
   key: string;
@@ -224,6 +225,18 @@ export function DrawerContent(props: DrawerContentComponentProps) {
   const [expandedMenus, setExpandedMenus] = React.useState<Set<string>>(new Set(['fees']));
   const insets = useSafeAreaInsets();
   
+  // Fetch class information for students
+  const isStudent = role === 'student';
+  const { data: classData } = useClass(profile?.class_instance_id || undefined);
+  
+  // Format class name for display
+  const displayText = useMemo(() => {
+    if (isStudent && classData) {
+      return `Grade ${classData.grade}${classData.section ? `-${classData.section}` : ''}`;
+    }
+    return (profile?.role || 'UNKNOWN').toUpperCase();
+  }, [isStudent, classData, profile?.role]);
+  
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -341,7 +354,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
               {profile?.full_name || 'User'}
             </Text>
             <Text style={[styles.userRole, { color: getRoleColor(role || '') }]}>
-              {(profile?.role || 'UNKNOWN').toUpperCase()}
+              {displayText}
             </Text>
           </View>
           <TouchableOpacity style={styles.headerLogoutButton} onPress={handleLogout}>

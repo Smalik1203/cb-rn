@@ -77,7 +77,7 @@ function CleanTimetableCard({
       
       <View style={styles.cleanPeriodContent}>
         <View style={styles.cleanPeriodHeader}>
-          <View style={styles.cleanTimeSubjectRow}>
+          <View style={styles.cleanContentColumn}>
             <Text style={styles.cleanTimeText}>
               {formatTime12Hour(slot.start_time)} - {formatTime12Hour(slot.end_time)}
             </Text>
@@ -86,20 +86,16 @@ function CleanTimetableCard({
             </Text>
           </View>
 
-          <View style={styles.cleanHeaderActions}>
-            <TouchableOpacity
-              onPress={() => {
-                setSelectedSlotForMenu(slot);
-                setShowSlotMenu(true);
-              }}
-              style={styles.cleanCardMenu}
-              activeOpacity={0.6}
-            >
-              <View style={styles.menuIconContainer}>
-                <Edit size={18} color={colors.info[500]} />
-              </View>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            onPress={() => {
+              setSelectedSlotForMenu(slot);
+              setShowSlotMenu(true);
+            }}
+            style={styles.cleanCardMenu}
+            activeOpacity={0.6}
+          >
+            <Edit size={20} color={colors.info[500]} />
+          </TouchableOpacity>
         </View>
 
         {/* Topic and Teacher Info - Full Width */}
@@ -111,7 +107,7 @@ function CleanTimetableCard({
                   <BookOpen size={12} color={colors.text.secondary} />
                   <Text style={styles.cleanTopicLabel}>Topic:</Text>
                 </View>
-                <Text style={styles.cleanTopicText} numberOfLines={2}>
+                <Text style={styles.cleanTopicText}>
                   {slot.topic_name}
                 </Text>
               </View>
@@ -122,7 +118,7 @@ function CleanTimetableCard({
                   <User size={12} color={colors.text.secondary} />
                   <Text style={styles.cleanTeacherLabel}>Teacher:</Text>
                 </View>
-                <Text style={styles.cleanTeacherText} numberOfLines={1}>
+                <Text style={styles.cleanTeacherText}>
                   {slot.teacher_name}
                 </Text>
               </View>
@@ -130,10 +126,8 @@ function CleanTimetableCard({
           </View>
         )}
 
-
-
         {slot.plan_text && (
-          <Text style={styles.cleanPlanText} numberOfLines={2}>
+          <Text style={styles.cleanPlanText}>
             {slot.plan_text}
           </Text>
         )}
@@ -216,7 +210,9 @@ function ModernTimetableSlotCard({
       
       <View style={styles.modernPeriodContent}>
         <View style={styles.modernPeriodHeader}>
-          <Text style={[styles.modernSubjectName, { color: subjectColor }]}>
+          <Text
+            style={[styles.modernSubjectName, { color: subjectColor }]}
+          >
             {slot.subject_name || 'No Subject'}
           </Text>
           <TouchableOpacity
@@ -238,7 +234,7 @@ function ModernTimetableSlotCard({
         </View>
         
         {slot.plan_text && (
-          <Text style={styles.modernPlanText} numberOfLines={2}>
+          <Text style={styles.modernPlanText}>
             {slot.plan_text}
           </Text>
         )}
@@ -2124,15 +2120,15 @@ const styles = StyleSheet.create({
   },
   cleanPeriodCard: {
     backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     ...shadows.sm,
     flexDirection: 'row',
-    overflow: 'hidden',
-    minHeight: 100, // Increased height to show all content
+    minHeight: 140, // Increased for better spacing
     borderLeftWidth: 4,
-    borderLeftColor: colors.neutral[300], // Default gray for pending
-    marginHorizontal: spacing.xs,
-    marginBottom: spacing.sm,
+    borderLeftColor: colors.neutral[300],
+    marginHorizontal: spacing.sm,
+    marginBottom: spacing.md,
+    padding: spacing.lg, // Increased padding
   },
   cleanCurrentCard: {
     borderWidth: 2,
@@ -2144,7 +2140,7 @@ const styles = StyleSheet.create({
     borderColor: colors.info[600],
   },
   cleanPastCard: {
-    opacity: 0.7,
+    opacity: 0.85, // Increased from 0.7 for better readability
   },
   cleanCompletedCard: {
     borderLeftColor: colors.secondary[600], // Secondary color for completed
@@ -2162,35 +2158,32 @@ const styles = StyleSheet.create({
   },
   cleanPeriodContent: {
     flex: 1,
-    padding: isTablet ? 16 : 12,
-    paddingBottom: isTablet ? 16 : 12,
+    padding: 16, // Consistent padding for all screens
+    paddingBottom: 16,
     minWidth: 0, // Allow content to shrink
   },
   cleanPeriodHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
-    minHeight: 32,
+    marginBottom: spacing.sm,
+    width: '100%',
   },
-  cleanTimeSubjectRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  cleanContentColumn: {
     flex: 1,
-    gap: isTablet ? 12 : 8,
-  },
-  cleanHeaderActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 0,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    marginRight: spacing.sm,
+    minWidth: 0,
   },
   cleanTimeText: {
-    fontSize: isTablet ? typography.fontSize.base : typography.fontSize.sm,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    lineHeight: isTablet ? typography.lineHeight.snug : typography.lineHeight.normal,
-    textAlign: 'left',
-    flexShrink: 0,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.secondary,
+    lineHeight: typography.lineHeight.normal,
+    marginBottom: spacing.sm,
+    width: '100%',
   },
   cleanCardMenu: {
     padding: spacing.sm,
@@ -2211,12 +2204,11 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   cleanSubjectName: {
-    fontSize: isTablet ? typography.fontSize.lg : typography.fontSize.base,
+    fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
-    lineHeight: isTablet ? typography.lineHeight.snug : typography.lineHeight.normal,
-    textAlign: 'left',
-    flex: 1,
+    lineHeight: typography.lineHeight.snug,
+    width: '100%',
     flexWrap: 'wrap',
   },
   cleanInfoLabelRow: {
@@ -2226,30 +2218,28 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   cleanPlanText: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.normal,
     color: colors.text.secondary,
-    lineHeight: typography.lineHeight.normal,
-    marginBottom: 0,
-  },
-  cleanInfoRow: {
-    flexDirection: 'row',
-    gap: isTablet ? spacing.md : spacing.md,
-    marginTop: spacing.xs,
-    marginBottom: spacing.xs,
-    paddingHorizontal: 0,
-    alignItems: 'flex-start',
+    lineHeight: typography.lineHeight.relaxed,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.border.light,
-    paddingTop: spacing.xs,
+  },
+  cleanInfoRow: {
+    flexDirection: 'column',
+    gap: spacing.md,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
   },
   cleanTopicInfo: {
-    flex: 2,
-    minWidth: 0, // Allow text to wrap
+    width: '100%',
   },
   cleanTeacherInfo: {
-    flex: 1,
-    minWidth: 0, // Allow text to wrap
+    width: '100%',
   },
   cleanTopicLabel: {
     fontSize: typography.fontSize.xs,
@@ -2260,11 +2250,11 @@ const styles = StyleSheet.create({
     letterSpacing: typography.letterSpacing.wide,
   },
   cleanTopicText: {
-    fontSize: isTablet ? typography.fontSize.base : typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
     color: colors.text.primary,
-    lineHeight: isTablet ? typography.lineHeight.normal : typography.lineHeight.snug,
-    flexWrap: 'wrap',
+    lineHeight: typography.lineHeight.relaxed,
+    marginTop: spacing.xs,
   },
   cleanTeacherLabel: {
     fontSize: typography.fontSize.xs,
@@ -2275,26 +2265,26 @@ const styles = StyleSheet.create({
     letterSpacing: typography.letterSpacing.wide,
   },
   cleanTeacherText: {
-    fontSize: isTablet ? typography.fontSize.base : typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
     color: colors.text.primary,
-    lineHeight: isTablet ? typography.lineHeight.normal : typography.lineHeight.snug,
-    flexWrap: 'wrap',
+    lineHeight: typography.lineHeight.relaxed,
+    marginTop: spacing.xs,
   },
   cleanBreakCard: {
     backgroundColor: colors.warning[50],
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     ...shadows.xs,
-    minHeight: 100, // Increased height to match period cards
+    minHeight: 140, // Match period cards
     opacity: 0.9,
     borderLeftWidth: 4,
     borderLeftColor: colors.warning[700],
-    marginHorizontal: spacing.xs,
-    marginBottom: spacing.sm,
+    marginHorizontal: spacing.sm,
+    marginBottom: spacing.md,
   },
   cleanBreakContent: {
     flexDirection: 'row',
@@ -3336,14 +3326,15 @@ const styles = StyleSheet.create({
   modernPeriodCard: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
-    marginBottom: spacing.md,
-    padding: spacing.md,
+    marginBottom: spacing.lg, // Increased from md
+    padding: spacing.lg, // Increased from md
     flexDirection: 'row',
     borderLeftWidth: 4,
     borderLeftColor: colors.info[600],
     borderWidth: 1,
     borderColor: colors.info[100],
     ...shadows.DEFAULT,
+    minHeight: 120, // Added min height
   },
   modernCurrentPeriodCard: {
     borderLeftColor: colors.success[600],
@@ -3354,7 +3345,7 @@ const styles = StyleSheet.create({
     borderLeftColor: colors.info[600],
   },
   modernPastPeriodCard: {
-    opacity: 0.7,
+    opacity: 0.85, // Increased from 0.7 for better readability
   },
   modernPeriodTime: {
     flex: 0.3,
@@ -3385,6 +3376,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111827',
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   modernCardMenu: {
     padding: 4,
@@ -3394,6 +3387,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+    flex: 1,
+    minWidth: 0,
   },
   modernTeacherAvatar: {
     width: 24,
@@ -3408,12 +3403,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     fontWeight: '500',
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   modernPlanText: {
     fontSize: 14,
     color: '#6b7280',
     lineHeight: 20,
     marginBottom: 8,
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   modernPeriodStatus: {
     flexDirection: 'row',

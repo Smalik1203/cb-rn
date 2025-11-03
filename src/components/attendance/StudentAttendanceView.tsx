@@ -33,25 +33,63 @@ export const StudentAttendanceView: React.FC = () => {
   const [studentId, setStudentId] = useState<string | null>(null);
   const [loadingStudentId, setLoadingStudentId] = useState(true);
 
-  // Get student ID from profile
+  // Get student ID from profile (matching V1 pattern with fallback logic)
   useEffect(() => {
-    if (profile?.auth_id && profile?.role === 'student') {
+    const fetchStudent = async () => {
+      if (!profile?.auth_id || profile?.role !== 'student') {
+        setLoadingStudentId(false);
+        return;
+      }
+
       setLoadingStudentId(true);
-      supabase
-        .from('student')
-        .select('id')
-        .eq('auth_user_id', profile.auth_id)
-        .single()
-        .then(({ data, error }) => {
-          if (data && !error) {
-            setStudentId(data.id);
-          }
-          setLoadingStudentId(false);
-        });
-    } else {
-      setLoadingStudentId(false);
-    }
-  }, [profile?.auth_id, profile?.role]);
+      try {
+        const schoolCode = profile.school_code;
+        
+        if (!schoolCode) {
+          throw new Error('School information not found in your profile. Please contact support.');
+        }
+
+        // Try to find student by auth_user_id first (most reliable)
+        let { data, error: queryError } = await supabase
+          .from('student')
+          .select('id')
+          .eq('auth_user_id', profile.auth_id)
+          .eq('school_code', schoolCode)
+          .maybeSingle();
+
+        // If not found by auth_user_id, try by email (fallback)
+        if (!data && !queryError && profile.email) {
+          const result = await supabase
+            .from('student')
+            .select('id')
+            .eq('email', profile.email)
+            .eq('school_code', schoolCode)
+            .maybeSingle();
+          data = result.data;
+          queryError = result.error;
+        }
+
+        if (queryError) {
+          console.error('Student lookup error:', queryError);
+          throw new Error(`Failed to find student profile: ${queryError.message || 'Please contact support if this issue persists.'}`);
+        }
+        
+        if (!data) {
+          throw new Error('Student profile not found. Please contact your administrator to ensure your account is properly linked.');
+        }
+        
+        setStudentId(data.id);
+      } catch (err: any) {
+        console.error('Error fetching student:', err);
+        // Error will be caught and loading set to false
+        // Don't set studentId, so viewState will be 'empty'
+      } finally {
+        setLoadingStudentId(false);
+      }
+    };
+
+    fetchStudent();
+  }, [profile?.auth_id, profile?.role, profile?.school_code, profile?.email]);
 
   // Fetch student attendance data
   const { data: attendanceRecords = [], isLoading, error, refetch } = useStudentAttendance(studentId || undefined);
@@ -193,14 +231,15 @@ export const StudentAttendanceView: React.FC = () => {
       errorDetails={error?.message}
       onRetry={handleRefresh}
     >
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-      >
+      <View style={styles.container}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+        >
         {/* Overall Stats Cards */}
         <View style={styles.statsSection}>
           <Card mode="elevated" style={styles.statCard}>
@@ -432,12 +471,17 @@ export const StudentAttendanceView: React.FC = () => {
             </Card>
           )}
         </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
     </ThreeStateView>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background.app,
+  },
   scrollView: {
     flex: 1,
   },

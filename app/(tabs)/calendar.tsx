@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, RefreshControl } from 'react-native';
 import { Text, Card, Button } from 'react-native-paper';
 import { 
   Plus, 
@@ -42,14 +42,19 @@ export default function CalendarScreen() {
   // Month picker state
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [monthPickerYear, setMonthPickerYear] = useState<number>(new Date().getFullYear());
+  const [refreshing, setRefreshing] = useState(false);
 
   const role = profile?.role;
+  const isStudent = role === 'student';
   const canManageEvents = role === 'admin' || role === 'superadmin' || role === 'cb_admin';
   const schoolCode = profile?.school_code || '';
 
-  // Fetch classes for the school
+  // For students, use their class_instance_id automatically
+  const studentClassId = isStudent ? profile?.class_instance_id || undefined : undefined;
+
+  // Fetch classes for the school (only for admins, not needed for students)
   const fetchClasses = useCallback(async () => {
-    if (!schoolCode) return;
+    if (!schoolCode || isStudent) return;
     
     setLoadingClasses(true);
     try {
@@ -67,7 +72,7 @@ export default function CalendarScreen() {
     } finally {
       setLoadingClasses(false);
     }
-  }, [schoolCode]);
+  }, [schoolCode, isStudent]);
 
   useEffect(() => {
     fetchClasses();
@@ -83,13 +88,29 @@ export default function CalendarScreen() {
     };
   }, [currentDate]);
 
+  // For students: show only school-wide + their class events
+  // For admins: show based on selectedClassId filter
+  const effectiveClassId = isStudent ? studentClassId : (selectedClassId || undefined);
+
   // Fetch calendar events
   const { data: events = [], isLoading, error, refetch } = useCalendarEvents(
     schoolCode,
     startDate,
     endDate,
-    selectedClassId || undefined
+    effectiveClassId
   );
+
+  // Pull to refresh handler
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } catch (err) {
+      console.error('Error refreshing calendar:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   // Mutations
   const createEventMutation = useCreateCalendarEvent();
@@ -241,7 +262,18 @@ export default function CalendarScreen() {
     const sortedDates = Object.keys(groupedEvents).sort();
 
     return (
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={handleRefresh}
+            tintColor={colors.primary[600]}
+            colors={[colors.primary[600]]}
+          />
+        }
+      >
         {isLoading ? (
           <View style={styles.centerContainer}>
             <Text>Loading events...</Text>
@@ -345,21 +377,24 @@ export default function CalendarScreen() {
 
       {/* Filter Bar */}
       <View style={styles.filterBar}>
-        <TouchableOpacity style={styles.filterItem} onPress={() => setShowClassDropdown(true)}>
-          <View style={styles.filterIcon}>
-            <Users size={16} color={colors.text.inverse} />
-          </View>
-          <View style={styles.filterContent}>
-            <Text style={styles.filterLabel}>Class</Text>
-            <Text style={styles.filterValue}>
-              {selectedClassId
-                ? `${classes.find((c) => c.id === selectedClassId)?.grade}-${
-                    classes.find((c) => c.id === selectedClassId)?.section || ''
-                  }`
-                : 'All Classes'}
-            </Text>
-          </View>
-        </TouchableOpacity>
+        {/* Class Filter - only show for admins, not students */}
+        {!isStudent && (
+          <TouchableOpacity style={styles.filterItem} onPress={() => setShowClassDropdown(true)}>
+            <View style={styles.filterIcon}>
+              <Users size={16} color={colors.text.inverse} />
+            </View>
+            <View style={styles.filterContent}>
+              <Text style={styles.filterLabel}>Class</Text>
+              <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
+                {selectedClassId
+                  ? `${classes.find((c) => c.id === selectedClassId)?.grade}-${
+                      classes.find((c) => c.id === selectedClassId)?.section || ''
+                    }`
+                  : 'All Classes'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* Date Pill - opens month picker */}
         <TouchableOpacity
@@ -375,7 +410,7 @@ export default function CalendarScreen() {
           </View>
           <View style={styles.filterContent}>
             <Text style={styles.filterLabel}>Date</Text>
-            <Text style={styles.filterValue}>
+            <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
               {new Date(currentDate).toLocaleDateString('en-GB', {
                 month: 'short', year: 'numeric'
               })}
@@ -418,6 +453,14 @@ export default function CalendarScreen() {
           events={events}
           onDateClick={handleDateClick}
           onEventClick={handleEventClick}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={handleRefresh}
+              tintColor={colors.primary[600]}
+              colors={[colors.primary[600]]}
+            />
+          }
         />
       )}
 
@@ -482,7 +525,7 @@ export default function CalendarScreen() {
         event={selectedEvent || undefined}
         academicYearId={undefined}
         schoolCode={schoolCode}
-        classes={[]}
+        classes={classes}
         userId={profile?.auth_id || ''}
         onCancel={() => {
           setIsEventModalVisible(false);
@@ -497,7 +540,7 @@ export default function CalendarScreen() {
         event={selectedEvent || undefined}
         academicYearId={undefined}
         schoolCode={schoolCode}
-        classes={[]}
+        classes={classes}
         isHoliday
         userId={profile?.auth_id || ''}
         onCancel={() => {
@@ -706,6 +749,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.default,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+    gap: spacing.md,
   },
   filterItem: {
     flexDirection: 'row',
@@ -718,6 +762,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderWidth: 1,
     borderColor: '#E6E8EF',
+    minWidth: 0, // Prevents overflow
   },
   filterItemDisabled: {
     opacity: 0.6,
@@ -735,6 +780,7 @@ const styles = StyleSheet.create({
   },
   filterContent: {
     flex: 1,
+    minWidth: 0, // Prevents overflow
   },
   filterLabel: {
     fontSize: typography.fontSize.xs,
@@ -745,6 +791,7 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.medium,
+    flexShrink: 1,
   },
   modalOverlay: {
     flex: 1,

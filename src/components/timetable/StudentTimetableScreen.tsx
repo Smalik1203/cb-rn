@@ -186,13 +186,13 @@ export function StudentTimetableScreen() {
 
                 {slot.slot_type === 'period' ? (
                   <View style={styles.periodContent}>
-                    <Text style={styles.subjectTitle}>
+                    <Text style={styles.subjectTitle} numberOfLines={2} ellipsizeMode="tail">
                       {slot.subject?.subject_name || 'Unknown Subject'}
                     </Text>
                     
                     <View style={styles.detailRow}>
                       <User size={14} color={colors.text.tertiary} />
-                      <Text style={styles.teacherName}>
+                      <Text style={styles.teacherName} numberOfLines={1} ellipsizeMode="tail">
                         {slot.teacher?.full_name || 'Unknown Teacher'}
                       </Text>
                     </View>
@@ -200,7 +200,9 @@ export function StudentTimetableScreen() {
                     {slot.plan_text && (
                       <View style={styles.detailRow}>
                         <BookOpen size={14} color={colors.text.tertiary} />
-                        <Text style={styles.planText}>{slot.plan_text}</Text>
+                        <Text style={styles.planText} numberOfLines={3} ellipsizeMode="tail">
+                          {slot.plan_text}
+                        </Text>
                       </View>
                     )}
                   </View>
@@ -312,6 +314,8 @@ const styles = StyleSheet.create({
   },
   periodContent: {
     gap: spacing.sm,
+    flex: 1,
+    minWidth: 0,
   },
   subjectRow: {
     flexDirection: 'row',
@@ -328,6 +332,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: spacing.xs,
+    flex: 1,
+    minWidth: 0,
   },
   teacherRow: {
     flexDirection: 'row',
@@ -358,6 +364,8 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.normal,
     color: colors.text.primary,
     lineHeight: typography.lineHeight.normal,
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   breakContent: {
     alignItems: 'center',
@@ -509,12 +517,16 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     marginBottom: spacing.xs,
     lineHeight: typography.lineHeight.tight,
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   teacherName: {
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.medium,
     color: colors.text.secondary,
     lineHeight: typography.lineHeight.normal,
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   breakTitle: {
     fontSize: typography.fontSize['2xl'],

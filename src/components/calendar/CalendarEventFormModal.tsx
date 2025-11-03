@@ -248,7 +248,7 @@ export default function CalendarEventFormModal({
             </Text>
             <TouchableOpacity
               style={styles.selector}
-              onPress={() => setShowClassSelector(!showClassSelector)}
+              onPress={() => setShowClassSelector(true)}
             >
               <Text style={styles.selectorText}>
                 {selectedClass
@@ -256,34 +256,6 @@ export default function CalendarEventFormModal({
                   : 'All Classes (School-wide)'}
               </Text>
             </TouchableOpacity>
-            {showClassSelector && (
-              <View style={styles.dropdownContainer}>
-                <TouchableOpacity
-                  style={styles.dropdownItem}
-                  onPress={() => {
-                    setClassInstanceId(null);
-                    setShowClassSelector(false);
-                  }}
-                >
-                  <Text style={styles.dropdownItemText}>All Classes (School-wide)</Text>
-                </TouchableOpacity>
-                {classes.map((cls) => (
-                  <TouchableOpacity
-                    key={cls.id}
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setClassInstanceId(cls.id);
-                      setShowClassSelector(false);
-                    }}
-                  >
-                    <Text style={styles.dropdownItemText}>
-                      Grade {cls.grade}
-                      {cls.section ? `-${cls.section}` : ''}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
           </View>
 
           {/* Dates */}
@@ -464,6 +436,69 @@ export default function CalendarEventFormModal({
           />
         )}
       </Modal>
+
+      {/* Class Selection Modal - Separate modal outside the main form modal */}
+      <Modal
+        visible={showClassSelector}
+        onDismiss={() => setShowClassSelector(false)}
+        contentContainerStyle={styles.classModalContainer}
+      >
+        <View style={styles.classModalHeader}>
+          <Text variant="headlineSmall" style={styles.classModalTitle}>
+            Select Class
+          </Text>
+          <TouchableOpacity onPress={() => setShowClassSelector(false)} style={styles.closeButton}>
+            <X size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+        </View>
+        <ScrollView style={styles.classModalList}>
+          <TouchableOpacity
+            style={[
+              styles.classModalItem,
+              !classInstanceId && styles.classModalItemSelected,
+            ]}
+            onPress={() => {
+              setClassInstanceId(null);
+              setShowClassSelector(false);
+            }}
+          >
+            <Text
+              style={[
+                styles.classModalItemText,
+                !classInstanceId && styles.classModalItemTextSelected,
+              ]}
+            >
+              All Classes (School-wide)
+            </Text>
+          </TouchableOpacity>
+          {classes.map((cls) => (
+            <TouchableOpacity
+              key={cls.id}
+              style={[
+                styles.classModalItem,
+                classInstanceId === cls.id && styles.classModalItemSelected,
+              ]}
+              onPress={() => {
+                setClassInstanceId(cls.id);
+                setShowClassSelector(false);
+              }}
+            >
+              <Text
+                style={[
+                  styles.classModalItemText,
+                  classInstanceId === cls.id && styles.classModalItemTextSelected,
+                ]}
+              >
+                Grade {cls.grade}
+                {cls.section ? `-${cls.section}` : ''}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <Button onPress={() => setShowClassSelector(false)} style={styles.classModalButton}>
+          Cancel
+        </Button>
+      </Modal>
     </Portal>
   );
 }
@@ -536,22 +571,48 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.base,
     color: colors.text.primary,
   },
-  dropdownContainer: {
-    marginTop: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    borderRadius: borderRadius.md,
+  classModalContainer: {
     backgroundColor: colors.background.card,
-    maxHeight: 200,
+    marginHorizontal: spacing.lg,
+    borderRadius: borderRadius.lg,
+    maxHeight: '80%',
+    padding: spacing.lg,
   },
-  dropdownItem: {
+  classModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  classModalTitle: {
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+  },
+  classModalList: {
+    maxHeight: 400,
+    marginBottom: spacing.md,
+  },
+  classModalItem: {
     padding: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.light,
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.xs,
   },
-  dropdownItemText: {
+  classModalItemSelected: {
+    backgroundColor: colors.primary[50],
+    borderBottomColor: colors.primary[200],
+  },
+  classModalItemText: {
     fontSize: typography.fontSize.base,
     color: colors.text.primary,
+  },
+  classModalItemTextSelected: {
+    color: colors.primary[700],
+    fontWeight: typography.fontWeight.semibold,
+  },
+  classModalButton: {
+    marginTop: spacing.md,
   },
   row: {
     flexDirection: 'row',

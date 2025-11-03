@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, RefreshControl, RefreshControlProps } from 'react-native';
 import { Text, Chip } from 'react-native-paper';
 import { colors, spacing, borderRadius, typography } from '../../../lib/design-system';
 import { CalendarEvent } from '../../hooks/useCalendarEvents';
@@ -9,6 +9,7 @@ interface CalendarMonthViewProps {
   events: CalendarEvent[];
   onDateClick: (date: Date) => void;
   onEventClick: (event: CalendarEvent) => void;
+  refreshControl?: React.ReactElement<RefreshControlProps>;
 }
 
 const { width, height } = Dimensions.get('window');
@@ -21,6 +22,7 @@ export default function CalendarMonthView({
   events,
   onDateClick,
   onEventClick,
+  refreshControl,
 }: CalendarMonthViewProps) {
   // Get events for a specific date
   const getEventsForDate = (date: Date): CalendarEvent[] => {
@@ -107,7 +109,11 @@ export default function CalendarMonthView({
 
       {/* Calendar Grid - Full viewport */}
       <View style={styles.gridContainer}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView 
+          showsVerticalScrollIndicator={false} 
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={refreshControl}
+        >
           <View style={styles.grid}>
             {calendarDays.map((day, index) => {
             const isCurrentMonth = day.getMonth() === currentDate.getMonth();
