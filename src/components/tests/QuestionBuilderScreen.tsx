@@ -10,14 +10,13 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, Trash2, ArrowLeft, Save, Image as ImageIcon, Upload } from 'lucide-react-native';
+import { Plus, Trash2, ArrowLeft, Save, Image as ImageIcon } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTestQuestions, useCreateQuestion, useUpdateQuestion, useDeleteQuestion } from '../../hooks/tests';
 import { TestQuestion, QuestionType } from '../../types/test.types';
 import { colors, spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { ImportQuestionsModal } from './ImportQuestionsModal';
 import { ParsedQuestion } from '../../utils/questionParsers';
 
 export function QuestionBuilderScreen() {
@@ -38,7 +37,7 @@ export function QuestionBuilderScreen() {
   const [correctIndex, setCorrectIndex] = useState(0);
   const [correctText, setCorrectText] = useState('');
   const [points, setPoints] = useState('10');
-  const [showImportModal, setShowImportModal] = useState(false);
+  
 
   const resetForm = () => {
     setEditingQuestionId(null);
@@ -173,31 +172,7 @@ export function QuestionBuilderScreen() {
     setOptions(newOptions);
   };
 
-  const handleImportQuestions = async (importedQuestions: ParsedQuestion[]) => {
-    try {
-      const currentMaxOrder = questions.length > 0
-        ? Math.max(...questions.map((q) => q.order_index))
-        : -1;
-
-      // Create all questions
-      for (let i = 0; i < importedQuestions.length; i++) {
-        const q = importedQuestions[i];
-        await createQuestion.mutateAsync({
-          test_id: testId,
-          question_text: q.question_text,
-          question_type: q.question_type,
-          points: q.points,
-          options: q.options,
-          correct_answer: q.correct_answer,
-          order_index: currentMaxOrder + i + 1,
-        });
-      }
-
-      Alert.alert('Success', `Imported ${importedQuestions.length} questions successfully`);
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to import questions');
-    }
-  };
+  
 
   if (isLoading) {
     return (
@@ -224,14 +199,7 @@ export function QuestionBuilderScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Import Button */}
-        <TouchableOpacity
-          style={styles.importButton}
-          onPress={() => setShowImportModal(true)}
-        >
-          <Upload size={20} color={colors.primary[600]} />
-          <Text style={styles.importButtonText}>Import Questions from File</Text>
-        </TouchableOpacity>
+        
 
         {/* Question Form */}
         <View style={styles.formCard}>
@@ -464,12 +432,7 @@ export function QuestionBuilderScreen() {
         </View>
       </ScrollView>
 
-      {/* Import Questions Modal */}
-      <ImportQuestionsModal
-        visible={showImportModal}
-        onClose={() => setShowImportModal(false)}
-        onImport={handleImportQuestions}
-      />
+      
     </SafeAreaView>
   );
 }
@@ -517,24 +480,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: spacing.lg,
   },
-  importButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-    borderRadius: borderRadius.md,
-    borderWidth: 2,
-    borderColor: colors.primary[600],
-    borderStyle: 'dashed',
-    backgroundColor: colors.primary[50],
-  },
-  importButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.primary[600],
-  },
+  
   formCard: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,

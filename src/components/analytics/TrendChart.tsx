@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import { Text } from 'react-native-paper';
 import Svg, { Path, Circle, Line, Text as SvgText } from 'react-native-svg';
-import { colors, spacing, typography } from '../../../lib/design-system';
+import { colors, spacing } from '../../../lib/design-system';
 
 export interface DataPoint {
   label: string;

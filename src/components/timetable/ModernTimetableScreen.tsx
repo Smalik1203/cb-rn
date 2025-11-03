@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert, RefreshControl, Animated, Vibration, Modal as RNModal } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert, RefreshControl, Animated, Vibration, Modal as RNModal, Text as RNText } from 'react-native';
 import { Text, Card, Button, Chip, Portal, Modal, TextInput, SegmentedButtons, Snackbar } from 'react-native-paper';
 import { Calendar, Clock, ChevronLeft, ChevronRight, Plus, Edit, Trash2, CheckCircle, Circle, Settings, Users, BookOpen, MapPin, Filter, RotateCcw, User, MoreVertical, Coffee, ListTodo, X } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
@@ -9,6 +9,7 @@ import { useClasses } from '../../hooks/useClasses';
 import { useSubjects } from '../../hooks/useSubjects';
 import { useAdmins } from '../../hooks/useAdmins';
 import { DatePickerModal } from '../common/DatePickerModal';
+import { ThreeStateView } from '../common/ThreeStateView';
 import { colors, typography, spacing, borderRadius, shadows } from '../../../lib/design-system';
 import dayjs from 'dayjs';
 import { router } from 'expo-router';
@@ -76,16 +77,16 @@ function CleanTimetableCard({
       <View style={styles.cleanPeriodLeftBorder} />
       
       <View style={styles.cleanPeriodContent}>
+        {/* Line 1: Time + Subject */}
         <View style={styles.cleanPeriodHeader}>
           <View style={styles.cleanContentColumn}>
-            <Text style={styles.cleanTimeText}>
-              {formatTime12Hour(slot.start_time)} - {formatTime12Hour(slot.end_time)}
-            </Text>
-            <Text style={styles.cleanSubjectName}>
-              {slot.subject_name || 'Unassigned'}
-            </Text>
+            <RNText style={styles.cleanTimeText}>
+              {`${formatTime12Hour(slot?.start_time)} - ${formatTime12Hour(slot?.end_time)}`}
+            </RNText>
+            <RNText style={styles.cleanSubjectName} numberOfLines={2} ellipsizeMode="tail">
+              {slot?.subject_name?.trim?.() || 'Unassigned'}
+            </RNText>
           </View>
-
           <TouchableOpacity
             onPress={() => {
               setSelectedSlotForMenu(slot);
@@ -98,39 +99,17 @@ function CleanTimetableCard({
           </TouchableOpacity>
         </View>
 
-        {/* Topic and Teacher Info - Full Width */}
-        {(slot.topic_name || slot.teacher_name) && (
-          <View style={styles.cleanInfoRow}>
-            {slot.topic_name && (
-              <View style={styles.cleanTopicInfo}>
-                <View style={styles.cleanInfoLabelRow}>
-                  <BookOpen size={12} color={colors.text.secondary} />
-                  <Text style={styles.cleanTopicLabel}>Topic:</Text>
-                </View>
-                <Text style={styles.cleanTopicText}>
-                  {slot.topic_name}
-                </Text>
-              </View>
-            )}
-            {slot.teacher_name && (
-              <View style={styles.cleanTeacherInfo}>
-                <View style={styles.cleanInfoLabelRow}>
-                  <User size={12} color={colors.text.secondary} />
-                  <Text style={styles.cleanTeacherLabel}>Teacher:</Text>
-                </View>
-                <Text style={styles.cleanTeacherText}>
-                  {slot.teacher_name}
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {slot.plan_text && (
-          <Text style={styles.cleanPlanText}>
-            {slot.plan_text}
-          </Text>
-        )}
+        {/* Lines 2 & 3: Topic and Teacher */}
+        <View style={styles.cleanLines}>
+          <RNText style={styles.cleanLineText} numberOfLines={1}>
+            <RNText style={styles.cleanLabel}>Topic: </RNText>
+            {slot?.topic_name?.trim?.() || '—'}
+          </RNText>
+          <RNText style={styles.cleanLineText} numberOfLines={1}>
+            <RNText style={styles.cleanLabel}>Teacher: </RNText>
+            {slot?.teacher_name?.trim?.() || '—'}
+          </RNText>
+        </View>
       </View>
     </View>
   );
@@ -212,6 +191,8 @@ function ModernTimetableSlotCard({
         <View style={styles.modernPeriodHeader}>
           <Text
             style={[styles.modernSubjectName, { color: subjectColor }]}
+            numberOfLines={2}
+            ellipsizeMode="tail"
           >
             {slot.subject_name || 'No Subject'}
           </Text>
@@ -350,9 +331,20 @@ export function ModernTimetableScreen() {
   }, [profile?.class_instance_id, selectedClassId]);
 
   // Helper function to format time in 12-hour format
-  const formatTime12Hour = (time24: string) => {
-    const [hours, minutes] = time24.split(':');
+  const formatTime12Hour = (time24: string | null | undefined) => {
+    if (!time24 || typeof time24 !== 'string') {
+      return '--:--';
+    }
+    const parts = time24.split(':');
+    if (parts.length < 2) {
+      return time24;
+    }
+    const hours = parts[0];
+    const minutes = parts[1];
     const hour = parseInt(hours, 10);
+    if (Number.isNaN(hour)) {
+      return `${hours}:${minutes}`;
+    }
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const hour12 = hour % 12 || 12;
     return `${hour12}:${minutes} ${ampm}`;
@@ -933,20 +925,14 @@ export function ModernTimetableScreen() {
         <View style={styles.timetableContentContainer}>
           
           {selectedClassId && slots.length === 0 ? (
-            <View
-              style={[
-                styles.cleanEmptyState,
-                isTablet ? styles.cleanEmptyStateTablet : (isSmallScreen ? styles.cleanEmptyStateMobile : null),
-              ]}
-            >
-              <View style={styles.cleanEmptyIcon}>
-                <Calendar size={isTablet ? 64 : (isSmallScreen ? 40 : 56)} color="#9ca3af" />
-              </View>
-              <Text style={styles.cleanEmptyTitle}>No classes yet</Text>
-              <Text style={styles.cleanEmptyMessage}>
-                Tap &apos;+ Period&apos; to start building your schedule for {dayjs(selectedDate).format('MMM D, YYYY')}.
-              </Text>
-            </View>
+            <ThreeStateView
+              state="empty"
+              emptyMessage={`No timetable for ${dayjs(selectedDate).format('MMM D, YYYY')}`}
+              emptyAction={{
+                label: 'Add Period',
+                onPress: () => setShowActionsModal(true),
+              }}
+            />
           ) : (
             <View style={styles.cleanTimetableGrid}>
               {slots.map((slot, index) => {
@@ -2123,12 +2109,12 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     ...shadows.sm,
     flexDirection: 'row',
-    minHeight: 140, // Increased for better spacing
+    minHeight: 96,
     borderLeftWidth: 4,
     borderLeftColor: colors.neutral[300],
     marginHorizontal: spacing.sm,
-    marginBottom: spacing.md,
-    padding: spacing.lg, // Increased padding
+    marginBottom: spacing.sm,
+    padding: spacing.md,
   },
   cleanCurrentCard: {
     borderWidth: 2,
@@ -2158,9 +2144,9 @@ const styles = StyleSheet.create({
   },
   cleanPeriodContent: {
     flex: 1,
-    padding: 16, // Consistent padding for all screens
-    paddingBottom: 16,
-    minWidth: 0, // Allow content to shrink
+    padding: spacing.sm,
+    paddingBottom: spacing.sm,
+    minWidth: 0,
   },
   cleanPeriodHeader: {
     flexDirection: 'row',
@@ -2181,13 +2167,13 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.secondary,
-    lineHeight: typography.lineHeight.normal,
+    lineHeight: 18,
     marginBottom: spacing.sm,
     width: '100%',
   },
   cleanCardMenu: {
-    padding: spacing.sm,
-    minWidth: 40,
+    padding: 6,
+    minWidth: 34,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: borderRadius.sm,
@@ -2207,9 +2193,12 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
-    lineHeight: typography.lineHeight.snug,
+    lineHeight: 24,
     width: '100%',
     flexWrap: 'wrap',
+    paddingRight: 40, // ensure room for menu button
+    overflow: 'hidden',
+    marginBottom: 6,
   },
   cleanInfoLabelRow: {
     flexDirection: 'row',
@@ -2217,11 +2206,27 @@ const styles = StyleSheet.create({
     gap: 4,
     marginBottom: 3,
   },
+  cleanLines: {
+    marginTop: spacing.sm,
+    gap: 4,
+  },
+  cleanLabel: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.tertiary,
+    textTransform: 'uppercase',
+    letterSpacing: typography.letterSpacing.wide,
+  },
+  cleanLineText: {
+    fontSize: typography.fontSize.base,
+    color: colors.text.primary,
+    lineHeight: 20,
+  },
   cleanPlanText: {
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.normal,
     color: colors.text.secondary,
-    lineHeight: typography.lineHeight.relaxed,
+    lineHeight: 22,
     marginTop: spacing.md,
     paddingTop: spacing.md,
     borderTopWidth: 1,
@@ -2268,23 +2273,23 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.medium,
     color: colors.text.primary,
-    lineHeight: typography.lineHeight.relaxed,
+    lineHeight: 20,
     marginTop: spacing.xs,
   },
   cleanBreakCard: {
     backgroundColor: colors.warning[50],
     borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     ...shadows.xs,
-    minHeight: 140, // Match period cards
+    minHeight: 96,
     opacity: 0.9,
     borderLeftWidth: 4,
     borderLeftColor: colors.warning[700],
     marginHorizontal: spacing.sm,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   cleanBreakContent: {
     flexDirection: 'row',
@@ -3378,6 +3383,9 @@ const styles = StyleSheet.create({
     flex: 1,
     flexShrink: 1,
     minWidth: 0,
+    paddingRight: 32,
+    overflow: 'hidden',
+    marginBottom: 6,
   },
   modernCardMenu: {
     padding: 4,

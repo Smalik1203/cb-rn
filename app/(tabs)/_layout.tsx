@@ -74,6 +74,16 @@ export default function TabLayout() {
         }}
       />
 
+      {/* Student Fees screen */}
+      <Tabs.Screen
+        name="fees-student"
+        options={{
+          title: 'Fees',
+          tabBarIcon: ({ size, color }) => <CreditCard size={size} color={color} />,
+          href: null,
+        }}
+      />
+
       <Tabs.Screen
         name="syllabus"
         options={{
@@ -87,6 +97,7 @@ export default function TabLayout() {
         options={{
           title: 'Syllabus (Student)',
           tabBarIcon: ({ size, color }) => <NotebookText size={size} color={color} />,
+          href: null,
         }}
       />
 

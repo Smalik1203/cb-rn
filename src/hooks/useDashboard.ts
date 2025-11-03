@@ -46,6 +46,18 @@ export interface TaskOverview {
   dueThisWeek: number;
 }
 
+export interface SyllabusProgressOverview {
+  overallProgress: number;
+  totalSubjects: number;
+  subjectBreakdown: {
+    subjectId: string;
+    subjectName: string;
+    progress: number;
+    totalTopics: number;
+    completedTopics: number;
+  }[];
+}
+
 export function useDashboardStats(userId: string, classInstanceId?: string, role?: string) {
   return useQuery({
     queryKey: ['dashboard-stats', userId, classInstanceId, role],
@@ -415,6 +427,118 @@ export function useTaskOverview(studentId: string, classInstanceId?: string) {
       return overview;
     },
     enabled: !!studentId && !!classInstanceId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useSyllabusOverview(classInstanceId: string) {
+  return useQuery({
+    queryKey: ['syllabus-overview', classInstanceId],
+    queryFn: async (): Promise<SyllabusProgressOverview> => {
+      if (!classInstanceId) {
+        return {
+          overallProgress: 0,
+          totalSubjects: 0,
+          subjectBreakdown: [],
+        };
+      }
+
+      // Fetch all subjects for this class from timetable
+      const { data: timetableData } = await supabase
+        .from(DB.tables.timetableSlots)
+        .select('subject_id, subjects!inner(subject_name, id)')
+        .eq('class_instance_id', classInstanceId);
+
+      if (!timetableData || timetableData.length === 0) {
+        return {
+          overallProgress: 0,
+          totalSubjects: 0,
+          subjectBreakdown: [],
+        };
+      }
+
+      // Get unique subjects
+      const uniqueSubjects = new Map<string, any>();
+      timetableData.forEach((item: any) => {
+        if (item.subjects) {
+          uniqueSubjects.set(item.subjects.id, item.subjects);
+        }
+      });
+
+      const subjects = Array.from(uniqueSubjects.values());
+
+      // Fetch progress for each subject
+      const subjectProgress = await Promise.all(
+        subjects.map(async (subject: any) => {
+          // Fetch syllabus tree
+          const { data: syllabiData } = await supabase
+            .from('syllabi')
+            .select('id')
+            .eq('class_instance_id', classInstanceId)
+            .eq('subject_id', subject.id)
+            .maybeSingle();
+
+          if (!syllabiData?.id) {
+            return {
+              subjectId: subject.id,
+              subjectName: subject.subject_name,
+              progress: 0,
+              totalTopics: 0,
+              completedTopics: 0,
+            };
+          }
+
+          // Get topics for this syllabus
+          const { data: chapters } = await supabase
+            .from('syllabus_chapters')
+            .select('id')
+            .eq('syllabus_id', syllabiData.id);
+
+          const chapterIds = chapters?.map(c => c.id) || [];
+          
+          const { data: topics } = await supabase
+            .from('syllabus_topics')
+            .select('id')
+            .in('chapter_id', chapterIds);
+
+          const totalTopics = topics?.length || 0;
+
+          // Get completed topics from syllabus_progress
+          const { data: progressData } = await supabase
+            .from('syllabus_progress')
+            .select('syllabus_topic_id')
+            .eq('class_instance_id', classInstanceId)
+            .eq('subject_id', subject.id)
+            .not('syllabus_topic_id', 'is', null);
+
+          const completedTopics = new Set(
+            progressData?.map(p => p.syllabus_topic_id).filter(Boolean) || []
+          ).size;
+
+          const progress = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
+
+          return {
+            subjectId: subject.id,
+            subjectName: subject.subject_name,
+            progress,
+            totalTopics,
+            completedTopics,
+          };
+        })
+      );
+
+      // Calculate overall progress
+      const totalTopics = subjectProgress.reduce((sum, s) => sum + s.totalTopics, 0);
+      const completedTopics = subjectProgress.reduce((sum, s) => sum + s.completedTopics, 0);
+      const overallProgress = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
+
+      return {
+        overallProgress,
+        totalSubjects: subjects.length,
+        subjectBreakdown: subjectProgress,
+      };
+    },
+    enabled: !!classInstanceId,
     staleTime: 5 * 60 * 1000,
   });
 }

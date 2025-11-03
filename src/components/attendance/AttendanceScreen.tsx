@@ -1,26 +1,18 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Dimensions } from 'react-native';
-import { Text, Card, Button, SegmentedButtons, ActivityIndicator, Menu, Portal, Modal } from 'react-native-paper';
+import { Text, SegmentedButtons, ActivityIndicator } from 'react-native-paper';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { 
-  CheckSquare, 
   Users, 
   Calendar, 
   CheckCircle, 
   XCircle, 
-  AlertCircle, 
   Save, 
   ChevronDown,
-  Filter,
-  Clock,
-  X,
-  ChevronLeft,
-  ChevronRight,
   Circle
 } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClassSelection } from '../../contexts/ClassSelectionContext';
-import { ClassSelector } from '../ClassSelector';
 import { DatePickerModal } from '../common/DatePickerModal';
 import { useStudents } from '../../hooks/useStudents';
 import { useClasses } from '../../hooks/useClasses';
@@ -44,11 +36,10 @@ export const AttendanceScreen: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [attendanceData, setAttendanceData] = useState<StudentAttendanceData[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
-  const [classMenuVisible, setClassMenuVisible] = useState(false);
-  const [dateMenuVisible, setDateMenuVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState<'mark' | 'history'>('mark');
+  const [activeTab, setActiveTab] = useState<'mark' | 'history'>(
+    profile?.role === 'student' ? 'history' : 'mark'
+  );
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [tempDate, setTempDate] = useState<Date>(new Date());
   const [historyStartDate, setHistoryStartDate] = useState<Date>(() => {
     const date = new Date();
     date.setDate(date.getDate() - 30); // Default to last 30 days
@@ -318,30 +309,27 @@ export const AttendanceScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       {/* Tab Switcher */}
-      <View style={styles.tabContainer}>
-        <SegmentedButtons
-          value={activeTab}
-          onValueChange={(value) => setActiveTab(value as 'mark' | 'history')}
-          buttons={[
-            {
-              value: 'mark',
-              label: 'Mark Attendance',
-            },
-            {
-              value: 'history',
-              label: 'View History',
-            },
-          ]}
-          style={styles.tabSwitcher}
-        />
-      </View>
+      {!isStudent && (
+        <View style={styles.tabContainer}>
+          <SegmentedButtons
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value as 'mark' | 'history')}
+            buttons={[
+              { value: 'mark', label: 'Mark Attendance' },
+              { value: 'history', label: 'View History' },
+            ]}
+            style={styles.tabSwitcher}
+          />
+        </View>
+      )}
 
-      {/* Quick Filters Section - Shared between both tabs */}
-      <View style={styles.filterSection}>
-        {activeTab === 'mark' ? (
-          <>
-          {/* Mark Attendance Filters */}
-          <View style={styles.filterRow}>
+      {/* Quick Filters Section - Only shown for non-students */}
+      {!isStudent && (
+        <View style={styles.filterSection}>
+          {activeTab === 'mark' ? (
+            <>
+            {/* Mark Attendance Filters */}
+            <View style={styles.filterRow}>
             {/* Class Filter */}
             <TouchableOpacity
               style={styles.filterItem}
@@ -450,8 +438,9 @@ export const AttendanceScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
           </>
-        )}
-      </View>
+          )}
+        </View>
+      )}
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {activeTab === 'mark' ? (
@@ -587,83 +576,86 @@ export const AttendanceScreen: React.FC = () => {
         ) : (
           /* History Tab */
           <View style={styles.historyContainer}>
-            {!selectedClass ? (
-              <View style={styles.emptyContainer}>
-                <Users size={48} color={colors.text.tertiary} />
-                <Text style={styles.emptyText}>Please select a class to view attendance history</Text>
-              </View>
+            {isStudent ? (
+              <StudentAttendanceView />
             ) : (
-              <>
-
-                {/* Summary Stats */}
-                <View style={styles.historyStats}>
-                  <View style={styles.statCard}>
-                    <Text style={styles.statNumber}>{historyStats.total}</Text>
-                    <Text style={styles.statLabel}>Total Students</Text>
-                  </View>
-                  <View style={styles.statCard}>
-                    <Text style={[styles.statNumber, { color: colors.success[600] }]}>{historyStats.averageAttendance}%</Text>
-                    <Text style={styles.statLabel}>Avg Attendance</Text>
-                  </View>
-                  <View style={styles.statCard}>
-                    <Text style={[styles.statNumber, { color: colors.error[600] }]}>{historyStats.averageAbsent}%</Text>
-                    <Text style={styles.statLabel}>Avg Absent</Text>
-                  </View>
+              !selectedClass ? (
+                <View style={styles.emptyContainer}>
+                  <Users size={48} color={colors.text.tertiary} />
+                  <Text style={styles.emptyText}>Please select a class to view attendance history</Text>
                 </View>
-
-                {/* Date Range Display */}
-                <View style={styles.dateRangeContainer}>
-                  <Text style={styles.dateRangeText}>
-                    {historyStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {historyEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </Text>
-                </View>
-
-                {/* Attendance Summary List */}
-                <View style={styles.summaryContainer}>
-                  <Text style={styles.summaryTitle}>Student Summary</Text>
-                  {summaryLoading ? (
-                    <View style={styles.loadingContainer}>
-                      <ActivityIndicator size="large" color={colors.primary[600]} />
-                      <Text style={styles.loadingText}>Loading history...</Text>
+              ) : (
+                <>
+                  {/* Summary Stats */}
+                  <View style={styles.historyStats}>
+                    <View style={styles.statCard}>
+                      <Text style={styles.statNumber}>{historyStats.total}</Text>
+                      <Text style={styles.statLabel}>Total Students</Text>
                     </View>
-                  ) : attendanceSummary.length === 0 ? (
-                    <View style={styles.emptyState}>
-                      <Text style={styles.emptyStateText}>No attendance records found for this period</Text>
+                    <View style={styles.statCard}>
+                      <Text style={[styles.statNumber, { color: colors.success[600] }]}>{historyStats.averageAttendance}%</Text>
+                      <Text style={styles.statLabel}>Avg Attendance</Text>
                     </View>
-                  ) : (
-                    <View style={styles.summaryList}>
-                      {attendanceSummary.map((student) => (
-                        <View key={student.studentId} style={styles.summaryItem}>
-                          <View style={styles.summaryStudentInfo}>
-                            <Text style={styles.summaryStudentName}>{student.studentName}</Text>
-                            <Text style={styles.studentCode}>{student.studentCode}</Text>
-                          </View>
-                          <View style={styles.summaryStats}>
-                            <Text style={styles.summaryStatText}>
-                              {student.presentDays} / {student.totalDays} ({student.percentage.toFixed(0)}%)
-                            </Text>
-                            <View style={[
-                              styles.summaryStatus,
-                              student.percentage >= 75 ? styles.summaryStatusPresent :
-                              student.percentage >= 50 ? styles.summaryStatusUnmarked :
-                              styles.summaryStatusAbsent
-                            ]}>
-                              <Text style={[
-                                styles.summaryStatusText,
-                                student.percentage >= 75 ? styles.summaryStatusTextPresent :
-                                student.percentage >= 50 ? styles.summaryStatusTextUnmarked :
-                                styles.summaryStatusTextAbsent
-                              ]}>
-                                {student.percentage >= 75 ? 'Good' : student.percentage >= 50 ? 'Fair' : 'Low'}
+                    <View style={styles.statCard}>
+                      <Text style={[styles.statNumber, { color: colors.error[600] }]}>{historyStats.averageAbsent}%</Text>
+                      <Text style={styles.statLabel}>Avg Absent</Text>
+                    </View>
+                  </View>
+
+                  {/* Date Range Display */}
+                  <View style={styles.dateRangeContainer}>
+                    <Text style={styles.dateRangeText}>
+                      {historyStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {historyEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </Text>
+                  </View>
+
+                  {/* Attendance Summary List */}
+                  <View style={styles.summaryContainer}>
+                    <Text style={styles.summaryTitle}>Student Summary</Text>
+                    {summaryLoading ? (
+                      <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color={colors.primary[600]} />
+                        <Text style={styles.loadingText}>Loading history...</Text>
+                      </View>
+                    ) : attendanceSummary.length === 0 ? (
+                      <View style={styles.emptyState}>
+                        <Text style={styles.emptyStateText}>No attendance records found for this period</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.summaryList}>
+                        {attendanceSummary.map((student) => (
+                          <View key={student.studentId} style={styles.summaryItem}>
+                            <View style={styles.summaryStudentInfo}>
+                              <Text style={styles.summaryStudentName}>{student.studentName}</Text>
+                              <Text style={styles.studentCode}>{student.studentCode}</Text>
+                            </View>
+                            <View style={styles.summaryStats}>
+                              <Text style={styles.summaryStatText}>
+                                {student.presentDays} / {student.totalDays} ({student.percentage.toFixed(0)}%)
                               </Text>
+                              <View style={[
+                                styles.summaryStatus,
+                                student.percentage >= 75 ? styles.summaryStatusPresent :
+                                student.percentage >= 50 ? styles.summaryStatusUnmarked :
+                                styles.summaryStatusAbsent
+                              ]}>
+                                <Text style={[
+                                  styles.summaryStatusText,
+                                  student.percentage >= 75 ? styles.summaryStatusTextPresent :
+                                  student.percentage >= 50 ? styles.summaryStatusTextUnmarked :
+                                  styles.summaryStatusTextAbsent
+                                ]}>
+                                  {student.percentage >= 75 ? 'Good' : student.percentage >= 50 ? 'Fair' : 'Low'}
+                                </Text>
+                              </View>
                             </View>
                           </View>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </View>
-              </>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                </>
+              )
             )}
           </View>
         )}

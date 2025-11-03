@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
-import { Text, Surface } from 'react-native-paper';
-import { ChevronRight, Users, DollarSign, Target, Calendar } from 'lucide-react-native';
+import { Text } from 'react-native-paper';
+import { ChevronRight } from 'lucide-react-native';
 import { colors, typography, spacing, borderRadius, shadows } from '../../../../lib/design-system';
 import { AnalyticsFeature } from '../types';
 

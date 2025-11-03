@@ -5,7 +5,6 @@ import { colors, typography, spacing, borderRadius } from '../../../../../lib/de
 import { SuperAdminAnalytics, TimePeriod } from '../../types';
 import { TimePeriodFilter } from '../../shared/TimePeriodFilter';
 import { MetricCard } from '../../shared/MetricCard';
-import { ComparisonChart } from '../../shared/ComparisonChart';
 
 interface LearningDetailViewProps {
   data: SuperAdminAnalytics;

@@ -5,6 +5,5 @@ export * from './TestList';
 export * from './CreateTestForm';
 export * from './QuestionBuilderScreen';
 export * from './OfflineMarksUploadScreen';
-export * from './ImportQuestionsModal';
 export * from './TestTakingScreen';
 export * from './TestResultsScreen';

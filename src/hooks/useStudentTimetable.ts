@@ -9,14 +9,15 @@ export interface StudentTimetableResult {
   loading: boolean;
   error: Error | null;
   refetch: () => void;
+  taughtSlotIds: Set<string>;
 }
 
 export function useStudentTimetable(classInstanceId?: string, dateStr?: string): StudentTimetableResult {
-  const { data: slots, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery<{ slots: TimetableSlot[]; taughtSlotIds: Set<string> }>({
     queryKey: ['studentTimetable', classInstanceId, dateStr],
     queryFn: async ({ signal }) => {
-      if (!classInstanceId || !dateStr) return [];
-      
+      if (!classInstanceId || !dateStr) return { slots: [], taughtSlotIds: new Set<string>() };
+
       // Fetch timetable slots for the selected date
       const { data: slotsData, error: slotsError } = await supabase
         .from('timetable_slots')
@@ -30,7 +31,9 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
           end_time,
           subject_id,
           teacher_id,
-          plan_text
+          plan_text,
+          syllabus_chapter_id,
+          syllabus_topic_id
         `)
         .eq('class_instance_id', classInstanceId)
         .eq('class_date', dateStr)
@@ -38,7 +41,7 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
         .abortSignal(signal);
 
       if (slotsError) throw slotsError;
-      if (!slotsData || slotsData.length === 0) return [];
+      if (!slotsData || slotsData.length === 0) return { slots: [], taughtSlotIds: new Set<string>() };
 
       // Get unique subject and teacher IDs
       const subjectIds = [...new Set(slotsData.map(slot => slot.subject_id).filter(Boolean))];
@@ -61,6 +64,21 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
       const subjectsMap = new Map((subjectsResult.data || []).map(s => [s.id, s]));
       const teachersMap = new Map((teachersResult.data || []).map(t => [t.id, t]));
 
+      // Get taught slot IDs from syllabus_progress table
+      const { data: progressData, error: progressError } = await supabase
+        .from('syllabus_progress')
+        .select('timetable_slot_id')
+        .eq('class_instance_id', classInstanceId)
+        .eq('date', dateStr)
+        .abortSignal(signal);
+
+      if (progressError) {
+        // Don't throw, just log - taught status is optional
+        console.warn('Error fetching taught slots:', progressError);
+      }
+
+      const taughtSlotIds = new Set((progressData || []).map(p => p.timetable_slot_id).filter(Boolean));
+
       // Combine slots with subject and teacher data
       const enrichedSlots = slotsData.map(slot => ({
         ...slot,
@@ -68,7 +86,7 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
         teacher: slot.teacher_id ? teachersMap.get(slot.teacher_id) : null,
       }));
 
-      return enrichedSlots as TimetableSlot[];
+      return { slots: enrichedSlots as TimetableSlot[], taughtSlotIds };
     },
     enabled: !!classInstanceId && !!dateStr,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -81,15 +99,16 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
 
   // Compute displayPeriodNumber counting only period slots
   const displayPeriodNumber = useMemo(() => {
-    if (!slots) return 0;
-    return slots.filter(slot => slot.slot_type === 'period').length;
-  }, [slots]);
+    if (!data?.slots) return 0;
+    return data.slots.filter(slot => slot.slot_type === 'period').length;
+  }, [data?.slots]);
 
   return {
-    slots: slots || [],
+    slots: data?.slots || [],
     displayPeriodNumber,
     loading: isLoading,
     error: error as Error | null,
     refetch,
+    taughtSlotIds: data?.taughtSlotIds || new Set<string>(),
   };
 }

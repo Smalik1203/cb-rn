@@ -1,7 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text, Surface } from 'react-native-paper';
-import { colors, typography, spacing, borderRadius } from '../../../../../lib/design-system';
+import { colors } from '../../../../../lib/design-system';
 import { SuperAdminAnalytics, TimePeriod } from '../../types';
 import { TimePeriodFilter, MetricCard, ComparisonChart } from '../../shared';
 

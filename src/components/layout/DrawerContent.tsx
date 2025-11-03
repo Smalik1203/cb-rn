@@ -108,9 +108,18 @@ const MENU: MenuItem[] = [
     label: 'Attendance', 
     icon: UserCheck, 
     route: '/(tabs)/attendance', 
-    roles: ['admin', 'superadmin', 'cb_admin'], 
+    roles: ['admin', 'superadmin', 'cb_admin', 'student'], 
     section: 'Academic',
     description: 'Track student attendance'
+  },
+  { 
+    key: 'fees_student', 
+    label: 'Fees', 
+    icon: CreditCard, 
+    route: '/(tabs)/fees-student', 
+    roles: ['student'], 
+    section: 'Academic',
+    description: 'Your fees'
   },
   {
     key: 'assessments',
@@ -156,7 +165,7 @@ const MENU: MenuItem[] = [
     label: 'Analytics', 
     icon: LineChart, 
     route: '/(tabs)/analytics', 
-    roles: ['admin', 'superadmin', 'cb_admin'], 
+    roles: ['admin', 'superadmin', 'cb_admin', 'student'], 
     section: 'Academic',
     description: 'Performance insights'
   },

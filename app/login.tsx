@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../src/lib/supabase';
 import { useAuth } from '../src/contexts/AuthContext';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react-native';
-import { colors, typography, spacing, borderRadius, shadows } from '../lib/design-system';
+import { typography, spacing, borderRadius, shadows } from '../lib/design-system';
 import { isRateLimited, getRemainingAttempts, getResetTime, clearRateLimit } from '../src/utils/rateLimiter';
 import { sanitizeEmail } from '../src/utils/sanitize';
 import { LinearGradient } from 'expo-linear-gradient';

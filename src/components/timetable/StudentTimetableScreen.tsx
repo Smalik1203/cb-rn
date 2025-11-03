@@ -1,59 +1,159 @@
 import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Text, Card, Button, ActivityIndicator, Chip } from 'react-native-paper';
-import { Calendar, Clock, ChevronLeft, ChevronRight, BookOpen, User } from 'lucide-react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Text as RNText, RefreshControl } from 'react-native';
+import { Text, Button, ActivityIndicator } from 'react-native-paper';
+import { Calendar, Clock, ListTodo, Coffee } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useStudentTimetable } from '../../hooks/useStudentTimetable';
+import { useSyllabusLoader } from '../../hooks/useSyllabusLoader';
 import { colors, typography, spacing, borderRadius, shadows } from '../../../lib/design-system';
 import dayjs from 'dayjs';
+import { DatePickerModal } from '../common/DatePickerModal';
+import { ThreeStateView } from '../common/ThreeStateView';
+
+// Clean Timetable Card Component (replicated from superadmin)
+function CleanTimetableCard({
+  slot,
+  formatTime12Hour,
+  isCurrentPeriod,
+  isUpcomingPeriod,
+  isPastPeriod,
+  isTaught,
+  syllabusContentMap,
+}: any) {
+  if (slot.slot_type === 'break') {
+    return (
+      <View style={styles.cleanBreakCard}>
+        <View style={styles.cleanBreakContent}>
+          <View style={styles.cleanBreakIcon}>
+            <Coffee size={18} color="#a16207" />
+          </View>
+          <View style={styles.cleanBreakText}>
+            <Text style={styles.cleanBreakTitle}>{slot.name || 'Break'}</Text>
+            <Text style={styles.cleanBreakTime}>
+              {formatTime12Hour(slot.start_time)} - {formatTime12Hour(slot.end_time)}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[
+      styles.cleanPeriodCard,
+      isCurrentPeriod && styles.cleanCurrentCard,
+      isUpcomingPeriod && styles.cleanUpcomingCard,
+      isPastPeriod && styles.cleanPastCard,
+      isTaught ? styles.cleanCompletedCard : styles.cleanPendingCard
+    ]}>
+      <View style={styles.cleanPeriodLeftBorder} />
+      
+      <View style={styles.cleanPeriodContent}>
+        {/* Line 1: Time + Subject */}
+        <View style={styles.cleanPeriodHeader}>
+          <View style={styles.cleanContentColumn}>
+            <RNText style={[styles.cleanTimeText, isTaught && styles.completedText]}>
+              {`${formatTime12Hour(slot?.start_time)} - ${formatTime12Hour(slot?.end_time)}`}
+            </RNText>
+            <RNText style={[styles.cleanSubjectName, isTaught && styles.completedText]} numberOfLines={2} ellipsizeMode="tail">
+              {slot.subject?.subject_name?.trim?.() || 'Unassigned'}
+            </RNText>
+          </View>
+        </View>
+
+        {/* Lines 2 & 3: Topic and Teacher */}
+        <View style={styles.cleanLines}>
+          <RNText style={[styles.cleanLineText, isTaught && styles.completedText]} numberOfLines={1}>
+            <RNText style={[styles.cleanLabel, isTaught && styles.completedLabel]}>Topic: </RNText>
+            {(() => {
+              // Get topic name from syllabus content map (same as superadmin)
+              const topicContent = slot.syllabus_topic_id ? syllabusContentMap?.get(`topic_${slot.syllabus_topic_id}`) : null;
+              return topicContent?.title?.trim() || slot.plan_text?.trim() || '—';
+            })()}
+          </RNText>
+          <RNText style={[styles.cleanLineText, isTaught && styles.completedText]} numberOfLines={1}>
+            <RNText style={[styles.cleanLabel, isTaught && styles.completedLabel]}>Teacher: </RNText>
+            {slot.teacher?.full_name?.trim?.() || '—'}
+          </RNText>
+        </View>
+      </View>
+    </View>
+  );
+}
 
 export function StudentTimetableScreen() {
   const { profile } = useAuth();
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   
   const dateStr = dayjs(selectedDate).format('YYYY-MM-DD');
-  const { slots, displayPeriodNumber, loading, error, refetch } = useStudentTimetable(
+  const { slots, displayPeriodNumber, loading, error, refetch, taughtSlotIds } = useStudentTimetable(
     profile?.class_instance_id,
     dateStr
   );
+  
+  // Load syllabus data for topic names (same as superadmin)
+  const { syllabusContentMap } = useSyllabusLoader(profile?.class_instance_id, profile?.school_code);
 
-  // Navigation functions
-  const goToPreviousDay = () => {
-    setSelectedDate(prev => dayjs(prev).subtract(1, 'day').toDate());
+  // Time formatter
+  const formatTime12Hour = (time24?: string | null) => {
+    if (!time24 || typeof time24 !== 'string') {
+      return '--:--';
+    }
+    const parts = time24.split(':');
+    if (parts.length < 2) return time24;
+    const hour = parseInt(parts[0], 10);
+    const minutes = parts[1];
+    if (Number.isNaN(hour)) return `${parts[0]}:${minutes}`;
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minutes} ${ampm}`;
   };
 
-  const goToNextDay = () => {
-    setSelectedDate(prev => dayjs(prev).add(1, 'day').toDate());
+  // Helper function to get current time in HH:MM format
+  const getCurrentTime = () => {
+    const now = new Date();
+    return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
   };
 
-  const goToToday = () => {
-    setSelectedDate(new Date());
+  // Helper function to determine if a period is currently active
+  const isCurrentPeriod = (slot: any) => {
+    if (!slot || slot.slot_type !== 'period') return false;
+    const currentTime = getCurrentTime();
+    return currentTime >= slot.start_time && currentTime <= slot.end_time;
   };
 
-  // Group slots by time for display
-  const groupedSlots = useMemo(() => {
-    if (!slots) return [];
-    
-    return slots.map((slot, index) => {
-      const isPeriod = slot.slot_type === 'period';
-      const periodNumber = isPeriod ? 
-        slots.slice(0, index + 1).filter(s => s.slot_type === 'period').length : 
-        null;
+  // Helper function to determine if a period is upcoming today
+  const isUpcomingPeriod = (slot: any) => {
+    if (!slot || slot.slot_type !== 'period') return false;
+    const currentTime = getCurrentTime();
+    return slot.start_time > currentTime;
+  };
 
-      return {
-        ...slot,
-        displayPeriodNumber: periodNumber,
-      };
-    });
-  }, [slots]);
+  // Helper function to determine if a period is completed
+  const isCompletedPeriod = (slot: any) => {
+    if (!slot || slot.slot_type !== 'period') return false;
+    const currentTime = getCurrentTime();
+    return slot.end_time < currentTime;
+  };
+
+  // Handle pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } catch (error) {
+      // Handle error silently
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Handle loading state
   if (loading) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Daily Schedule</Text>
-        </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary[600]} />
           <Text style={styles.loadingText}>Loading timetable...</Text>
@@ -66,9 +166,6 @@ export function StudentTimetableScreen() {
   if (error) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Daily Schedule</Text>
-        </View>
         <View style={styles.errorContainer}>
           <Text style={styles.errorTitle}>Failed to load timetable</Text>
           <Text style={styles.errorMessage}>{error.message}</Text>
@@ -80,13 +177,10 @@ export function StudentTimetableScreen() {
     );
   }
 
-  // Handle empty state
+  // Handle empty state - no class assigned
   if (!profile?.class_instance_id) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Daily Schedule</Text>
-        </View>
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyTitle}>No class assigned</Text>
           <Text style={styles.emptyMessage}>
@@ -97,125 +191,101 @@ export function StudentTimetableScreen() {
     );
   }
 
+  // Handle empty state - no slots for selected date
   if (slots.length === 0) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Daily Schedule</Text>
+        {/* Filter bar (Date only) */}
+        <View style={styles.filterBar}>
+          <TouchableOpacity style={styles.filterItem} onPress={() => setShowDatePicker(true)}>
+            <View style={styles.filterIcon}>
+              <ListTodo size={16} color="#ffffff" />
+            </View>
+            <View style={styles.filterContent}>
+              <Text style={styles.filterLabel}>Date</Text>
+              <Text style={styles.filterValue}>{dayjs(selectedDate).format('MMM YYYY')}</Text>
+            </View>
+          </TouchableOpacity>
         </View>
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyTitle}>No classes scheduled</Text>
-          <Text style={styles.emptyMessage}>
-            No classes are scheduled for {dayjs(selectedDate).format('MMMM D, YYYY')}.
-          </Text>
-        </View>
+
+        <ThreeStateView
+          state="empty"
+          emptyMessage={`No classes scheduled for ${dayjs(selectedDate).format('MMMM D, YYYY')}`}
+          emptyAction={{ label: 'Change Date', onPress: () => setShowDatePicker(true) }}
+        />
+        <DatePickerModal
+          visible={showDatePicker}
+          initialDate={selectedDate}
+          onDismiss={() => setShowDatePicker(false)}
+          onConfirm={(date) => {
+            setSelectedDate(date);
+            setShowDatePicker(false);
+          }}
+        />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Primary Header */}
-      <View style={styles.primaryHeader}>
-        <Text style={styles.primaryTitle}>My Schedule</Text>
-        <Text style={styles.contextSubtitle}>
-          {dayjs(selectedDate).format('MMMM D, YYYY')}
-        </Text>
-      </View>
-
-      {/* Date Navigation */}
-      <View style={styles.dateNavigation}>
-        <TouchableOpacity 
-          onPress={goToPreviousDay} 
-          style={styles.dateNavButton}
-          activeOpacity={0.7}
-        >
-          <ChevronLeft size={20} color={colors.text.primary} />
-        </TouchableOpacity>
-        
-        <View style={styles.dateDisplay}>
-          <Text style={styles.dateText}>
-            {dayjs(selectedDate).format('MMM D')}
-          </Text>
-          <TouchableOpacity 
-            onPress={goToToday} 
-            style={styles.todayChip}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.todayChipText}>Today</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <TouchableOpacity 
-          onPress={goToNextDay} 
-          style={styles.dateNavButton}
-          activeOpacity={0.7}
-        >
-          <ChevronRight size={20} color={colors.text.primary} />
+      {/* Filter bar (Date only) */}
+      <View style={styles.filterBar}>
+        <TouchableOpacity style={styles.filterItem} onPress={() => setShowDatePicker(true)}>
+          <View style={styles.filterIcon}>
+            <ListTodo size={16} color="#ffffff" />
+          </View>
+          <View style={styles.filterContent}>
+            <Text style={styles.filterLabel}>Date</Text>
+            <Text style={styles.filterValue}>{dayjs(selectedDate).format('MMM YYYY')}</Text>
+          </View>
         </TouchableOpacity>
       </View>
 
       {/* Timetable */}
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.slotsContainer}>
-          {groupedSlots.map((slot, index) => (
-            <Card 
-              key={slot.id} 
-              style={[
-                styles.slotCard,
-                slot.slot_type === 'period' ? styles.periodCard : styles.breakCard
-              ]}
-              elevation={2}
-            >
-              <Card.Content style={styles.slotContent}>
-                <View style={styles.slotHeader}>
-                  <View style={styles.slotTimeContainer}>
-                    <Clock size={16} color={colors.text.secondary} />
-                    <Text style={styles.slotTime}>
-                      {slot.start_time} - {slot.end_time}
-                    </Text>
-                    {slot.slot_type === 'period' && (
-                      <View style={styles.periodBadge}>
-                        <Text style={styles.periodBadgeText}>
-                          Period {slot.displayPeriodNumber}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-
-                {slot.slot_type === 'period' ? (
-                  <View style={styles.periodContent}>
-                    <Text style={styles.subjectTitle} numberOfLines={2} ellipsizeMode="tail">
-                      {slot.subject?.subject_name || 'Unknown Subject'}
-                    </Text>
-                    
-                    <View style={styles.detailRow}>
-                      <User size={14} color={colors.text.tertiary} />
-                      <Text style={styles.teacherName} numberOfLines={1} ellipsizeMode="tail">
-                        {slot.teacher?.full_name || 'Unknown Teacher'}
-                      </Text>
-                    </View>
-
-                    {slot.plan_text && (
-                      <View style={styles.detailRow}>
-                        <BookOpen size={14} color={colors.text.tertiary} />
-                        <Text style={styles.planText} numberOfLines={3} ellipsizeMode="tail">
-                          {slot.plan_text}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                ) : (
-                  <View style={styles.breakContent}>
-                    <Text style={styles.breakTitle}>{slot.name || 'Break'}</Text>
-                  </View>
-                )}
-              </Card.Content>
-            </Card>
-          ))}
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#8b5cf6']}
+            tintColor="#8b5cf6"
+          />
+        }
+      >
+        <View style={styles.timetableContentContainer}>
+          <View style={styles.cleanTimetableGrid}>
+            {slots.map((slot, index) => {
+              const isTaught = taughtSlotIds.has(slot.id);
+              return (
+                <CleanTimetableCard
+                  key={slot.id}
+                  slot={slot}
+                  index={index}
+                  formatTime12Hour={formatTime12Hour}
+                  isCurrentPeriod={isCurrentPeriod(slot)}
+                  isUpcomingPeriod={isUpcomingPeriod(slot)}
+                  isPastPeriod={isCompletedPeriod(slot)}
+                  isTaught={isTaught}
+                  syllabusContentMap={syllabusContentMap}
+                />
+              );
+            })}
+          </View>
         </View>
       </ScrollView>
+
+      <DatePickerModal
+        visible={showDatePicker}
+        initialDate={selectedDate}
+        onDismiss={() => setShowDatePicker(false)}
+        onConfirm={(date) => {
+          setSelectedDate(date);
+          setShowDatePicker(false);
+        }}
+      />
     </View>
   );
 }
@@ -225,158 +295,204 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background.app,
   },
-  header: {
-    backgroundColor: colors.primary[600],
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-    paddingTop: spacing.xl,
-  },
-  headerTitle: {
-    fontSize: typography.fontSize['3xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.inverse,
-    lineHeight: typography.lineHeight.tight,
-  },
-  headerSubtitle: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.normal,
-    color: colors.text.inverse,
-    opacity: 0.9,
-    marginTop: spacing.xs,
-    lineHeight: typography.lineHeight.normal,
-  },
-  dateNavigation: {
+  // Filter bar styles (matching superadmin)
+  filterBar: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    backgroundColor: colors.background.secondary,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    backgroundColor: colors.surface.primary,
     borderBottomWidth: 1,
     borderBottomColor: colors.border.light,
+    gap: spacing.md,
   },
-  navButton: {
-    padding: spacing.sm,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.background.app,
-  },
-  todayButton: {
-    paddingHorizontal: spacing.lg,
+  filterItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.primary[600],
+    gap: spacing.sm,
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border.light,
   },
-  todayButtonText: {
-    fontSize: typography.fontSize.sm,
+  filterIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.primary[600],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterContent: { flex: 1 },
+  filterLabel: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.normal,
+    color: colors.text.secondary,
+    marginBottom: 2,
+  },
+  filterValue: {
+    fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.text.inverse,
-    lineHeight: typography.lineHeight.normal,
+    color: colors.text.primary,
   },
   scrollView: {
     flex: 1,
   },
-  slotsContainer: {
-    padding: spacing.lg,
+  scrollContent: {
+    paddingBottom: 16,
   },
-  slotCard: {
-    marginBottom: spacing.md,
+  timetableContentContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  cleanTimetableGrid: {
+    gap: 8,
+  },
+  // Clean UI Styles (matching superadmin)
+  cleanPeriodCard: {
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.lg,
     ...shadows.sm,
+    flexDirection: 'row',
+    minHeight: 96,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.neutral[300], // Default, will be overridden by pending/completed
+    marginHorizontal: spacing.sm,
+    marginBottom: spacing.sm,
+    padding: spacing.md,
   },
-  slotContent: {
-    padding: spacing.lg,
+  cleanCurrentCard: {
+    borderWidth: 2,
+    borderColor: colors.success[600],
+    ...shadows.md,
   },
-  slotHeader: {
+  cleanUpcomingCard: {
+    borderWidth: 1,
+    borderColor: colors.info[600],
+  },
+  cleanPastCard: {
+    opacity: 0.85,
+  },
+  cleanCompletedCard: {
+    borderLeftColor: colors.secondary[600], // Secondary color for completed (matches superadmin)
+    backgroundColor: colors.secondary[50], // Light secondary background (matches superadmin)
+    borderLeftWidth: 4,
+    opacity: 0.7, // Grey out effect for completed cards
+  },
+  cleanPendingCard: {
+    borderLeftColor: colors.primary[600], // Primary orange for pending
+    backgroundColor: colors.surface.primary, // White background
+    borderLeftWidth: 4,
+  },
+  cleanPeriodLeftBorder: {
+    width: 4,
+    backgroundColor: 'transparent', // Will be overridden by card status colors
+  },
+  cleanPeriodContent: {
+    flex: 1,
+    padding: spacing.sm,
+    paddingBottom: spacing.sm,
+    minWidth: 0,
+  },
+  cleanPeriodHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.sm,
+    width: '100%',
+  },
+  cleanContentColumn: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    marginRight: spacing.sm,
+    minWidth: 0,
+  },
+  cleanTimeText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.secondary,
+    lineHeight: 18,
+    marginBottom: spacing.sm,
+    width: '100%',
+  },
+  cleanSubjectName: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    lineHeight: 24,
+    width: '100%',
+    flexWrap: 'wrap',
+    overflow: 'hidden',
+    marginBottom: 6,
+    // No paddingRight needed for students (no edit button)
+  },
+  cleanLines: {
+    marginTop: spacing.sm,
+    gap: 4,
+  },
+  cleanLabel: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.tertiary,
+    textTransform: 'uppercase',
+    letterSpacing: typography.letterSpacing.wide,
+  },
+  cleanLineText: {
+    fontSize: typography.fontSize.base,
+    color: colors.text.primary,
+    lineHeight: 20,
+  },
+  completedText: {
+    color: colors.text.tertiary, // Very muted grey text for completed cards
+    opacity: 0.6, // Strong opacity reduction for text
+  },
+  completedLabel: {
+    color: colors.text.tertiary, // Muted for labels
+    opacity: 0.5,
+  },
+  cleanBreakCard: {
+    backgroundColor: colors.warning[50],
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    ...shadows.xs,
+    minHeight: 96,
+    opacity: 0.9,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.warning[700],
+    marginHorizontal: spacing.sm,
     marginBottom: spacing.sm,
   },
-  slotTimeContainer: {
+  cleanBreakContent: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  slotTime: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.secondary,
-    marginLeft: spacing.xs,
-    lineHeight: typography.lineHeight.normal,
-  },
-  periodChip: {
-    backgroundColor: colors.primary[100],
-    borderColor: colors.primary[600],
-  },
-  periodChipText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.primary[600],
-    lineHeight: typography.lineHeight.normal,
-  },
-  periodContent: {
-    gap: spacing.sm,
     flex: 1,
-    minWidth: 0,
   },
-  subjectRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  cleanBreakIcon: {
+    marginRight: 12,
   },
-  subjectText: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    marginLeft: spacing.sm,
-    lineHeight: typography.lineHeight.tight,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.xs,
+  cleanBreakText: {
     flex: 1,
-    minWidth: 0,
   },
-  teacherRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  teacherText: {
+  cleanBreakTitle: {
     fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.normal,
-    color: colors.text.secondary,
-    marginLeft: spacing.sm,
-    lineHeight: typography.lineHeight.normal,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.warning[800],
+    marginBottom: 2,
   },
-  planContainer: {
-    marginTop: spacing.sm,
-    padding: spacing.sm,
-    backgroundColor: colors.background.tertiary,
-    borderRadius: borderRadius.sm,
-  },
-  planLabel: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.secondary,
-    marginBottom: spacing.xs,
-    lineHeight: typography.lineHeight.normal,
-  },
-  planText: {
+  cleanBreakTime: {
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.normal,
-    color: colors.text.primary,
-    lineHeight: typography.lineHeight.normal,
-    flexShrink: 1,
-    flexWrap: 'wrap',
+    fontWeight: typography.fontWeight.medium,
+    color: colors.warning[700],
   },
-  breakContent: {
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-  },
-  breakText: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.secondary,
-    lineHeight: typography.lineHeight.tight,
-  },
+  // Loading States
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -390,6 +506,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     lineHeight: typography.lineHeight.normal,
   },
+  // Error States
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -414,6 +531,7 @@ const styles = StyleSheet.create({
   retryButton: {
     backgroundColor: colors.primary[600],
   },
+  // Empty States
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -433,106 +551,5 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: typography.lineHeight.normal,
-  },
-  // New improved styles
-  primaryHeader: {
-    backgroundColor: colors.surface.primary,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-    paddingTop: spacing.xl,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-    ...shadows.sm,
-  },
-  primaryTitle: {
-    fontSize: typography.fontSize['4xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-    lineHeight: typography.lineHeight.tight,
-  },
-  contextSubtitle: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.secondary,
-    lineHeight: typography.lineHeight.normal,
-  },
-  dateNavButton: {
-    padding: spacing.sm,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.background.app,
-    ...shadows.xs,
-  },
-  dateDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  dateText: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    lineHeight: typography.lineHeight.tight,
-  },
-  todayChip: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.primary[50],
-    borderWidth: 1,
-    borderColor: colors.primary[200],
-  },
-  todayChipText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.primary[600],
-    lineHeight: typography.lineHeight.normal,
-  },
-  periodCard: {
-    backgroundColor: colors.primary[50],
-    borderLeftWidth: 4,
-    borderLeftColor: colors.primary[600],
-  },
-  breakCard: {
-    backgroundColor: colors.neutral[50],
-    borderLeftWidth: 4,
-    borderLeftColor: colors.neutral[300],
-  },
-  periodBadge: {
-    backgroundColor: colors.primary[600],
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.full,
-    marginLeft: spacing.sm,
-  },
-  periodBadgeText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.inverse,
-    lineHeight: typography.lineHeight.normal,
-  },
-  subjectTitle: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-    lineHeight: typography.lineHeight.tight,
-    flexShrink: 1,
-    flexWrap: 'wrap',
-  },
-  teacherName: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.secondary,
-    lineHeight: typography.lineHeight.normal,
-    flexShrink: 1,
-    flexWrap: 'wrap',
-  },
-  breakTitle: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.secondary,
-    fontStyle: 'italic',
-    lineHeight: typography.lineHeight.tight,
   },
 });

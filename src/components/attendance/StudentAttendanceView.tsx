@@ -104,10 +104,12 @@ export const StudentAttendanceView: React.FC = () => {
   const monthStats = useMemo(() => {
     const startOfMonth = dayjs(selectedMonth).startOf('month');
     const endOfMonth = dayjs(selectedMonth).endOf('month');
+    const startDateStr = startOfMonth.format('YYYY-MM-DD');
+    const endDateStr = endOfMonth.format('YYYY-MM-DD');
     
     const monthRecords = attendanceRecords.filter(record => {
-      const recordDate = dayjs(record.date);
-      return recordDate.isAfter(startOfMonth.subtract(1, 'day')) && recordDate.isBefore(endOfMonth.add(1, 'day'));
+      // Use string comparison for reliable date filtering
+      return record.date >= startDateStr && record.date <= endDateStr;
     });
 
     const present = monthRecords.filter(r => r.status === 'present').length;
@@ -480,13 +482,14 @@ export const StudentAttendanceView: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.app,
+    backgroundColor: colors.background.secondary,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
     paddingBottom: spacing.xl,
   },
   statsSection: {
