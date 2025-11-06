@@ -10,9 +10,10 @@ import { colors, spacing, typography, borderRadius, shadows } from '../../../lib
 interface StudentTestCardProps {
   test: TestWithDetails;
   attempt?: TestAttempt;
+  mark?: { marks_obtained: number; max_marks: number; remarks?: string | null; test_mode?: string };
 }
 
-export function StudentTestCard({ test, attempt }: StudentTestCardProps) {
+export function StudentTestCard({ test, attempt, mark }: StudentTestCardProps) {
   const router = useRouter();
 
   const getTestStatus = () => {
@@ -115,9 +116,21 @@ export function StudentTestCard({ test, attempt }: StudentTestCardProps) {
   const canTakeTest = isTestAvailable();
 
   const getScoreDisplay = () => {
-    if (status === 'completed' && attempt) {
+    // For online tests, use attempt data
+    if (test.test_mode === 'online' && status === 'completed' && attempt) {
       const score = attempt.earned_points || 0;
       const total = attempt.total_points || 0;
+      const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
+      return {
+        score,
+        total,
+        percentage,
+      };
+    }
+    // For offline tests, use marks data
+    if (test.test_mode === 'offline' && mark) {
+      const score = mark.marks_obtained || 0;
+      const total = mark.max_marks || 0;
       const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
       return {
         score,
@@ -270,10 +283,21 @@ export function StudentTestCard({ test, attempt }: StudentTestCardProps) {
           )
         ) : (
           <View style={styles.offlineNotice}>
-            <AlertCircle size={16} color={colors.text.secondary} />
-            <Text style={styles.offlineText}>
-              This is an offline test. Your teacher will upload marks after evaluation.
-            </Text>
+            {mark ? (
+              <>
+                <CheckCircle size={16} color={colors.success[600]} />
+                <Text style={styles.offlineText}>
+                  Marks have been uploaded. Check your score above.
+                </Text>
+              </>
+            ) : (
+              <>
+                <AlertCircle size={16} color={colors.text.secondary} />
+                <Text style={styles.offlineText}>
+                  This is an offline test. Your teacher will upload marks after evaluation.
+                </Text>
+              </>
+            )}
           </View>
         )}
       </View>

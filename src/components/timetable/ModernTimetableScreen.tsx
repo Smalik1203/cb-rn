@@ -2129,8 +2129,8 @@ const styles = StyleSheet.create({
     opacity: 0.85, // Increased from 0.7 for better readability
   },
   cleanCompletedCard: {
-    borderLeftColor: colors.secondary[600], // Secondary color for completed
-    backgroundColor: colors.secondary[50], // Light secondary background
+    borderLeftColor: colors.success[600], // ✅ GREEN for completed (taught)
+    backgroundColor: colors.success[50], // ✅ Light green background
     borderLeftWidth: 4,
   },
   cleanPendingCard: {

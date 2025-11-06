@@ -17,6 +17,7 @@ interface TestListProps {
   showActions?: boolean;
   isStudentView?: boolean;
   studentAttempts?: TestAttempt[];
+  studentMarks?: Record<string, { marks_obtained: number; max_marks: number; remarks?: string | null; test_mode?: string }>;
 }
 
 export function TestList({
@@ -30,6 +31,7 @@ export function TestList({
   showActions = true,
   isStudentView = false,
   studentAttempts = [],
+  studentMarks = {},
 }: TestListProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -71,7 +73,8 @@ export function TestList({
   const renderTestCard = (item: any) => {
     if (isStudentView) {
       const attempt = studentAttempts.find((a) => a.test_id === item.id);
-      return <StudentTestCard test={item} attempt={attempt} />;
+      const mark = studentMarks[item.id];
+      return <StudentTestCard test={item} attempt={attempt} mark={mark} />;
     }
 
     return (

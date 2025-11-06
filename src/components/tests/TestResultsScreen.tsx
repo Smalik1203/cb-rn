@@ -225,45 +225,55 @@ export function TestResultsScreen() {
                 <Text style={styles.questionText}>{question.question_text}</Text>
 
                 {question.question_type === 'mcq' && question.options && (
-                  <View style={styles.optionsContainer}>
-                    {question.options.map((option, optIndex) => {
-                      const isStudentAnswer = answer?.answer === optIndex;
-                      const isCorrectOption = optIndex === question.correct_index;
+                  <>
+                    <View style={styles.optionsContainer}>
+                      {question.options.map((option, optIndex) => {
+                        const isStudentAnswer = answer?.answer === optIndex;
+                        const isCorrectOption = optIndex === question.correct_index;
 
-                      return (
-                        <View
-                          key={optIndex}
-                          style={[
-                            styles.optionItem,
-                            isCorrectOption && styles.optionItemCorrect,
-                            isStudentAnswer && !isCorrectOption && styles.optionItemIncorrect,
-                          ]}
-                        >
+                        return (
                           <View
+                            key={optIndex}
                             style={[
-                              styles.optionBullet,
-                              isCorrectOption && styles.optionBulletCorrect,
-                              isStudentAnswer && !isCorrectOption && styles.optionBulletIncorrect,
+                              styles.optionItem,
+                              isCorrectOption && styles.optionItemCorrect,
+                              isStudentAnswer && !isCorrectOption && styles.optionItemIncorrect,
                             ]}
                           >
-                            {isCorrectOption && <CheckCircle size={12} color={colors.success[600]} />}
-                            {isStudentAnswer && !isCorrectOption && (
-                              <XCircle size={12} color={colors.error[600]} />
-                            )}
+                            <View
+                              style={[
+                                styles.optionBullet,
+                                isCorrectOption && styles.optionBulletCorrect,
+                                isStudentAnswer && !isCorrectOption && styles.optionBulletIncorrect,
+                              ]}
+                            >
+                              {isCorrectOption && <CheckCircle size={12} color={colors.success[600]} />}
+                              {isStudentAnswer && !isCorrectOption && (
+                                <XCircle size={12} color={colors.error[600]} />
+                              )}
+                            </View>
+                            <Text
+                              style={[
+                                styles.optionText,
+                                isCorrectOption && styles.optionTextCorrect,
+                                isStudentAnswer && !isCorrectOption && styles.optionTextIncorrect,
+                              ]}
+                            >
+                              {option}
+                            </Text>
                           </View>
-                          <Text
-                            style={[
-                              styles.optionText,
-                              isCorrectOption && styles.optionTextCorrect,
-                              isStudentAnswer && !isCorrectOption && styles.optionTextIncorrect,
-                            ]}
-                          >
-                            {option}
-                          </Text>
-                        </View>
-                      );
-                    })}
-                  </View>
+                        );
+                      })}
+                    </View>
+
+                    {/* Explanation Section */}
+                    {question.correct_answer && (
+                      <View style={styles.explanationSection}>
+                        <Text style={styles.explanationLabel}>Explanation:</Text>
+                        <Text style={styles.explanationText}>{question.correct_answer}</Text>
+                      </View>
+                    )}
+                  </>
                 )}
 
                 {question.question_type === 'one_word' && (
@@ -607,5 +617,24 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.xs,
     color: colors.warning[700],
     fontStyle: 'italic',
+  },
+  explanationSection: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.primary[50],
+    borderRadius: borderRadius.md,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary[600],
+  },
+  explanationLabel: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.primary[700],
+    marginBottom: spacing.xs,
+  },
+  explanationText: {
+    fontSize: typography.fontSize.base,
+    color: colors.text.primary,
+    lineHeight: typography.fontSize.base * 1.5,
   },
 });

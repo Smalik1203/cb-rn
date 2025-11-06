@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Dimensions, Animated } from 'react-native';
 import { Text } from 'react-native-paper';
-import { CalendarRange, UserCheck, CreditCard, NotebookText, UsersRound, LineChart, TrendingUp, Bell, Activity, FileText, CalendarDays, CheckCircle2, Target, AlertCircle, FolderOpen, ArrowUpRight, ArrowDownRight, ChevronRight } from 'lucide-react-native';
+import { CalendarRange, UserCheck, CreditCard, NotebookText, UsersRound, LineChart, TrendingUp, Activity, FileText, CalendarDays, CheckCircle2, Target, AlertCircle, FolderOpen, ArrowUpRight, ArrowDownRight, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { colors, typography, spacing, borderRadius, shadows } from '../../../lib/design-system';
 import { useAuth } from '../../contexts/AuthContext';
@@ -102,7 +102,7 @@ export default function DashboardScreen() {
     },
     {
       title: 'Tasks',
-      subtitle: 'Assignments',
+      subtitle: 'Tasks',
       icon: CheckCircle2,
       color: colors.secondary[600],
       bgColor: colors.secondary[50],
@@ -164,7 +164,7 @@ export default function DashboardScreen() {
       trend: isStudent ? (stats.attendancePercentage >= 75 ? 'up' : 'down') : null,
     },
     {
-      title: 'Assignments',
+      title: 'Tasks',
       value: stats.pendingAssignments.toString(),
       change: stats.pendingAssignments > 0 ? 'Pending' : 'All done',
       icon: FileText,
@@ -185,24 +185,8 @@ export default function DashboardScreen() {
       showProgress: false,
       trend: null,
     },
-    ...(isStudent ? [{
-      title: 'Week Attendance',
-      value: `${stats.weekAttendance}%`,
-      change: stats.weekAttendance >= 90 ? 'Great' : stats.weekAttendance >= 75 ? 'Good' : 'Improve',
-      icon: UserCheck,
-      color: stats.weekAttendance >= 90 ? colors.success[600] : stats.weekAttendance >= 75 ? colors.info[600] : colors.warning[600],
-      bgColor: stats.weekAttendance >= 90 ? colors.success[50] : stats.weekAttendance >= 75 ? colors.info[50] : colors.warning[50],
-      route: '/(tabs)/attendance',
-      showProgress: true,
-      progressValue: stats.weekAttendance,
-      trend: stats.weekAttendance >= 75 ? 'up' : 'down',
-    }] : []),
   ] : [];
 
-  // Get most recent task/test for quick access
-  const mostRecentTask = recentActivity?.find(a => a.type === 'assignment');
-  const mostRecentTest = recentActivity?.find(a => a.type === 'test');
-  
   const viewState = (authLoading || statsLoading || activityLoading) ? 'loading' : (statsError || activityError) ? 'error' : !profile ? 'empty' : 'success';
   
   // Determine if user has incomplete profile (fallback profile)
@@ -229,44 +213,24 @@ export default function DashboardScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
         >
-        {/* Profile Header - Personalized */}
+        {/* Profile Header - Clean Design */}
         <View style={styles.profileHeader}>
-          <View style={styles.profileRow}>
-            <View style={styles.profileAvatar}>
-              <Avatar 
-                name={profile?.full_name || 'User'} 
-                size="lg"
-                variant="primary"
-              />
-            </View>
-            <View style={styles.profileInfo}>
-              <Text style={styles.greetingText}>
-                {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'} 👋
-              </Text>
+          <View style={styles.profileInfo}>
+            <Text style={styles.greetingText}>
+              {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'} 👋
+            </Text>
+            <View style={styles.nameRow}>
               <Text style={styles.profileName}>{profile?.full_name || 'User'}</Text>
               {classData && (
-                <View style={styles.classInfoRow}>
-                  <View style={styles.classBadge}>
-                    <Text style={styles.classBadgeText}>
-                      Class {classData.grade}-{classData.section}
-                    </Text>
-                  </View>
-                </View>
+                <Text style={styles.classText}>
+                  {' '}• Class {classData.grade}-{classData.section}
+                </Text>
               )}
             </View>
-            <TouchableOpacity 
-              style={styles.notificationButton}
-              onPress={() => {/* TODO: Navigate to notifications */}}
-              activeOpacity={0.7}
-            >
-              <View style={styles.notificationIconContainer}>
-                <Bell size={22} color={colors.primary[600]} />
-              </View>
-            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Quick Actions - Horizontal Scroll with Modern Design */}
+        {/* Quick Actions - Clean Icon Design */}
         <View style={styles.quickActionsSection}>
           <ScrollView 
             horizontal 
@@ -281,9 +245,9 @@ export default function DashboardScreen() {
                 activeOpacity={0.6}
               >
                 <View style={[styles.quickActionCircle, { backgroundColor: action.bgColor }]}>
-                  <action.icon size={24} color={action.color} strokeWidth={2} />
+                  <action.icon size={24} color={action.color} strokeWidth={2.5} />
                 </View>
-                <Text style={styles.quickActionText}>{action.title}</Text>
+                <Text style={styles.quickActionText} numberOfLines={1}>{action.title}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -351,55 +315,6 @@ export default function DashboardScreen() {
             )}
           </View>
         </View>
-
-        {/* Quick Access - Most Recent Items */}
-        {(mostRecentTask || mostRecentTest) && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Quick Access</Text>
-            <View style={styles.quickAccessContainer}>
-              {mostRecentTask && (
-                <TouchableOpacity
-                  style={styles.quickAccessCard}
-                  onPress={() => router.push('/(tabs)/tasks')}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.quickAccessIcon, { backgroundColor: colors.info[50] }]}>
-                    <FileText size={20} color={colors.info[600]} />
-                  </View>
-                  <View style={styles.quickAccessContent}>
-                    <Text style={styles.quickAccessTitle} numberOfLines={1}>
-                      {mostRecentTask.title}
-                    </Text>
-                    <Text style={styles.quickAccessSubtitle} numberOfLines={1}>
-                      {mostRecentTask.subtitle}
-                    </Text>
-                  </View>
-                  <ChevronRight size={16} color={colors.text.tertiary} />
-                </TouchableOpacity>
-              )}
-              {mostRecentTest && (
-                <TouchableOpacity
-                  style={styles.quickAccessCard}
-                  onPress={() => router.push('/(tabs)/assessments')}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.quickAccessIcon, { backgroundColor: colors.secondary[50] }]}>
-                    <Target size={20} color={colors.secondary[600]} />
-                  </View>
-                  <View style={styles.quickAccessContent}>
-                    <Text style={styles.quickAccessTitle} numberOfLines={1}>
-                      {mostRecentTest.title}
-                    </Text>
-                    <Text style={styles.quickAccessSubtitle} numberOfLines={1}>
-                      {mostRecentTest.subtitle}
-                    </Text>
-                  </View>
-                  <ChevronRight size={16} color={colors.text.tertiary} />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        )}
 
         {/* Class Overview (Admin/Teacher Only) */}
         {isAdmin && stats && (
@@ -576,6 +491,7 @@ export default function DashboardScreen() {
                         strokeWidth={8}
                         color={colors.primary[600]}
                         backgroundColor={colors.neutral[100]}
+                        showPercentage={false}
                       />
                       <Text style={styles.syllabusOverallValue}>
                         {syllabusOverview.overallProgress}%
@@ -786,7 +702,8 @@ export default function DashboardScreen() {
                 const getActivityIcon = (type: string) => {
                   switch (type) {
                     case 'attendance': return UserCheck;
-                    case 'assignment': return NotebookText;
+                    case 'assignment':
+                    case 'task': return NotebookText;
                     case 'test': return Target;
                     case 'event': return CalendarDays;
                     default: return Activity;
@@ -857,15 +774,9 @@ const styles = StyleSheet.create({
   },
   profileHeader: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
     marginBottom: spacing.sm,
-  },
-  profileRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  profileAvatar: {
-    marginRight: spacing.md,
   },
   profileInfo: {
     flex: 1,
@@ -873,40 +784,25 @@ const styles = StyleSheet.create({
   greetingText: {
     fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
-    marginBottom: 2,
+    marginBottom: 6,
     fontWeight: typography.fontWeight.medium,
   },
-  profileName: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-  },
-  classInfoRow: {
+  nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
-  classBadge: {
-    backgroundColor: colors.primary[100],
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: borderRadius.full,
+  profileName: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    letterSpacing: -0.2,
   },
-  classBadgeText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.primary[700],
-    fontWeight: typography.fontWeight.semibold,
-  },
-  notificationButton: {
-    padding: spacing.xs,
-  },
-  notificationIconContainer: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.primary[50],
-    borderRadius: borderRadius.full,
+  classText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    fontWeight: typography.fontWeight.medium,
+    marginLeft: 4,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -1007,7 +903,7 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: spacing.md,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -1026,7 +922,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
   },
   taskOverviewCard: {
-    padding: spacing.md,
+    padding: spacing.lg,
   },
   taskOverviewGrid: {
     flexDirection: 'row',
@@ -1145,7 +1041,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
   },
   feeCard: {
-    padding: spacing.md,
+    padding: spacing.lg,
   },
   feeRow: {
     flexDirection: 'row',
@@ -1186,7 +1082,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   eventsCard: {
-    padding: spacing.md,
+    padding: spacing.lg,
   },
   eventItem: {
     flexDirection: 'row',
@@ -1221,24 +1117,24 @@ const styles = StyleSheet.create({
     marginRight: spacing.xs,
   },
   quickActionsSection: {
-    paddingHorizontal: spacing.md,
     marginBottom: spacing.md,
   },
   quickActionsScroll: {
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   quickActionItem: {
     alignItems: 'center',
     marginRight: spacing.lg,
+    minWidth: 70,
   },
   quickActionCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: borderRadius.lg,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.xs,
-    ...shadows.sm,
   },
   quickActionText: {
     fontSize: typography.fontSize.xs,
@@ -1246,13 +1142,14 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     textAlign: 'center',
     maxWidth: 70,
+    marginTop: 2,
   },
   statsSection: {
     paddingHorizontal: spacing.md,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   activityCard: {
-    padding: spacing.md,
+    padding: spacing.lg,
   },
   activityItem: {
     flexDirection: 'row',
@@ -1325,56 +1222,21 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.inverse,
   },
-  quickAccessContainer: {
-    gap: spacing.sm,
-  },
-  quickAccessCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface.primary,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    ...shadows.sm,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-  },
-  quickAccessIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  quickAccessContent: {
-    flex: 1,
-    minWidth: 0,
-  },
-  quickAccessTitle: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    marginBottom: 2,
-  },
-  quickAccessSubtitle: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.secondary,
-  },
   classOverviewCard: {
-    padding: spacing.md,
+    padding: spacing.lg,
   },
   classOverviewGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   classOverviewItem: {
-    width: (width - spacing.md * 2 - spacing.sm) / 2,
+    width: (width - spacing.md * 2 - spacing.md) / 2,
     alignItems: 'center',
-    padding: spacing.sm,
+    padding: spacing.md,
     backgroundColor: colors.background.secondary,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
   },
   classOverviewIconContainer: {
     width: 40,
@@ -1396,7 +1258,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   quickStatsCard: {
-    padding: spacing.md,
+    padding: spacing.lg,
   },
   quickStatRow: {
     flexDirection: 'row',

@@ -89,42 +89,99 @@ export function useDashboardStats(userId: string, classInstanceId?: string, role
       
       if (classesError) throw classesError;
 
-      // Get attendance percentage for current month
-      const currentMonth = new Date().toISOString().substring(0, 7);
-      const { data: attendanceData, error: attendanceError } = await supabase
-        .from(DB.tables.attendance)
-        .select('status')
-        .eq('student_id', userId)
-        .gte('date', `${currentMonth}-01`)
-        .lt('date', new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().split('T')[0]);
-      
-      if (attendanceError) throw attendanceError;
-      
-      const totalAttendance = attendanceData.length;
-      const presentCount = attendanceData.filter(a => a.status === 'present').length;
-      const attendancePercentage = totalAttendance > 0 ? Math.round((presentCount / totalAttendance) * 100) : 0;
+      // For students, get student ID from auth_user_id
+      let studentId = userId;
+      if (role === 'student') {
+        const { data: studentData } = await supabase
+          .from('student')
+          .select('id')
+          .eq('auth_user_id', userId)
+          .maybeSingle();
+        
+        if (studentData) {
+          studentId = studentData.id;
+        } else {
+          // If student not found, return early with zero attendance
+          return {
+            todaysClasses: todaysClasses?.length || 0,
+            attendancePercentage: 0,
+            weekAttendance: 0,
+            pendingAssignments: 0,
+            upcomingTests: 0,
+            achievements: 0,
+            totalStudents: 0,
+          };
+        }
+      }
 
-      // Get week attendance
-      const { data: weekAttendanceData } = await supabase
-        .from(DB.tables.attendance)
-        .select('status')
-        .eq('student_id', userId)
-        .gte('date', weekStartStr)
-        .lte('date', today);
+      // Get attendance percentage for current month (only for students)
+      let attendancePercentage = 0;
+      let weekAttendance = 0;
+      
+      if (role === 'student') {
+        const currentMonth = new Date().toISOString().substring(0, 7);
+        const { data: attendanceData, error: attendanceError } = await supabase
+          .from(DB.tables.attendance)
+          .select('status')
+          .eq('student_id', studentId)
+          .gte('date', `${currentMonth}-01`)
+          .lt('date', new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().split('T')[0]);
+        
+        if (attendanceError) throw attendanceError;
 
-      const weekTotal = weekAttendanceData?.length || 0;
-      const weekPresent = weekAttendanceData?.filter(a => a.status === 'present').length || 0;
-      const weekAttendance = weekTotal > 0 ? Math.round((weekPresent / weekTotal) * 100) : 0;
+        const totalAttendance = attendanceData?.length || 0;
+        const presentCount = attendanceData?.filter(a => a.status === 'present').length || 0;
+        attendancePercentage = totalAttendance > 0 ? Math.round((presentCount / totalAttendance) * 100) : 0;
+
+        // Get week attendance
+        const { data: weekAttendanceData } = await supabase
+          .from(DB.tables.attendance)
+          .select('status')
+          .eq('student_id', studentId)
+          .gte('date', weekStartStr)
+          .lte('date', today);
+
+        const weekTotal = weekAttendanceData?.length || 0;
+        const weekPresent = weekAttendanceData?.filter(a => a.status === 'present').length || 0;
+        weekAttendance = weekTotal > 0 ? Math.round((weekPresent / weekTotal) * 100) : 0;
+      }
 
       // Get pending assignments from tasks table
-      const { data: tasksData } = await supabase
-        .from('tasks')
-        .select('id')
-        .eq('class_instance_id', classInstanceId)
-        .gte('due_date', today)
-        .eq('is_active', true);
+      // For students: only count unsubmitted tasks
+      // For admins: count all active tasks
+      let pendingAssignments = 0;
+      
+      if (role === 'student') {
+        // Get all active tasks for student's class (including overdue)
+        const { data: tasksData } = await supabase
+          .from('tasks')
+          .select('id')
+          .eq('class_instance_id', classInstanceId)
+          .eq('is_active', true);
 
-      const pendingAssignments = tasksData?.length || 0;
+        // Get student submissions (check for any submission, not just submitted status)
+        const { data: submissions } = await supabase
+          .from('task_submissions')
+          .select('task_id, status')
+          .eq('student_id', studentId);
+
+        // Count tasks that are not submitted or graded (pending = unsubmitted)
+        const submittedOrGradedTaskIds = new Set(
+          submissions?.filter(s => s.status === 'submitted' || s.status === 'graded').map(s => s.task_id) || []
+        );
+        
+        // Count only unsubmitted tasks (including overdue)
+        pendingAssignments = tasksData?.filter(task => !submittedOrGradedTaskIds.has(task.id)).length || 0;
+      } else {
+        // For admins, count all active tasks (including overdue)
+        const { data: tasksData } = await supabase
+          .from('tasks')
+          .select('id')
+          .eq('class_instance_id', classInstanceId)
+          .eq('is_active', true);
+
+        pendingAssignments = tasksData?.length || 0;
+      }
 
       // Get upcoming tests (next 7 days)
       const nextWeek = new Date();
@@ -178,6 +235,18 @@ export function useRecentActivity(userId: string, classInstanceId?: string) {
         return [];
       }
 
+      // Get student ID from auth_user_id
+      const { data: studentData } = await supabase
+        .from('student')
+        .select('id')
+        .eq('auth_user_id', userId)
+        .maybeSingle();
+
+      if (!studentData) {
+        return [];
+      }
+
+      const studentId = studentData.id;
       const activities: RecentActivity[] = [];
       
       // Get recent attendance records
@@ -185,7 +254,7 @@ export function useRecentActivity(userId: string, classInstanceId?: string) {
         const { data: attendanceData, error: attendanceError } = await supabase
           .from(DB.tables.attendance)
           .select('id, status, date, created_at')
-          .eq('student_id', userId)
+          .eq('student_id', studentId)
           .order('created_at', { ascending: false })
           .limit(2);
         
@@ -240,7 +309,7 @@ export function useRecentActivity(userId: string, classInstanceId?: string) {
         const { data: testScoresData, error: testScoresError } = await supabase
           .from('test_marks')
           .select('id, marks_obtained, max_marks, created_at, tests(title)')
-          .eq('student_id', userId)
+          .eq('student_id', studentId)
           .order('created_at', { ascending: false })
           .limit(2);
 
@@ -315,14 +384,27 @@ export function useUpcomingEvents(schoolCode: string, classInstanceId?: string) 
   });
 }
 
-export function useFeeOverview(studentId: string) {
+export function useFeeOverview(authUserId: string) {
   return useQuery({
-    queryKey: ['fee-overview', studentId],
+    queryKey: ['fee-overview', authUserId],
     queryFn: async (): Promise<FeeOverview> => {
-      // Guard against invalid student ID
-      if (!studentId) {
+      // Guard against invalid auth user ID
+      if (!authUserId) {
         return { totalFee: 0, paidAmount: 0, pendingAmount: 0 };
       }
+
+      // Get student ID from auth_user_id
+      const { data: studentData } = await supabase
+        .from('student')
+        .select('id')
+        .eq('auth_user_id', authUserId)
+        .maybeSingle();
+
+      if (!studentData) {
+        return { totalFee: 0, paidAmount: 0, pendingAmount: 0 };
+      }
+
+      const studentId = studentData.id;
 
       // Get active fee plan for student
       const { data: feePlan } = await supabase
@@ -365,17 +447,17 @@ export function useFeeOverview(studentId: string) {
         pendingAmount,
       };
     },
-    enabled: !!studentId,
+    enabled: !!authUserId,
     staleTime: 10 * 60 * 1000,
   });
 }
 
-export function useTaskOverview(studentId: string, classInstanceId?: string) {
+export function useTaskOverview(authUserId: string, classInstanceId?: string) {
   return useQuery({
-    queryKey: ['task-overview', studentId, classInstanceId],
+    queryKey: ['task-overview', authUserId, classInstanceId],
     queryFn: async (): Promise<TaskOverview> => {
       // Guard against invalid ID values
-      if (!studentId || !classInstanceId) {
+      if (!authUserId || !classInstanceId) {
         return {
           total: 0,
           completed: 0,
@@ -385,6 +467,24 @@ export function useTaskOverview(studentId: string, classInstanceId?: string) {
         };
       }
 
+      // Get student ID from auth_user_id
+      const { data: studentData } = await supabase
+        .from('student')
+        .select('id')
+        .eq('auth_user_id', authUserId)
+        .maybeSingle();
+
+      if (!studentData) {
+        return {
+          total: 0,
+          completed: 0,
+          pending: 0,
+          overdue: 0,
+          dueThisWeek: 0,
+        };
+      }
+
+      const studentId = studentData.id;
       const today = new Date().toISOString().split('T')[0];
       const weekEnd = new Date();
       weekEnd.setDate(weekEnd.getDate() + 7);
@@ -397,13 +497,15 @@ export function useTaskOverview(studentId: string, classInstanceId?: string) {
         .eq('class_instance_id', classInstanceId)
         .eq('is_active', true);
 
-      // Get student submissions
+      // Get student submissions (only submitted or graded count as completed)
       const { data: submissions } = await supabase
         .from('task_submissions')
-        .select('task_id')
+        .select('task_id, status')
         .eq('student_id', studentId);
 
-      const submittedTaskIds = new Set(submissions?.map(s => s.task_id) || []);
+      const submittedTaskIds = new Set(
+        submissions?.filter(s => s.status === 'submitted' || s.status === 'graded').map(s => s.task_id) || []
+      );
       
       const overview: TaskOverview = {
         total: tasks?.length || 0,
@@ -413,6 +515,7 @@ export function useTaskOverview(studentId: string, classInstanceId?: string) {
         dueThisWeek: 0,
       };
 
+      // Only count unsubmitted tasks for pending/overdue/dueThisWeek
       tasks?.forEach(task => {
         if (!submittedTaskIds.has(task.id)) {
           overview.pending++;
@@ -426,7 +529,7 @@ export function useTaskOverview(studentId: string, classInstanceId?: string) {
 
       return overview;
     },
-    enabled: !!studentId && !!classInstanceId,
+    enabled: !!authUserId && !!classInstanceId,
     staleTime: 5 * 60 * 1000,
   });
 }

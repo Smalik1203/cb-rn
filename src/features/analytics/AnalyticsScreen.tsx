@@ -61,17 +61,15 @@ const SkeletonCard: React.FC = () => (
 const SuperAdminDashboard: React.FC<{
   data: SuperAdminAnalytics;
   isLoading: boolean;
+  isFetching: boolean;
   timePeriod: TimePeriod;
   setTimePeriod: (period: TimePeriod) => void;
   startDate: string;
   endDate: string;
-}> = ({ data, isLoading, timePeriod, setTimePeriod, startDate, endDate }) => {
+}> = ({ data, isLoading, isFetching, timePeriod, setTimePeriod, startDate, endDate }) => {
   const [selectedFeature, setSelectedFeature] = useState<AnalyticsFeature>('overview');
 
-  // Reset to overview when component mounts or data changes
-  useEffect(() => {
-    setSelectedFeature('overview');
-  }, [data?.summary?.activeAcademicYear]);
+  // Don't reset selectedFeature when data changes - let user stay on their selected view
 
   if (isLoading) {
     return (
@@ -116,18 +114,32 @@ const SuperAdminDashboard: React.FC<{
 
   // Render feature-specific view
   const renderFeatureView = () => {
-    switch (selectedFeature) {
-      case 'attendance':
-        return <AttendanceDetailView data={data} timePeriod={timePeriod} setTimePeriod={setTimePeriod} />;
-      case 'fees':
-        return <FeesDetailView data={data} timePeriod={timePeriod} setTimePeriod={setTimePeriod} />;
-      case 'learning':
-        return <LearningDetailView data={data} timePeriod={timePeriod} setTimePeriod={setTimePeriod} />;
-      case 'operations':
-        return <SyllabusProgressDetailView data={data} timePeriod={timePeriod} setTimePeriod={setTimePeriod} />;
-      default:
-        return null;
-    }
+    const content = (() => {
+      switch (selectedFeature) {
+        case 'attendance':
+          return <AttendanceDetailView data={data} timePeriod={timePeriod} setTimePeriod={setTimePeriod} />;
+        case 'fees':
+          return <FeesDetailView data={data} timePeriod={timePeriod} setTimePeriod={setTimePeriod} />;
+        case 'learning':
+          return <LearningDetailView data={data} timePeriod={timePeriod} setTimePeriod={setTimePeriod} />;
+        case 'operations':
+          return <SyllabusProgressDetailView data={data} timePeriod={timePeriod} setTimePeriod={setTimePeriod} />;
+        default:
+          return null;
+      }
+    })();
+
+    return (
+      <>
+        {isFetching && !isLoading && (
+          <View style={styles.fetchingIndicator}>
+            <ActivityIndicator size="small" color={colors.primary[600]} />
+            <Text style={styles.fetchingText}>Updating data...</Text>
+          </View>
+        )}
+        {content}
+      </>
+    );
   };
 
   // Overview Feature Cards - Always show overview with category cards list
@@ -548,7 +560,7 @@ export default function AnalyticsScreen() {
   const { startDate, endDate } = getDateRangeForPeriod(timePeriod);
 
   // Fetch analytics data based on role
-  const { data: analyticsData, isLoading, error, refetch } = useQuery({
+  const { data: analyticsData, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ['analytics', role, profile?.auth_id, timePeriod],
     queryFn: async () => {
       if (role === 'superadmin' || role === 'cb_admin') {
@@ -675,6 +687,7 @@ export default function AnalyticsScreen() {
           <SuperAdminDashboard
             data={analyticsData as SuperAdminAnalytics}
             isLoading={isLoading}
+            isFetching={isFetching}
             timePeriod={timePeriod}
             setTimePeriod={setTimePeriod}
             startDate={startDate}
@@ -866,7 +879,7 @@ const styles = StyleSheet.create({
   // Skeleton Loader
   skeletonCard: {
     backgroundColor: colors.surface.primary,
-    padding: spacing.xl,
+    padding: spacing.lg,
     borderRadius: borderRadius.lg,
     marginBottom: spacing.lg,
   },
@@ -884,12 +897,28 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     width: '100%',
   },
+  // Fetching Indicator
+  fetchingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+    backgroundColor: colors.primary[50],
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
+  },
+  fetchingText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.primary[700],
+    fontWeight: typography.fontWeight.medium,
+  },
   // Hero Card
   heroCard: {
     backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    marginBottom: spacing.xl,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
   },
   heroTitle: {
     fontWeight: typography.fontWeight.bold,
@@ -924,8 +953,8 @@ const styles = StyleSheet.create({
   // Insight Card
   insightCard: {
     backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
     marginBottom: spacing.lg,
   },
   insightHeader: {
@@ -1030,8 +1059,8 @@ const styles = StyleSheet.create({
   metricCard: {
     flex: 1,
     backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
     alignItems: 'center',
   },
   metricIconCircle: {
@@ -1054,9 +1083,9 @@ const styles = StyleSheet.create({
   // Detailed Analytics Sections
   sectionContainer: {
     backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.xl,
-    padding: spacing.xl,
-    marginBottom: spacing.xl,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -1078,7 +1107,7 @@ const styles = StyleSheet.create({
   metricCardLarge: {
     backgroundColor: colors.background.app,
     borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    padding: spacing.lg,
     marginBottom: spacing.md,
   },
   metricCardHeader: {
@@ -1260,7 +1289,7 @@ const styles = StyleSheet.create({
   summaryCardModern: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    padding: spacing.lg,
     marginBottom: spacing.md,
     ...shadows.md,
     borderWidth: 1,
@@ -1314,7 +1343,7 @@ const styles = StyleSheet.create({
   summaryCard: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    padding: spacing.lg,
     marginBottom: spacing.md,
     ...shadows.sm,
   },
@@ -1330,7 +1359,7 @@ const styles = StyleSheet.create({
   sectionCard: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    padding: spacing.lg,
     marginBottom: spacing.md,
     ...shadows.sm,
   },

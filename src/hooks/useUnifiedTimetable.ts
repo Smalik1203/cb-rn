@@ -458,6 +458,8 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
     onSuccess: () => {
       // Invalidate all timetable queries for better cross-device sync
       queryClient.invalidateQueries({ queryKey: ['unifiedTimetable'] });
+      // Invalidate student timetable queries so students see the update
+      queryClient.invalidateQueries({ queryKey: ['studentTimetable'] });
       // Also invalidate syllabus progress queries
       queryClient.invalidateQueries({ queryKey: ['syllabus_progress'] });
     },
@@ -492,6 +494,8 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
     onSuccess: () => {
       // Invalidate all timetable queries for better cross-device sync
       queryClient.invalidateQueries({ queryKey: ['unifiedTimetable'] });
+      // Invalidate student timetable queries so students see the update
+      queryClient.invalidateQueries({ queryKey: ['studentTimetable'] });
       // Also invalidate syllabus progress queries
       queryClient.invalidateQueries({ queryKey: ['syllabus_progress'] });
     },

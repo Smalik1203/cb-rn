@@ -7,10 +7,12 @@ import { Stack } from 'expo-router';
 import { ClipboardList, Plus, Calendar, AlertCircle, CheckCircle, Clock, Edit, Trash2, MoreVertical, Users, BookOpen, AlertTriangle, X, BarChart3, FileCheck, FileText, Download } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius } from '../../../lib/design-system';
 import { useAuth } from '../../contexts/AuthContext';
-import { useTasks, useStudentTasks, useTaskStats, useToggleTaskComplete, useCreateTask, useUpdateTask, useDeleteTask, Task, useTaskSubmissions } from '../../hooks/useTasks';
+import { useTasks, useStudentTasks, useTaskStats, useCreateTask, useUpdateTask, useDeleteTask, Task, useTaskSubmissions, useSubmitTask, useUnsubmitTask } from '../../hooks/useTasks';
 import { useClasses } from '../../hooks/useClasses';
 import { useSubjects } from '../../hooks/useSubjects';
 import { TaskFormModal } from '../../components/tasks/TaskFormModal';
+import { TaskSubmissionModal } from '../../components/tasks/TaskSubmissionModal';
+import { StudentTaskCard } from '../../components/tasks/StudentTaskCard';
 
 // Task Detail Modal Component
 interface TaskDetailModalProps {
@@ -359,8 +361,16 @@ export default function TasksScreen() {
   const [fileViewerVisible, setFileViewerVisible] = useState(false);
   const [selectedFile, setSelectedFile] = useState<{ url: string; name: string; type: string } | null>(null);
   
+  // Task submission modal (for students)
+  const [submissionModalVisible, setSubmissionModalVisible] = useState(false);
+  const [selectedTaskForSubmission, setSelectedTaskForSubmission] = useState<Task | null>(null);
+  
   // Get student ID if student role
   const [studentId, setStudentId] = React.useState<string | null>(null);
+  
+  // Task submission hooks
+  const submitTask = useSubmitTask();
+  const unsubmitTask = useUnsubmitTask();
   
   React.useEffect(() => {
     if (isStudent && profile?.auth_id) {
@@ -401,9 +411,46 @@ export default function TasksScreen() {
     studentId || ''
   );
   
-  const { data: stats, isLoading: statsLoading } = useTaskStats(schoolCode, selectedClassId);
+  const { data: adminStats, isLoading: statsLoading } = useTaskStats(schoolCode, selectedClassId);
   
-  const toggleComplete = useToggleTaskComplete();
+  const tasks = isStudent ? studentTasksData : adminTasks;
+  const isLoading = isStudent ? studentLoading : adminLoading;
+
+  // Calculate student stats from their tasks (only unsubmitted tasks count)
+  const studentStats = useMemo(() => {
+    if (!isStudent || !studentTasksData) {
+      return null;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Filter to only unsubmitted tasks
+    const unsubmittedTasks = studentTasksData.filter((task: any) => 
+      !task.submission || (task.submission.status !== 'submitted' && task.submission.status !== 'graded')
+    );
+
+    let total = unsubmittedTasks.length;
+    let overdue = 0;
+    let upcoming = 0;
+
+    unsubmittedTasks.forEach((task: any) => {
+      if (task.due_date < today) {
+        overdue++;
+      } else if (task.due_date > today) {
+        upcoming++;
+      }
+    });
+
+    return {
+      total,
+      overdue,
+      upcoming,
+    };
+  }, [isStudent, studentTasksData]);
+  
+  // Use student stats if student, otherwise use admin stats
+  const stats = isStudent ? studentStats : adminStats;
+  
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
@@ -426,9 +473,6 @@ export default function TasksScreen() {
       });
     }
   }, [schoolCode, isStudent]);
-
-  const tasks = isStudent ? studentTasksData : adminTasks;
-  const isLoading = isStudent ? studentLoading : adminLoading;
 
   // Filter tasks (client-side filtering for students, server-side for admins)
   const filteredTasks = useMemo(() => {
@@ -459,13 +503,55 @@ export default function TasksScreen() {
     return { status: 'upcoming', color: colors.success[500], text: 'Upcoming' };
   };
 
-  const handleToggleComplete = async (taskId: string, isCompleted: boolean) => {
+  const handleOpenSubmissionModal = async (task: Task) => {
+    setSelectedTaskForSubmission(task);
+    setSubmissionModalVisible(true);
+  };
+
+  const handleSubmitTaskSubmission = async (submissionData: {
+    task_id: string;
+    student_id: string;
+    submission_text: string | null;
+    attachments: any[];
+  }) => {
     if (!studentId) return;
+    
     try {
-      await toggleComplete.mutateAsync({ taskId, studentId, isCompleted });
+      await submitTask.mutateAsync({
+        task_id: submissionData.task_id,
+        student_id: studentId,
+        submission_text: submissionData.submission_text,
+        attachments: submissionData.attachments,
+        status: 'submitted',
+        submitted_at: new Date().toISOString(),
+        marks_obtained: null,
+        feedback: null,
+        graded_by: null,
+        graded_at: null,
+      });
     } catch (error) {
-      console.error('Failed to toggle task:', error);
+      throw error;
     }
+  };
+
+  const handleUnsubmitTask = async (taskId: string) => {
+    if (!studentId) return;
+    
+    try {
+      await unsubmitTask.mutateAsync({
+        taskId,
+        studentId,
+      });
+      Alert.alert('Success', 'Task unsubmitted successfully');
+    } catch (error) {
+      console.error('Failed to unsubmit task:', error);
+      Alert.alert('Error', 'Failed to unsubmit task. Please try again.');
+    }
+  };
+
+  const handleViewStudentAttachments = (task: Task) => {
+    setSelectedTaskForAttachments(task);
+    setAttachmentsModalVisible(true);
   };
 
   const onRefresh = () => {
@@ -688,7 +774,7 @@ export default function TasksScreen() {
           </View>
           
           {/* Stats Cards */}
-          {!statsLoading && stats && (
+          {!isLoading && stats && (
             <View style={styles.statsSection}>
               <View style={styles.statsGrid}>
                 <Card style={styles.statCard}>
@@ -780,26 +866,81 @@ export default function TasksScreen() {
               />
             </View>
 
-            {filteredTasks.map((task: any) => {
-              const dueDateStatus = getDueDateStatus(task.due_date);
-              const isCompleted = task.submission?.status === 'submitted';
+            {isStudent ? (
+              // Student view: Separate submitted and unsubmitted tasks
+              (() => {
+                const submittedTasks = filteredTasks.filter((task: any) => 
+                  task.submission && (task.submission.status === 'submitted' || task.submission.status === 'graded')
+                );
+                const unsubmittedTasks = filteredTasks.filter((task: any) => 
+                  !task.submission || (task.submission.status !== 'submitted' && task.submission.status !== 'graded')
+                );
 
-              return (
+                return (
+                  <>
+                    {/* Unsubmitted Tasks Section */}
+                    {unsubmittedTasks.length > 0 && (
+                      <>
+                        <View style={styles.sectionHeader}>
+                          <Text style={styles.subsectionTitle}>Assigned Tasks</Text>
+                          <Text style={styles.subsectionCount}>
+                            {unsubmittedTasks.length} {unsubmittedTasks.length === 1 ? 'task' : 'tasks'}
+                          </Text>
+                        </View>
+                        {unsubmittedTasks.map((task: any) => (
+                          <StudentTaskCard
+                            key={task.id}
+                            task={task}
+                            onViewDetail={() => handleViewTaskDetail(task)}
+                            onViewAttachments={() => handleViewStudentAttachments(task)}
+                            onSubmit={() => handleOpenSubmissionModal(task)}
+                            onUnsubmit={handleUnsubmitTask}
+                          />
+                        ))}
+                      </>
+                    )}
+
+                    {/* Submitted Tasks Section */}
+                    {submittedTasks.length > 0 && (
+                      <>
+                        <View style={styles.sectionHeader}>
+                          <Text style={styles.subsectionTitle}>Submitted Tasks</Text>
+                          <Text style={styles.subsectionCount}>
+                            {submittedTasks.length} {submittedTasks.length === 1 ? 'task' : 'tasks'}
+                          </Text>
+                        </View>
+                        {submittedTasks.map((task: any) => (
+                          <StudentTaskCard
+                            key={task.id}
+                            task={task}
+                            onViewDetail={() => handleViewTaskDetail(task)}
+                            onViewAttachments={() => handleViewStudentAttachments(task)}
+                            onSubmit={() => handleOpenSubmissionModal(task)}
+                            onUnsubmit={handleUnsubmitTask}
+                            isSubmitted={true}
+                          />
+                        ))}
+                      </>
+                    )}
+                  </>
+                );
+              })()
+            ) : (
+              // Admin/Teacher view: Show all tasks normally
+              filteredTasks.map((task: any) => {
+                const dueDateStatus = getDueDateStatus(task.due_date);
+                const isCompleted = task.submission?.status === 'submitted';
+
+                // Admin/Teacher view
+                return (
                 <View 
                   key={task.id} 
                   style={styles.taskCard}
                 >
                   <View style={styles.taskCardHeader}>
                     <View style={styles.taskHeaderLeft}>
-                      {isStudent && (
-                        <Checkbox
-                          status={isCompleted ? 'checked' : 'unchecked'}
-                          onPress={() => handleToggleComplete(task.id, isCompleted)}
-                          color={colors.primary[600]}
-                        />
-                      )}
                       <View style={styles.taskInfo}>
-                        <Text style={[styles.taskTitle, isCompleted && styles.taskTitleCompleted]} numberOfLines={2}>
+                        <Text style={styles.taskTitle} numberOfLines={2}>
                           {task.title}
                         </Text>
                       </View>
@@ -921,8 +1062,9 @@ export default function TasksScreen() {
                     </View>
                   </View>
                 </View>
-              );
-            })}
+                );
+              })
+            )}
           </View>
         )}
       </ScrollView>
@@ -1109,6 +1251,24 @@ export default function TasksScreen() {
         subjects={subjects}
       />
 
+      {/* Task Submission Modal (Students Only) */}
+      {isStudent && studentId && (
+        <TaskSubmissionModal
+          visible={submissionModalVisible}
+          onDismiss={() => {
+            setSubmissionModalVisible(false);
+            setSelectedTaskForSubmission(null);
+          }}
+          onSubmit={handleSubmitTaskSubmission}
+          task={selectedTaskForSubmission}
+          studentId={studentId}
+          existingSubmission={selectedTaskForSubmission ? 
+            (filteredTasks as any[]).find((t: any) => t.id === selectedTaskForSubmission.id)?.submission 
+            : undefined
+          }
+        />
+      )}
+
       {/* Simple Attachments Modal */}
       <Portal>
         <PaperModal
@@ -1127,15 +1287,55 @@ export default function TasksScreen() {
                   styles.simpleAttachmentItem,
                   index === selectedTaskForAttachments.attachments.length - 1 && styles.lastAttachmentItem
                 ]}
-                onPress={() => {
+                onPress={async () => {
                   if (attachment.url) {
-                    setSelectedFile({
-                      url: attachment.url,
-                      name: attachment.name,
-                      type: attachment.type || 'application/octet-stream'
-                    });
-                    setFileViewerVisible(true);
-                    setAttachmentsModalVisible(false);
+                    try {
+                      // For viewing attachments, open in WebView modal instead of downloading
+                      // This works for PDFs, images, and other viewable files
+                      const fileType = attachment.type || attachment.mimeType || 'application/octet-stream';
+                      const isViewable = 
+                        fileType.startsWith('image/') ||
+                        fileType === 'application/pdf' ||
+                        fileType.startsWith('text/');
+                      
+                      if (isViewable) {
+                        // Open in WebView for viewing
+                        setSelectedFile({
+                          url: attachment.url,
+                          name: attachment.name,
+                          type: fileType
+                        });
+                        setFileViewerVisible(true);
+                        setAttachmentsModalVisible(false);
+                      } else {
+                        // For non-viewable files, offer to open in external app
+                        Alert.alert(
+                          'Open File',
+                          `This file type cannot be viewed in-app. Would you like to open it in an external app?`,
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            {
+                              text: 'Open',
+                              onPress: async () => {
+                                try {
+                                  const canOpen = await Linking.canOpenURL(attachment.url);
+                                  if (canOpen) {
+                                    await Linking.openURL(attachment.url);
+                                  } else {
+                                    Alert.alert('Error', 'Cannot open this file type');
+                                  }
+                                } catch (error) {
+                                  Alert.alert('Error', 'Failed to open file');
+                                }
+                              }
+                            }
+                          ]
+                        );
+                      }
+                    } catch (error) {
+                      console.error('Error opening file:', error);
+                      Alert.alert('Error', 'Failed to open file. Please try again.');
+                    }
                   } else {
                     Alert.alert('Error', 'File URL not available');
                   }
@@ -1179,7 +1379,11 @@ export default function TasksScreen() {
           {selectedFile && (
             <View style={styles.fileViewerContent}>
               <WebView
-                source={{ uri: selectedFile.url }}
+                source={{
+                  uri: selectedFile.type === 'application/pdf'
+                    ? `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(selectedFile.url)}`
+                    : selectedFile.url
+                }}
                 style={styles.webView}
                 startInLoadingState={true}
                 renderLoading={() => (
@@ -1188,6 +1392,32 @@ export default function TasksScreen() {
                     <Text style={styles.webViewLoadingText}>Loading file...</Text>
                   </View>
                 )}
+                onError={(syntheticEvent) => {
+                  console.error('WebView error:', syntheticEvent.nativeEvent);
+                  Alert.alert(
+                    'Error',
+                    'Failed to load file. Would you like to open it in an external app?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Open Externally',
+                        onPress: async () => {
+                          try {
+                            const canOpen = await Linking.canOpenURL(selectedFile.url);
+                            if (canOpen) {
+                              await Linking.openURL(selectedFile.url);
+                              setFileViewerVisible(false);
+                            } else {
+                              Alert.alert('Error', 'Cannot open this file type');
+                            }
+                          } catch (error) {
+                            Alert.alert('Error', 'Failed to open file');
+                          }
+                        }
+                      }
+                    ]
+                  );
+                }}
               />
             </View>
           )}
@@ -1380,6 +1610,26 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold as any,
     color: colors.text.primary,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+  },
+  subsectionTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold as any,
+    color: colors.text.primary,
+  },
+  subsectionCount: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    fontWeight: typography.fontWeight.medium as any,
   },
   tasksCount: {
     fontSize: typography.fontSize.sm,

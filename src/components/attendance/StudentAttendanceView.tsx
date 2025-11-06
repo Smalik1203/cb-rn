@@ -1,21 +1,21 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
-import { Text, Card, ActivityIndicator, Chip } from 'react-native-paper';
-import { 
-  Calendar as CalendarIcon, 
-  CheckCircle, 
-  XCircle, 
-  TrendingUp, 
+import { Text, Card, ActivityIndicator, SegmentedButtons } from 'react-native-paper';
+import {
+  Calendar as CalendarIcon,
+  CheckCircle,
+  XCircle,
+  TrendingUp,
   CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  AlertCircle
+  ChevronDown,
+  AlertCircle,
+  Users
 } from 'lucide-react-native';
 import { useStudentAttendance } from '../../hooks/useAttendance';
 import { useAuth } from '../../contexts/AuthContext';
 import { colors, typography, spacing, borderRadius, shadows } from '../../../lib/design-system';
-import { ProgressRing } from '../analytics/ProgressRing';
 import { ThreeStateView } from '../common/ThreeStateView';
+import { DatePickerModal } from '../common/DatePickerModal';
 import { supabase } from '../../data/supabaseClient';
 import dayjs from 'dayjs';
 
@@ -28,10 +28,18 @@ interface AttendanceRecord {
 
 export const StudentAttendanceView: React.FC = () => {
   const { profile } = useAuth();
-  const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [refreshing, setRefreshing] = useState(false);
   const [studentId, setStudentId] = useState<string | null>(null);
   const [loadingStudentId, setLoadingStudentId] = useState(true);
+  const [activeTab, setActiveTab] = useState<'overview' | 'history'>('overview');
+  const [historyStartDate, setHistoryStartDate] = useState<Date>(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 30); // Default to last 30 days
+    return date;
+  });
+  const [historyEndDate, setHistoryEndDate] = useState<Date>(new Date());
+  const [showHistoryStartDatePicker, setShowHistoryStartDatePicker] = useState(false);
+  const [showHistoryEndDatePicker, setShowHistoryEndDatePicker] = useState(false);
 
   // Get student ID from profile (matching V1 pattern with fallback logic)
   useEffect(() => {
@@ -100,25 +108,22 @@ export const StudentAttendanceView: React.FC = () => {
     setRefreshing(false);
   };
 
-  // Calculate month stats
-  const monthStats = useMemo(() => {
-    const startOfMonth = dayjs(selectedMonth).startOf('month');
-    const endOfMonth = dayjs(selectedMonth).endOf('month');
-    const startDateStr = startOfMonth.format('YYYY-MM-DD');
-    const endDateStr = endOfMonth.format('YYYY-MM-DD');
-    
-    const monthRecords = attendanceRecords.filter(record => {
-      // Use string comparison for reliable date filtering
-      return record.date >= startDateStr && record.date <= endDateStr;
+  // Calculate date range stats for history view
+  const historyStartDateString = historyStartDate.toISOString().split('T')[0];
+  const historyEndDateString = historyEndDate.toISOString().split('T')[0];
+
+  const historyStats = useMemo(() => {
+    const rangeRecords = attendanceRecords.filter(record => {
+      return record.date >= historyStartDateString && record.date <= historyEndDateString;
     });
 
-    const present = monthRecords.filter(r => r.status === 'present').length;
-    const absent = monthRecords.filter(r => r.status === 'absent').length;
-    const total = monthRecords.length;
+    const present = rangeRecords.filter(r => r.status === 'present').length;
+    const absent = rangeRecords.filter(r => r.status === 'absent').length;
+    const total = rangeRecords.length;
     const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
 
-    return { present, absent, total, percentage };
-  }, [attendanceRecords, selectedMonth]);
+    return { present, absent, total, percentage, records: rangeRecords };
+  }, [attendanceRecords, historyStartDateString, historyEndDateString]);
 
   // Calculate overall stats
   const overallStats = useMemo(() => {
@@ -129,89 +134,6 @@ export const StudentAttendanceView: React.FC = () => {
 
     return { present, absent, total, percentage };
   }, [attendanceRecords]);
-
-  // Group records by date for calendar view
-  const recordsByDate = useMemo(() => {
-    const grouped: { [key: string]: AttendanceRecord } = {};
-    attendanceRecords.forEach(record => {
-      grouped[record.date] = record;
-    });
-    return grouped;
-  }, [attendanceRecords]);
-
-  // Generate calendar days for selected month
-  const calendarDays = useMemo(() => {
-    const start = dayjs(selectedMonth).startOf('month');
-    const end = dayjs(selectedMonth).endOf('month');
-    const daysInMonth = end.date();
-    const firstDayOfWeek = start.day();
-
-    const days: Array<{ date: Date; isCurrentMonth: boolean; record?: AttendanceRecord }> = [];
-
-    // Add days from previous month
-    for (let i = firstDayOfWeek - 1; i >= 0; i--) {
-      const date = start.subtract(i + 1, 'day');
-      days.push({
-        date: date.toDate(),
-        isCurrentMonth: false,
-      });
-    }
-
-    // Add days from current month
-    for (let i = 1; i <= daysInMonth; i++) {
-      const date = start.date(i);
-      const dateStr = date.format('YYYY-MM-DD');
-      days.push({
-        date: date.toDate(),
-        isCurrentMonth: true,
-        record: recordsByDate[dateStr],
-      });
-    }
-
-    // Fill remaining days to complete week
-    const remainingDays = 7 - (days.length % 7);
-    if (remainingDays < 7) {
-      for (let i = 1; i <= remainingDays; i++) {
-        const date = end.add(i, 'day');
-        days.push({
-          date: date.toDate(),
-          isCurrentMonth: false,
-        });
-      }
-    }
-
-    return days;
-  }, [selectedMonth, recordsByDate]);
-
-  // Recent attendance history
-  const recentRecords = useMemo(() => {
-    return [...attendanceRecords]
-      .sort((a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf())
-      .slice(0, 10);
-  }, [attendanceRecords]);
-
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    setSelectedMonth(prev => {
-      const newDate = dayjs(prev);
-      return direction === 'prev' 
-        ? newDate.subtract(1, 'month').toDate()
-        : newDate.add(1, 'month').toDate();
-    });
-  };
-
-  const goToToday = () => {
-    setSelectedMonth(new Date());
-  };
-
-  const getStatusColor = (status?: 'present' | 'absent') => {
-    if (!status) return colors.neutral[200];
-    return status === 'present' ? colors.success[600] : colors.error[600];
-  };
-
-  const getStatusBgColor = (status?: 'present' | 'absent') => {
-    if (!status) return colors.neutral[50];
-    return status === 'present' ? colors.success[50] : colors.error[50];
-  };
 
   const viewState = loadingStudentId || isLoading ? 'loading' : error ? 'error' : !studentId ? 'empty' : 'success';
 
@@ -234,6 +156,67 @@ export const StudentAttendanceView: React.FC = () => {
       onRetry={handleRefresh}
     >
       <View style={styles.container}>
+        {/* Tab Switcher */}
+        <View style={styles.tabContainer}>
+          <SegmentedButtons
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value as 'overview' | 'history')}
+            buttons={[
+              { value: 'overview', label: 'Overview' },
+              { value: 'history', label: 'View History' },
+            ]}
+            style={styles.tabSwitcher}
+          />
+        </View>
+
+        {/* Filter Section - Only for History Tab */}
+        {activeTab === 'history' && (
+          <View style={styles.filterSection}>
+            <View style={styles.filterRow}>
+              {/* Start Date Filter */}
+              <TouchableOpacity
+                style={styles.filterItem}
+                onPress={() => setShowHistoryStartDatePicker(true)}
+              >
+                <View style={styles.filterIcon}>
+                  <CalendarIcon size={16} color={colors.text.inverse} />
+                </View>
+                <View style={styles.filterContent}>
+                  <Text style={styles.filterLabel}>Start</Text>
+                  <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
+                    {historyStartDate.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric'
+                    })}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Divider */}
+              <View style={styles.filterDivider} />
+
+              {/* End Date Filter */}
+              <TouchableOpacity
+                style={styles.filterItem}
+                onPress={() => setShowHistoryEndDatePicker(true)}
+              >
+                <View style={styles.filterIcon}>
+                  <CalendarIcon size={16} color={colors.text.inverse} />
+                </View>
+                <View style={styles.filterContent}>
+                  <Text style={styles.filterLabel}>End</Text>
+                  <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
+                    {historyEndDate.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric'
+                    })}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
@@ -242,238 +225,265 @@ export const StudentAttendanceView: React.FC = () => {
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
         >
-        {/* Overall Stats Cards */}
-        <View style={styles.statsSection}>
-          <Card mode="elevated" style={styles.statCard}>
-            <View style={styles.statContent}>
-              <View style={[styles.statIcon, { backgroundColor: colors.success[50] }]}>
-                <ProgressRing
-                  progress={overallStats.percentage}
-                  size={64}
-                  strokeWidth={6}
-                  color={colors.success[600]}
-                  backgroundColor={colors.neutral[100]}
-                  showPercentage={true}
-                />
-              </View>
-              <Text style={styles.statValue}>{overallStats.percentage}%</Text>
-              <Text style={styles.statLabel}>Overall Attendance</Text>
-            </View>
-          </Card>
-
-          <View style={styles.statsRow}>
-            <Card mode="elevated" style={styles.miniStatCard}>
-              <View style={[styles.miniStatIcon, { backgroundColor: colors.success[50] }]}>
-                <CheckCircle size={20} color={colors.success[600]} />
-              </View>
-              <Text style={styles.miniStatValue}>{overallStats.present}</Text>
-              <Text style={styles.miniStatLabel}>Present</Text>
-            </Card>
-
-            <Card mode="elevated" style={styles.miniStatCard}>
-              <View style={[styles.miniStatIcon, { backgroundColor: colors.error[50] }]}>
-                <XCircle size={20} color={colors.error[600]} />
-              </View>
-              <Text style={styles.miniStatValue}>{overallStats.absent}</Text>
-              <Text style={styles.miniStatLabel}>Absent</Text>
-            </Card>
-          </View>
-        </View>
-
-        {/* Monthly Calendar View */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Monthly View</Text>
-            <TouchableOpacity onPress={goToToday} style={styles.todayButton}>
-              <Text style={styles.todayButtonText}>Today</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Card mode="elevated" style={styles.calendarCard}>
-            {/* Month Navigation */}
-            <View style={styles.calendarHeader}>
-              <TouchableOpacity onPress={() => navigateMonth('prev')} style={styles.navButton}>
-                <ChevronLeft size={20} color={colors.text.primary} />
-              </TouchableOpacity>
-              <Text style={styles.calendarMonth}>
-                {dayjs(selectedMonth).format('MMMM YYYY')}
-              </Text>
-              <TouchableOpacity onPress={() => navigateMonth('next')} style={styles.navButton}>
-                <ChevronRight size={20} color={colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Month Stats */}
-            <View style={styles.monthStatsContainer}>
-              <View style={styles.monthStatItem}>
-                <Text style={styles.monthStatLabel}>This Month</Text>
-                <Text style={styles.monthStatValue}>{monthStats.percentage}%</Text>
-              </View>
-              <View style={styles.monthStatDivider} />
-              <View style={styles.monthStatItem}>
-                <Text style={styles.monthStatLabel}>Present</Text>
-                <Text style={[styles.monthStatValue, { color: colors.success[600] }]}>
-                  {monthStats.present}
-                </Text>
-              </View>
-              <View style={styles.monthStatDivider} />
-              <View style={styles.monthStatItem}>
-                <Text style={styles.monthStatLabel}>Absent</Text>
-                <Text style={[styles.monthStatValue, { color: colors.error[600] }]}>
-                  {monthStats.absent}
-                </Text>
-              </View>
-            </View>
-
-            {/* Calendar Grid */}
-            <View style={styles.calendarGrid}>
-              {/* Day Headers */}
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <View key={day} style={styles.dayHeader}>
-                  <Text style={styles.dayHeaderText}>{day}</Text>
-                </View>
-              ))}
-
-              {/* Calendar Days */}
-              {calendarDays.map((day, index) => {
-                const isToday = dayjs(day.date).isSame(dayjs(), 'day');
-                const hasRecord = !!day.record;
-                const status = day.record?.status;
-
-                return (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.calendarDay,
-                      !day.isCurrentMonth && styles.calendarDayOtherMonth,
-                      isToday && styles.calendarDayToday,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.calendarDayText,
-                        !day.isCurrentMonth && styles.calendarDayTextOtherMonth,
-                        isToday && styles.calendarDayTextToday,
-                      ]}
-                    >
-                      {dayjs(day.date).format('D')}
+          {activeTab === 'overview' ? (
+            <>
+              {/* Overall Stats Cards */}
+              <View style={styles.statsSection}>
+                <View style={styles.statsGrid}>
+                  <Card mode="elevated" style={styles.statCard}>
+                    <Text style={[styles.statNumber, { color: colors.primary[600] }]}>
+                      {overallStats.percentage}%
                     </Text>
-                    {hasRecord && (
-                      <View
-                        style={[
-                          styles.statusDot,
-                          { backgroundColor: getStatusColor(status) },
-                        ]}
-                      />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                    <Text style={styles.statLabel}>Overall Attendance</Text>
+                  </Card>
 
-            {/* Legend */}
-            <View style={styles.legend}>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: colors.success[600] }]} />
-                <Text style={styles.legendText}>Present</Text>
+                  <Card mode="elevated" style={styles.statCard}>
+                    <Text style={[styles.statNumber, { color: colors.success[600] }]}>
+                      {overallStats.present}
+                    </Text>
+                    <Text style={styles.statLabel}>Present Days</Text>
+                  </Card>
+
+                  <Card mode="elevated" style={styles.statCard}>
+                    <Text style={[styles.statNumber, { color: colors.error[600] }]}>
+                      {overallStats.absent}
+                    </Text>
+                    <Text style={styles.statLabel}>Absent Days</Text>
+                  </Card>
+                </View>
               </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: colors.error[600] }]} />
-                <Text style={styles.legendText}>Absent</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: colors.neutral[300] }]} />
-                <Text style={styles.legendText}>Not Marked</Text>
-              </View>
-            </View>
-          </Card>
-        </View>
 
-        {/* Recent History */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent History</Text>
-          </View>
+              {/* Recent Attendance List */}
+              <View style={styles.recentSection}>
+                <Text style={styles.sectionTitle}>Recent Attendance</Text>
 
-          {recentRecords.length > 0 ? (
-            <View style={styles.historyContainer}>
-              {recentRecords.map((record) => {
-                const isPresent = record.status === 'present';
-                const recordDate = dayjs(record.date);
-                const isToday = recordDate.isSame(dayjs(), 'day');
-                const isYesterday = recordDate.isSame(dayjs().subtract(1, 'day'), 'day');
-
-                let dateLabel = recordDate.format('MMM D, YYYY');
-                if (isToday) dateLabel = 'Today';
-                else if (isYesterday) dateLabel = 'Yesterday';
-
-                return (
-                  <Card key={record.id} mode="elevated" style={styles.historyCard}>
-                    <View style={styles.historyCardContent}>
-                      <View
-                        style={[
-                          styles.historyIcon,
-                          {
-                            backgroundColor: isPresent ? colors.success[50] : colors.error[50],
-                          },
-                        ]}
-                      >
-                        {isPresent ? (
-                          <CheckCircle size={24} color={colors.success[600]} />
-                        ) : (
-                          <XCircle size={24} color={colors.error[600]} />
-                        )}
-                      </View>
-                      <View style={styles.historyDetails}>
-                        <View style={styles.historyHeader}>
-                          <Text style={styles.historyStatus}>
-                            {isPresent ? 'Present' : 'Absent'}
-                          </Text>
-                          <Chip
-                            style={[
-                              styles.statusChip,
-                              {
-                                backgroundColor: isPresent
-                                  ? colors.success[100]
-                                  : colors.error[100],
-                              },
-                            ]}
-                            textStyle={[
-                              styles.statusChipText,
-                              {
-                                color: isPresent ? colors.success[700] : colors.error[700],
-                              },
-                            ]}
-                          >
-                            {record.status.toUpperCase()}
-                          </Chip>
-                        </View>
-                        <View style={styles.historyMeta}>
-                          <CalendarDays size={14} color={colors.text.secondary} />
-                          <Text style={styles.historyDate}>{dateLabel}</Text>
-                          <Text style={styles.historyDay}>
-                            {recordDate.format('dddd')}
-                          </Text>
-                        </View>
-                      </View>
+                {attendanceRecords.length === 0 ? (
+                  <Card mode="elevated" style={styles.emptyCard}>
+                    <View style={styles.emptyContainer}>
+                      <AlertCircle size={48} color={colors.text.tertiary} />
+                      <Text style={styles.emptyTitle}>No Records Yet</Text>
+                      <Text style={styles.emptyText}>
+                        Your attendance records will appear here once marked by your teacher.
+                      </Text>
                     </View>
                   </Card>
-                );
-              })}
-            </View>
-          ) : (
-            <Card mode="elevated" style={styles.emptyCard}>
-              <View style={styles.emptyContainer}>
-                <AlertCircle size={48} color={colors.text.tertiary} />
-                <Text style={styles.emptyTitle}>No Records Yet</Text>
-                <Text style={styles.emptyText}>
-                  Your attendance records will appear here once marked by your teacher.
-                </Text>
+                ) : (
+                  <View style={styles.recordsList}>
+                    {[...attendanceRecords]
+                      .sort((a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf())
+                      .slice(0, 10)
+                      .map((record) => {
+                        const isPresent = record.status === 'present';
+                        const recordDate = dayjs(record.date);
+
+                        return (
+                          <Card key={record.id} mode="elevated" style={styles.recordCard}>
+                            <View style={styles.recordContent}>
+                              <View
+                                style={[
+                                  styles.recordIcon,
+                                  {
+                                    backgroundColor: isPresent
+                                      ? colors.success[50]
+                                      : colors.error[50],
+                                  },
+                                ]}
+                              >
+                                {isPresent ? (
+                                  <CheckCircle size={20} color={colors.success[600]} />
+                                ) : (
+                                  <XCircle size={20} color={colors.error[600]} />
+                                )}
+                              </View>
+                              <View style={styles.recordDetails}>
+                                <Text style={styles.recordDate}>
+                                  {recordDate.format('MMM D, YYYY')}
+                                </Text>
+                                <Text style={styles.recordDay}>
+                                  {recordDate.format('dddd')}
+                                </Text>
+                              </View>
+                              <View
+                                style={[
+                                  styles.recordStatus,
+                                  {
+                                    backgroundColor: isPresent
+                                      ? colors.success[100]
+                                      : colors.error[100],
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.recordStatusText,
+                                    {
+                                      color: isPresent
+                                        ? colors.success[700]
+                                        : colors.error[700],
+                                    },
+                                  ]}
+                                >
+                                  {isPresent ? 'Present' : 'Absent'}
+                                </Text>
+                              </View>
+                            </View>
+                          </Card>
+                        );
+                      })}
+                  </View>
+                )}
               </View>
-            </Card>
+            </>
+          ) : (
+            <>
+              {/* History Tab */}
+              <View style={styles.historySection}>
+                {/* Summary Stats */}
+                <View style={styles.historyStats}>
+                  <Card mode="elevated" style={styles.statCard}>
+                    <Text style={[styles.statNumber, { color: colors.primary[600] }]}>
+                      {historyStats.total}
+                    </Text>
+                    <Text style={styles.statLabel}>Total Days</Text>
+                  </Card>
+                  <Card mode="elevated" style={styles.statCard}>
+                    <Text style={[styles.statNumber, { color: colors.success[600] }]}>
+                      {historyStats.percentage}%
+                    </Text>
+                    <Text style={styles.statLabel}>Attendance</Text>
+                  </Card>
+                  <Card mode="elevated" style={styles.statCard}>
+                    <Text style={[styles.statNumber, { color: colors.error[600] }]}>
+                      {historyStats.absent}
+                    </Text>
+                    <Text style={styles.statLabel}>Absent</Text>
+                  </Card>
+                </View>
+
+                {/* Date Range Display */}
+                <View style={styles.dateRangeContainer}>
+                  <Text style={styles.dateRangeText}>
+                    {historyStartDate.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                    })}{' '}
+                    -{' '}
+                    {historyEndDate.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </Text>
+                </View>
+
+                {/* History Records List */}
+                <View style={styles.historyList}>
+                  <Text style={styles.sectionTitle}>Attendance Records</Text>
+
+                  {historyStats.records.length === 0 ? (
+                    <Card mode="elevated" style={styles.emptyCard}>
+                      <View style={styles.emptyContainer}>
+                        <AlertCircle size={48} color={colors.text.tertiary} />
+                        <Text style={styles.emptyTitle}>No Records</Text>
+                        <Text style={styles.emptyText}>
+                          No attendance records found for this period.
+                        </Text>
+                      </View>
+                    </Card>
+                  ) : (
+                    historyStats.records
+                      .sort((a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf())
+                      .map((record) => {
+                        const isPresent = record.status === 'present';
+                        const recordDate = dayjs(record.date);
+
+                        return (
+                          <Card key={record.id} mode="elevated" style={styles.historyRecordCard}>
+                            <View style={styles.historyRecordContent}>
+                              <View
+                                style={[
+                                  styles.historyRecordIcon,
+                                  {
+                                    backgroundColor: isPresent
+                                      ? colors.success[50]
+                                      : colors.error[50],
+                                  },
+                                ]}
+                              >
+                                {isPresent ? (
+                                  <CheckCircle size={16} color={colors.success[600]} />
+                                ) : (
+                                  <XCircle size={16} color={colors.error[600]} />
+                                )}
+                              </View>
+                              <View style={styles.historyRecordDetails}>
+                                <Text style={styles.historyRecordDate}>
+                                  {recordDate.format('MMM D, YYYY')}
+                                </Text>
+                                <Text style={styles.historyRecordDay}>
+                                  {recordDate.format('dddd')}
+                                </Text>
+                              </View>
+                              <View
+                                style={[
+                                  styles.historyRecordStatus,
+                                  {
+                                    backgroundColor: isPresent
+                                      ? colors.success[100]
+                                      : colors.error[100],
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.historyRecordStatusText,
+                                    {
+                                      color: isPresent
+                                        ? colors.success[700]
+                                        : colors.error[700],
+                                    },
+                                  ]}
+                                >
+                                  {isPresent ? 'Present' : 'Absent'}
+                                </Text>
+                              </View>
+                            </View>
+                          </Card>
+                        );
+                      })
+                  )}
+                </View>
+              </View>
+            </>
           )}
-        </View>
+
         </ScrollView>
+
+        {/* Date Picker Modals */}
+        <DatePickerModal
+          visible={showHistoryStartDatePicker}
+          onDismiss={() => setShowHistoryStartDatePicker(false)}
+          onConfirm={(date) => {
+            setHistoryStartDate(date);
+            setShowHistoryStartDatePicker(false);
+          }}
+          initialDate={historyStartDate}
+          minimumDate={new Date(2020, 0, 1)}
+          maximumDate={new Date(2030, 11, 31)}
+          title="Select Start Date"
+        />
+
+        <DatePickerModal
+          visible={showHistoryEndDatePicker}
+          onDismiss={() => setShowHistoryEndDatePicker(false)}
+          onConfirm={(date) => {
+            setHistoryEndDate(date);
+            setShowHistoryEndDatePicker(false);
+          }}
+          initialDate={historyEndDate}
+          minimumDate={new Date(2020, 0, 1)}
+          maximumDate={new Date(2030, 11, 31)}
+          title="Select End Date"
+        />
       </View>
     </ThreeStateView>
   );
@@ -482,7 +492,72 @@ export const StudentAttendanceView: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background.app,
+  },
+  tabContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.surface.primary,
+  },
+  tabSwitcher: {
     backgroundColor: colors.background.secondary,
+  },
+  filterSection: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+  },
+  filterRow: {
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    paddingHorizontal: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  filterItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
+  },
+  filterIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary[600],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+    flexShrink: 0,
+  },
+  filterContent: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'flex-start',
+  },
+  filterLabel: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.secondary,
+    marginBottom: spacing.xs,
+  },
+  filterValue: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+  },
+  filterDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: colors.border.DEFAULT,
+    marginHorizontal: spacing.sm,
+    flexShrink: 0,
   },
   scrollView: {
     flex: 1,
@@ -494,254 +569,141 @@ const styles = StyleSheet.create({
   },
   statsSection: {
     marginBottom: spacing.lg,
-    gap: spacing.md,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   statCard: {
-    padding: spacing.lg,
-    borderRadius: borderRadius.xl,
-  },
-  statContent: {
-    alignItems: 'center',
-  },
-  statIcon: {
-    marginBottom: spacing.md,
-  },
-  statValue: {
-    fontSize: typography.fontSize['3xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginTop: spacing.sm,
-  },
-  statLabel: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.secondary,
-    marginTop: spacing.xs,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  miniStatCard: {
     flex: 1,
     padding: spacing.md,
     borderRadius: borderRadius.lg,
+    alignItems: 'center',
   },
-  miniStatIcon: {
+  statNumber: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.xs,
+  },
+  statLabel: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    textAlign: 'center',
+  },
+  recentSection: {
+    marginBottom: spacing.lg,
+  },
+  sectionTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.md,
+  },
+  recordsList: {
+    gap: spacing.sm,
+  },
+  recordCard: {
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+  },
+  recordContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+  },
+  recordIcon: {
     width: 40,
     height: 40,
     borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginRight: spacing.md,
   },
-  miniStatValue: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
+  recordDetails: {
+    flex: 1,
   },
-  miniStatLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    marginTop: spacing.xs,
-  },
-  section: {
-    marginBottom: spacing.lg,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  sectionTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  todayButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    backgroundColor: colors.primary[50],
-    borderRadius: borderRadius.full,
-  },
-  todayButtonText: {
-    fontSize: typography.fontSize.sm,
+  recordDate: {
+    fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.primary[600],
-  },
-  calendarCard: {
-    padding: spacing.md,
-    borderRadius: borderRadius.xl,
-  },
-  calendarHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  navButton: {
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.neutral[50],
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  calendarMonth: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
-  },
-  monthStatsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: spacing.md,
-    marginBottom: spacing.md,
-    backgroundColor: colors.neutral[50],
-    borderRadius: borderRadius.lg,
-  },
-  monthStatItem: {
-    alignItems: 'center',
-  },
-  monthStatLabel: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.secondary,
     marginBottom: spacing.xs,
   },
-  monthStatValue: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  monthStatDivider: {
-    width: 1,
-    backgroundColor: colors.border.light,
-  },
-  calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: spacing.md,
-  },
-  dayHeader: {
-    width: `${100 / 7}%`,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-  },
-  dayHeaderText: {
+  recordDay: {
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
     color: colors.text.secondary,
   },
-  calendarDay: {
-    width: `${100 / 7}%`,
-    aspectRatio: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
+  recordStatus: {
+    paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
   },
-  calendarDayOtherMonth: {
-    opacity: 0.3,
-  },
-  calendarDayToday: {
-    backgroundColor: colors.primary[50],
-    borderRadius: borderRadius.md,
-  },
-  calendarDayText: {
+  recordStatusText: {
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.primary,
-  },
-  calendarDayTextOtherMonth: {
-    color: colors.text.tertiary,
-  },
-  calendarDayTextToday: {
-    color: colors.primary[600],
     fontWeight: typography.fontWeight.bold,
   },
-  statusDot: {
-    position: 'absolute',
-    bottom: 4,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  historySection: {
+    marginBottom: spacing.lg,
   },
-  legend: {
+  historyStats: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.lg,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.secondary,
-  },
-  historyContainer: {
     gap: spacing.sm,
+    marginBottom: spacing.lg,
   },
-  historyCard: {
+  dateRangeContainer: {
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    alignItems: 'center',
+    ...shadows.sm,
+  },
+  dateRangeText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.primary,
+    fontWeight: typography.fontWeight.medium,
+  },
+  historyList: {
+    marginBottom: spacing.lg,
+  },
+  historyRecordCard: {
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
+    marginBottom: spacing.sm,
   },
-  historyCardContent: {
+  historyRecordContent: {
     flexDirection: 'row',
-    padding: spacing.md,
     alignItems: 'center',
+    padding: spacing.md,
   },
-  historyIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.lg,
+  historyRecordIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: borderRadius.sm,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
   },
-  historyDetails: {
+  historyRecordDetails: {
     flex: 1,
   },
-  historyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  historyRecordDate: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.primary,
     marginBottom: spacing.xs,
   },
-  historyStatus: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  statusChip: {
-    height: 24,
-  },
-  statusChipText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.bold,
-  },
-  historyMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  historyDate: {
+  historyRecordDay: {
     fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
   },
-  historyDay: {
+  historyRecordStatus: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+  },
+  historyRecordStatusText: {
     fontSize: typography.fontSize.sm,
-    color: colors.text.tertiary,
-    marginLeft: spacing.xs,
+    fontWeight: typography.fontWeight.medium,
   },
   emptyCard: {
     padding: spacing.xl,
@@ -764,4 +726,3 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 });
-

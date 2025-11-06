@@ -18,12 +18,26 @@ export const AttendanceDetailView: React.FC<AttendanceDetailViewProps> = ({
   setTimePeriod,
 }) => {
   const getAttendanceColor = (rate: number) => {
-    if (rate >= 90) return colors.success[600];
-    if (rate >= 80) return colors.warning[600];
-    return colors.error[600];
+    if (rate >= 80) return colors.success[600];
+    if (rate >= 50) return colors.info[600];
+    return colors.warning[600];
   };
 
   const attendanceRate = data?.attendance?.avgRate || 0;
+
+  const subtextByPeriod =
+    timePeriod === 'daily'
+      ? 'Last 7 days average'
+      : timePeriod === 'weekly'
+      ? 'Last 30 days average'
+      : 'Last 90 days average';
+
+  const classComparisonData = data?.attendance?.classesByConsistency?.slice(0, 5).map((classItem) => ({
+    label: classItem.className,
+    value: classItem.avgRate,
+    color: getAttendanceColor(classItem.avgRate),
+    subtext: `${classItem.className} attendance`,
+  })) || [];
 
   return (
     <>
@@ -32,40 +46,44 @@ export const AttendanceDetailView: React.FC<AttendanceDetailViewProps> = ({
       <MetricCard
         label="Overall Attendance Rate"
         value={`${Math.round(attendanceRate)}%`}
-        subtext={
-          timePeriod === 'daily'
-            ? 'Last 7 days average'
-            : timePeriod === 'weekly'
-            ? 'Last 30 days average'
-            : 'Last 90 days average'
-        }
-        valueColor={getAttendanceColor(attendanceRate)}
+        subtext={subtextByPeriod}
+        progress={attendanceRate}
+        variant="ring"
       />
 
-      {data?.attendance?.classesByConsistency && data.attendance.classesByConsistency.length > 0 && (
+      {classComparisonData.length > 0 && (
         <Surface style={styles.chartCard} elevation={1}>
-          <Text variant="titleMedium" style={styles.chartTitle}>Class-wise Comparison</Text>
-          <Text variant="bodySmall" style={styles.chartSubtitle}>Top performing classes</Text>
-
-          {data.attendance.classesByConsistency.slice(0, 5).map((classItem) => (
-            <View key={classItem.classId} style={styles.comparisonItem}>
-              <Text variant="bodyMedium" style={styles.comparisonLabel}>{classItem.className}</Text>
-              <View style={styles.comparisonBarContainer}>
-                <View
-                  style={[
-                    styles.comparisonBar,
-                    {
-                      width: `${classItem.avgRate}%`,
-                      backgroundColor: getAttendanceColor(classItem.avgRate),
-                    },
-                  ]}
-                />
-                <Text variant="labelMedium" style={[styles.comparisonValue, { color: getAttendanceColor(classItem.avgRate) }]}>
-                  {Math.round(classItem.avgRate)}%
-                </Text>
+          <MetricCard
+            label="Class-wise Attendance"
+            value=""
+            subtext="Top performing classes"
+            variant="default"
+          />
+          <View style={styles.comparisonContainer}>
+            {classComparisonData.map((item, index) => (
+              <View key={index} style={styles.comparisonItem}>
+                <View style={styles.comparisonHeader}>
+                  <Text style={styles.comparisonLabel} numberOfLines={1}>
+                    {item.label}
+                  </Text>
+                  <Text style={styles.comparisonProgress}>
+                    {Math.round(item.value)}%
+                  </Text>
+                </View>
+                <View style={styles.comparisonProgressBar}>
+                  <View
+                    style={[
+                      styles.comparisonProgressFill,
+                      {
+                        width: `${item.value}%`,
+                        backgroundColor: item.color,
+                      },
+                    ]}
+                  />
+                </View>
               </View>
-            </View>
-          ))}
+            ))}
+          </View>
         </Surface>
       )}
     </>
@@ -76,44 +94,45 @@ const styles = StyleSheet.create({
   chartCard: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    padding: spacing.lg,
     marginBottom: spacing.md,
   },
-  chartTitle: {
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    marginBottom: spacing.sm,
-    fontSize: typography.fontSize.base,
-  },
-  chartSubtitle: {
-    color: colors.text.secondary,
-    marginBottom: spacing.md,
-    fontSize: typography.fontSize.xs,
+  // Syllabus pattern styles
+  comparisonContainer: {
+    gap: spacing.md,
   },
   comparisonItem: {
-    marginBottom: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+  },
+  comparisonHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
   },
   comparisonLabel: {
-    fontWeight: typography.fontWeight.medium,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
-    marginBottom: spacing.xs,
-    fontSize: typography.fontSize.sm,
+    flex: 1,
   },
-  comparisonBarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  comparisonBar: {
-    height: 24,
-    borderRadius: borderRadius.sm,
-    minWidth: 2,
-  },
-  comparisonValue: {
+  comparisonProgress: {
+    fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.bold,
-    minWidth: 45,
-    textAlign: 'right',
-    fontSize: typography.fontSize.sm,
+    color: colors.primary[600],
     marginLeft: spacing.sm,
+  },
+  comparisonProgressBar: {
+    height: 6,
+    backgroundColor: colors.neutral[100],
+    borderRadius: borderRadius.full,
+    overflow: 'hidden',
+  },
+  comparisonProgressFill: {
+    height: '100%',
+    borderRadius: borderRadius.full,
   },
 });
 

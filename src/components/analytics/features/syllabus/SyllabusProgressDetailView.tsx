@@ -15,13 +15,15 @@ export const SyllabusProgressDetailView: React.FC<SyllabusProgressDetailViewProp
   setTimePeriod,
 }) => {
   const overallProgress = data?.syllabus?.overallProgress || 0;
-  
-  const progressColor = overallProgress >= 75 ? colors.success[600] :
-                       overallProgress >= 50 ? colors.warning[600] : colors.error[600];
+
+  const getProgressColor = (progress: number) => {
+    if (progress >= 80) return colors.success[600];
+    if (progress >= 50) return colors.info[600];
+    return colors.warning[600];
+  };
 
   const subjectData = data?.syllabus?.progressBySubject?.map(subject => {
-    const subjectColor = subject.progress >= 75 ? colors.success[600] :
-                         subject.progress >= 50 ? colors.warning[600] : colors.error[600];
+    const subjectColor = getProgressColor(subject.progress);
     return {
       id: subject.subjectId,
       label: subject.subjectName,
@@ -32,13 +34,13 @@ export const SyllabusProgressDetailView: React.FC<SyllabusProgressDetailViewProp
   }) || [];
 
   const classData = data?.syllabus?.progressByClass?.map(classItem => {
-    const classColor = classItem.progress >= 75 ? colors.success[600] :
-                      classItem.progress >= 50 ? colors.warning[600] : colors.error[600];
+    const classColor = getProgressColor(classItem.progress);
     return {
       id: classItem.classId,
       label: classItem.className,
       value: classItem.progress,
       color: classColor,
+      subtext: `${classItem.className} progress`,
     };
   }) || [];
 
@@ -50,7 +52,8 @@ export const SyllabusProgressDetailView: React.FC<SyllabusProgressDetailViewProp
         label="Overall Syllabus Progress"
         value={`${Math.round(overallProgress)}%`}
         subtext="School-wide completion"
-        valueColor={progressColor}
+        progress={overallProgress}
+        variant="ring"
       />
 
       {subjectData.length > 0 && (
@@ -58,6 +61,7 @@ export const SyllabusProgressDetailView: React.FC<SyllabusProgressDetailViewProp
           title="Progress by Subject"
           subtitle="Completion across all subjects"
           items={subjectData}
+          variant="syllabus"
         />
       )}
 
@@ -66,6 +70,7 @@ export const SyllabusProgressDetailView: React.FC<SyllabusProgressDetailViewProp
           title="Progress by Class"
           subtitle="Completion across all classes"
           items={classData}
+          variant="syllabus"
         />
       )}
     </>

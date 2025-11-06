@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Animated, Modal } from 'react-native';
 import { Text, Card, SegmentedButtons, ActivityIndicator } from 'react-native-paper';
-import { Plus, BookOpen, ChevronDown } from 'lucide-react-native';
+import { Plus, BookOpen, ChevronDown, Sparkles } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { useTests, useCreateTest, useUpdateTest, useDeleteTest, useStudentAttempts } from '../../hooks/tests';
+import { useTests, useCreateTest, useUpdateTest, useDeleteTest, useStudentAttempts, useStudentMarks } from '../../hooks/tests';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClasses } from '../../hooks/useClasses';
 import { useSubjects } from '../../hooks/useSubjects';
@@ -38,8 +38,11 @@ export default function AssessmentsScreen() {
   const { data: subjectsResult } = useSubjects(profile?.school_code || '');
   const subjects = subjectsResult?.data || [];
 
-  // Fetch student attempts if user is a student
+  // Fetch student attempts if user is a student (for online tests)
   const { data: rawStudentAttempts = [] } = useStudentAttempts(studentId || '', undefined);
+  
+  // Fetch student marks if user is a student (for offline tests)
+  const { data: rawStudentMarks = [] } = useStudentMarks(studentId || '');
   
   // Map student attempts to match TestAttempt type
   const studentAttempts = React.useMemo(() => {
@@ -60,6 +63,20 @@ export default function AssessmentsScreen() {
       time_taken_seconds: attempt.time_taken_seconds,
     }));
   }, [rawStudentAttempts]);
+
+  // Map student marks for offline tests
+  const studentMarks = React.useMemo(() => {
+    if (!rawStudentMarks || !Array.isArray(rawStudentMarks)) return {};
+    return rawStudentMarks.reduce((acc: Record<string, any>, mark: any) => {
+      acc[mark.test_id] = {
+        marks_obtained: mark.marks_obtained,
+        max_marks: mark.max_marks,
+        remarks: mark.remarks,
+        test_mode: mark.tests?.test_mode,
+      };
+      return acc;
+    }, {});
+  }, [rawStudentMarks]);
 
   // Filter tests based on online/offline selection
   const filteredTests = React.useMemo(() => {
@@ -186,19 +203,17 @@ export default function AssessmentsScreen() {
     <View style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Online/Offline Toggle */}
-        {canCreateTest && (
-          <View style={styles.tabContainer}>
-            <SegmentedButtons
-              value={assessmentView}
-              onValueChange={(value) => setAssessmentView(value as 'online' | 'offline')}
-              buttons={[
-                { value: 'online', label: 'Online' },
-                { value: 'offline', label: 'Offline' },
-              ]}
-              style={styles.tabSwitcher}
-            />
-          </View>
-        )}
+        <View style={styles.tabContainer}>
+          <SegmentedButtons
+            value={assessmentView}
+            onValueChange={(value) => setAssessmentView(value as 'online' | 'offline')}
+            buttons={[
+              { value: 'online', label: 'Online' },
+              { value: 'offline', label: 'Offline' },
+            ]}
+            style={styles.tabSwitcher}
+          />
+        </View>
 
         {/* Filter Section */}
         {canCreateTest && (
@@ -219,6 +234,19 @@ export default function AssessmentsScreen() {
                 <ChevronDown size={14} color={colors.text.secondary} />
               </TouchableOpacity>
             </View>
+          </View>
+        )}
+
+        {/* AI Test Generator Button */}
+        {canCreateTest && (
+          <View style={styles.aiButtonContainer}>
+            <TouchableOpacity
+              style={styles.aiGeneratorButton}
+              onPress={() => router.push('/ai-test-generator')}
+            >
+              <Sparkles size={20} color={colors.primary[600]} />
+              <Text style={styles.aiGeneratorButtonText}>Generate Test with AI</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -266,6 +294,7 @@ export default function AssessmentsScreen() {
               showActions={canManageTests}
               isStudentView={isStudent}
               studentAttempts={studentAttempts}
+              studentMarks={studentMarks}
             />
           </View>
         )}
@@ -413,6 +442,28 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
+  },
+  aiButtonContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  aiGeneratorButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.primary[50],
+    borderWidth: 1.5,
+    borderColor: colors.primary[600],
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    ...shadows.sm,
+  },
+  aiGeneratorButtonText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.primary[600],
   },
   sectionHeader: {
     flexDirection: 'row',

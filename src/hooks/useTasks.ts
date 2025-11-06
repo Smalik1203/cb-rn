@@ -347,61 +347,81 @@ export function useSubmitTask() {
 
   return useMutation({
     mutationFn: async (submissionData: Omit<TaskSubmission, 'id' | 'created_at' | 'updated_at'>) => {
-      const { data, error } = await supabase
+      // Check if submission already exists
+      const { data: existing } = await supabase
         .from('task_submissions')
-        .insert([submissionData])
-        .select()
-        .single();
+        .select('id')
+        .eq('task_id', submissionData.task_id)
+        .eq('student_id', submissionData.student_id)
+        .maybeSingle();
 
-      if (error) throw error;
-      return data;
+      if (existing) {
+        // Update existing submission
+        const { data, error } = await supabase
+          .from('task_submissions')
+          .update({
+            submission_text: submissionData.submission_text,
+            attachments: submissionData.attachments,
+            status: submissionData.status,
+            submitted_at: submissionData.submitted_at,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      } else {
+        // Create new submission
+        const { data, error } = await supabase
+          .from('task_submissions')
+          .insert([submissionData])
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['task-submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['task-overview'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-activity'] });
     },
   });
 }
 
 /**
- * Mark task as complete (simple checkbox)
+ * Unsubmit a task (delete submission)
+ * Only works if task hasn't been graded yet
  */
-export function useToggleTaskComplete() {
+export function useUnsubmitTask() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ taskId, studentId, isCompleted }: { 
+    mutationFn: async ({ taskId, studentId }: { 
       taskId: string; 
-      studentId: string; 
-      isCompleted: boolean;
+      studentId: string;
     }) => {
-      if (isCompleted) {
-        // Mark as incomplete - delete submission
-        const { error } = await supabase
-          .from('task_submissions')
-          .delete()
-          .eq('task_id', taskId)
-          .eq('student_id', studentId);
+      // Delete the submission
+      const { error } = await supabase
+        .from('task_submissions')
+        .delete()
+        .eq('task_id', taskId)
+        .eq('student_id', studentId);
 
-        if (error) throw error;
-      } else {
-        // Mark as complete - create submission
-        const { error } = await supabase
-          .from('task_submissions')
-          .insert([{
-            task_id: taskId,
-            student_id: studentId,
-            status: 'submitted',
-            submission_text: null,
-            attachments: [],
-            submitted_at: new Date().toISOString(),
-          }]);
-
-        if (error) throw error;
-      }
+      if (error) throw error;
+      return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['task-submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['task-overview'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-activity'] });
     },
   });
 }

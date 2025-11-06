@@ -982,6 +982,7 @@ export const api = {
             title,
             test_type,
             test_date,
+            test_mode,
             max_marks
           )
         `)
@@ -1006,7 +1007,10 @@ export const api = {
     async createBulk(marksData: any[]) {
       const { data, error } = await supabase
         .from('test_marks')
-        .insert(marksData)
+        .upsert(marksData, {
+          onConflict: 'test_id,student_id',
+          ignoreDuplicates: false,
+        })
         .select();
 
       if (error) throw error;

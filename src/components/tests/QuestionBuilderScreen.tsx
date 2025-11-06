@@ -24,6 +24,7 @@ export function QuestionBuilderScreen() {
   const params = useLocalSearchParams();
   const testId = params.testId as string;
   const testTitle = params.testTitle as string;
+  const aiGeneratedQuestionsParam = params.aiGeneratedQuestions as string | undefined;
 
   const { data: questions = [], isLoading } = useTestQuestions(testId);
   const createQuestion = useCreateQuestion();
@@ -37,6 +38,7 @@ export function QuestionBuilderScreen() {
   const [correctIndex, setCorrectIndex] = useState(0);
   const [correctText, setCorrectText] = useState('');
   const [points, setPoints] = useState('10');
+  const [importingAI, setImportingAI] = useState(false);
   
 
   const resetForm = () => {
@@ -47,6 +49,44 @@ export function QuestionBuilderScreen() {
     setCorrectIndex(0);
     setCorrectText('');
     setPoints('10');
+  };
+
+  // Handle AI-generated questions import
+  React.useEffect(() => {
+    if (aiGeneratedQuestionsParam && !importingAI && questions.length === 0) {
+      importAIGeneratedQuestions();
+    }
+  }, [aiGeneratedQuestionsParam]);
+
+  const importAIGeneratedQuestions = async () => {
+    try {
+      setImportingAI(true);
+      const aiQuestions = JSON.parse(aiGeneratedQuestionsParam!);
+
+      console.log('[QuestionBuilder] Importing', aiQuestions.length, 'AI-generated questions');
+
+      for (let i = 0; i < aiQuestions.length; i++) {
+        const aiQ = aiQuestions[i];
+
+        await createQuestion.mutateAsync({
+          test_id: testId,
+          question_text: aiQ.question_text,
+          question_type: 'mcq',
+          options: aiQ.options,
+          correct_index: aiQ.correct_index,
+          correct_answer: null,
+          points: 1,
+          order_index: i,
+        });
+      }
+
+      Alert.alert('Success', `Imported ${aiQuestions.length} AI-generated questions!`);
+    } catch (error: any) {
+      console.error('[QuestionBuilder] Error importing AI questions:', error);
+      Alert.alert('Error', 'Failed to import AI-generated questions');
+    } finally {
+      setImportingAI(false);
+    }
   };
 
   const handlePickImage = async () => {

@@ -79,6 +79,11 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
 
       const taughtSlotIds = new Set((progressData || []).map(p => p.timetable_slot_id).filter(Boolean));
 
+      // Debug logging
+      console.log('[useStudentTimetable] Date:', dateStr, 'Class:', classInstanceId);
+      console.log('[useStudentTimetable] Progress records:', progressData?.length || 0);
+      console.log('[useStudentTimetable] Taught slot IDs:', Array.from(taughtSlotIds));
+
       // Combine slots with subject and teacher data
       const enrichedSlots = slotsData.map(slot => ({
         ...slot,
@@ -89,12 +94,14 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
       return { slots: enrichedSlots as TimetableSlot[], taughtSlotIds };
     },
     enabled: !!classInstanceId && !!dateStr,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 15 * 60 * 1000, // 15 minutes
+    staleTime: 30 * 1000, // ✅ 30 seconds (was 5 minutes - too long!)
+    gcTime: 5 * 60 * 1000, // 5 minutes
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true, // ✅ Refetch when app comes to focus (was false!)
     refetchOnMount: true,
+    refetchInterval: 30 * 1000, // ✅ Auto-refetch every 30 seconds (NEW!)
+    refetchIntervalInBackground: false, // Don't refetch in background to save battery
   });
 
   // Compute displayPeriodNumber counting only period slots
@@ -102,6 +109,11 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
     if (!data?.slots) return 0;
     return data.slots.filter(slot => slot.slot_type === 'period').length;
   }, [data?.slots]);
+
+  // Debug logging to check taughtSlotIds
+  if (data?.taughtSlotIds && data.taughtSlotIds.size > 0) {
+    console.log('[useStudentTimetable] Taught slot IDs:', Array.from(data.taughtSlotIds));
+  }
 
   return {
     slots: data?.slots || [],

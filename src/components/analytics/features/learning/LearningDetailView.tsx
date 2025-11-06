@@ -19,24 +19,11 @@ export const LearningDetailView: React.FC<LearningDetailViewProps> = ({
 }) => {
   const participationRate = Math.round(data?.academics?.participationRate || 0);
 
-  // Create comparison items for subject performance
-  const subjectItems =
-    data?.academics?.avgScoreBySubject?.map((subject) => {
-      const scoreColor =
-        subject.avgScore >= 75
-          ? colors.success[600]
-          : subject.avgScore >= 60
-          ? colors.warning[600]
-          : colors.error[600];
-
-      return {
-        label: subject.subjectName,
-        value: subject.avgScore,
-        color: scoreColor,
-        percentage: subject.avgScore,
-        subtitle: `${Math.round(subject.participationRate)}% participation`,
-      };
-    }) || [];
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return colors.success[600];
+    if (score >= 50) return colors.info[600];
+    return colors.warning[600];
+  };
 
   return (
     <>
@@ -46,45 +33,47 @@ export const LearningDetailView: React.FC<LearningDetailViewProps> = ({
         label="Test Participation"
         value={`${participationRate}%`}
         subtext="students taking tests"
-        valueColor={colors.info[600]}
+        progress={participationRate}
+        variant="ring"
       />
 
-      {subjectItems.length > 0 && (
+      {data?.academics?.avgScoreBySubject && data.academics.avgScoreBySubject.length > 0 && (
         <Surface style={styles.chartCard} elevation={1}>
           <Text variant="titleMedium" style={styles.chartTitle}>Subject Performance</Text>
           <Text variant="bodySmall" style={styles.chartSubtitle}>Average scores by subject</Text>
 
-          {data.academics.avgScoreBySubject.map((subject) => {
-            const scoreColor =
-              subject.avgScore >= 75
-                ? colors.success[600]
-                : subject.avgScore >= 60
-                ? colors.warning[600]
-                : colors.error[600];
+          <View style={styles.subjectBreakdown}>
+            {data.academics.avgScoreBySubject.map((subject) => {
+              const scoreColor = getScoreColor(subject.avgScore);
 
-            return (
-              <View key={subject.subjectId} style={styles.comparisonItem}>
-                <Text variant="bodyMedium" style={styles.comparisonLabel}>{subject.subjectName}</Text>
-                <View style={styles.comparisonBarContainer}>
-                  <View
-                    style={[
-                      styles.comparisonBar,
-                      {
-                        width: `${subject.avgScore}%`,
-                        backgroundColor: scoreColor,
-                      },
-                    ]}
-                  />
-                  <Text variant="labelMedium" style={[styles.comparisonValue, { color: scoreColor }]}>
-                    {Math.round(subject.avgScore)}%
+              return (
+                <View key={subject.subjectId} style={styles.subjectItem}>
+                  <View style={styles.subjectHeader}>
+                    <Text style={styles.subjectLabel} numberOfLines={1}>
+                      {subject.subjectName}
+                    </Text>
+                    <Text style={styles.subjectProgress}>
+                      {Math.round(subject.avgScore)}%
+                    </Text>
+                  </View>
+                  <View style={styles.subjectProgressBar}>
+                    <View
+                      style={[
+                        styles.subjectProgressFill,
+                        {
+                          width: `${subject.avgScore}%`,
+                          backgroundColor: scoreColor,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.subjectSubtext}>
+                    {Math.round(subject.participationRate)}% participation
                   </Text>
                 </View>
-                <Text variant="bodySmall" style={[styles.comparisonSubtext, { marginTop: spacing.xs }]}>
-                  {Math.round(subject.participationRate)}% participation
-                </Text>
-              </View>
-            );
-          })}
+              );
+            })}
+          </View>
         </Surface>
       )}
     </>
@@ -95,7 +84,7 @@ const styles = StyleSheet.create({
   chartCard: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    padding: spacing.lg,
     marginBottom: spacing.md,
   },
   chartTitle: {
@@ -109,34 +98,47 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     fontSize: typography.fontSize.xs,
   },
-  comparisonItem: {
-    marginBottom: spacing.md,
+  // Syllabus pattern styles
+  subjectBreakdown: {
+    gap: spacing.md,
   },
-  comparisonLabel: {
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-    fontSize: typography.fontSize.sm,
+  subjectItem: {
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
   },
-  comparisonBarContainer: {
+  subjectHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: spacing.xs,
   },
-  comparisonBar: {
-    height: 24,
-    borderRadius: borderRadius.sm,
-    minWidth: 2,
+  subjectLabel: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    flex: 1,
   },
-  comparisonValue: {
+  subjectProgress: {
+    fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.bold,
-    minWidth: 45,
-    textAlign: 'right',
-    fontSize: typography.fontSize.sm,
+    color: colors.primary[600],
     marginLeft: spacing.sm,
   },
-  comparisonSubtext: {
-    color: colors.text.tertiary,
-    fontSize: 11,
+  subjectProgressBar: {
+    height: 6,
+    backgroundColor: colors.neutral[100],
+    borderRadius: borderRadius.full,
+    overflow: 'hidden',
+    marginBottom: spacing.xs,
+  },
+  subjectProgressFill: {
+    height: '100%',
+    borderRadius: borderRadius.full,
+  },
+  subjectSubtext: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.secondary,
   },
 });
 
